@@ -27,7 +27,7 @@ context = Context()
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
               default='config/optimize_BTSP_CA1_cli_config.yaml')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
-@click.option("--pcadim", type=int, default=None)
+@click.option("--pcadim", type=int, default=4)
 @click.option("--export", is_flag=True)
 @click.option("--label", type=str, default=None)
 def main(param_file_path, config_file_path, output_dir, pcadim, export, label):
@@ -49,7 +49,7 @@ def main(param_file_path, config_file_path, output_dir, pcadim, export, label):
         raise IOError('Invalid param_file_path: %s' % param_file_path)
     if export and not os.path.isdir(output_dir):
         raise IOError('Invalid output_dir: %s' % output_dir)
-    # plot_BTSP_model_param_cdfs(param_file_path, config_file_path, export, output_dir, label)
+    plot_BTSP_model_param_cdfs(param_file_path, config_file_path, export, output_dir, label)
     plot_BTSP_model_param_PCA(param_file_path, pcadim, export, output_dir, label)
     context.update(locals())
 
