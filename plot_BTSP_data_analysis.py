@@ -363,10 +363,10 @@ def main(data_file_path, model_file_path, output_dir, cell_id, export, debug, la
                     subaxes[row].set_xlim(0., xmax)
                     if induction_key == '1':
                         color = 'k'
-                        label = 'Induction 1'
+                        label = 'After induction 1'
                     else:
                         color = 'c'
-                        label = 'Induction 2'
+                        label = 'After induction 2'
                     subaxes[row].scatter(this_complete_t[induction_start_indexes] / 1000.,
                                          pretty_position[induction_start_indexes], c=color, label=label, s=40,
                                          linewidth=0, zorder=1)
@@ -540,40 +540,77 @@ def main(data_file_path, model_file_path, output_dir, cell_id, export, debug, la
 
     fig8, axes8 = plt.figure(figsize=(11, 7)), []
     gs8 = gridspec.GridSpec(3, 4, wspace=0.55, hspace=0.5, left=0.075, right=0.975, top=0.95, bottom=0.075)
-    axes8 = fig8.add_subplot(gs8[0,0])
+    axes8 = []
+    axes8.append(fig8.add_subplot(gs8[0,0]))
     xvals = np.abs(delta_x_at_peak1)
     xmin = np.min(xvals)
     xmax = np.max(xvals)
     deltax = xmax - xmin
-    axes8.scatter(xvals, delta_amp_at_peak2, c='c', s=40, alpha=0.5, linewidth=0)
-    axes8.scatter(xvals, delta_amp_at_peak1, c='darkgrey', s=40, alpha=0.5, linewidth=0)
-    axes8.set_ylabel('Change in\nramp amplitude (mV)')
-    axes8.set_xlabel('Distance from place field 1\nto induction 2 (cm)')
+    axes8[0].scatter(xvals, delta_amp_at_peak2, c='c', s=40, alpha=0.5, linewidth=0)
+    axes8[0].scatter(xvals, delta_amp_at_peak1, c='darkgrey', s=40, alpha=0.5, linewidth=0)
+    axes8[0].set_ylabel('Change in\nramp amplitude (mV)')
+    axes8[0].set_xlabel('Distance from place field 1\nto induction 2 (cm)')
     this_ylim = [math.floor(min(delta_amp_at_peak2 + delta_amp_at_peak1)) - 3.,
                  math.ceil(max(delta_amp_at_peak2 + delta_amp_at_peak1)) + 3.]
     this_xlim = [0., 120.]
-    axes8.set_ylim(this_ylim)
-    axes8.set_xlim(this_xlim)
+    axes8[0].set_ylim(this_ylim)
+    axes8[0].set_xlim(this_xlim)
     onset2_result = np.polyfit(xvals, delta_amp_at_peak2, 1)
     onset2_fit = np.vectorize(lambda x: onset2_result[0] * x + onset2_result[1])
     peak1_result = np.polyfit(xvals, delta_amp_at_peak1, 1)
     peak1_fit = np.vectorize(lambda x: peak1_result[0] * x + peak1_result[1])
     onset2_xlim = [math.floor(min(xvals)) - 1., math.ceil(max(xvals)) + 1.]
     peak1_xlim = [math.floor(min(xvals)) - 1., math.ceil(max(xvals)) + 1.]
-    axes8.plot(onset2_xlim, onset2_fit(onset2_xlim), c='c', alpha=0.5, zorder=0, linestyle='--')
-    axes8.plot(peak1_xlim, peak1_fit(peak1_xlim), c='grey', alpha=0.5, zorder=0, linestyle='--')
-    axes8.set_aspect('auto', adjustable='box')
+    axes8[0].plot(onset2_xlim, onset2_fit(onset2_xlim), c='c', alpha=0.5, zorder=0, linestyle='--')
+    axes8[0].plot(peak1_xlim, peak1_fit(peak1_xlim), c='grey', alpha=0.5, zorder=0, linestyle='--')
+    axes8[0].set_aspect('auto', adjustable='box')
     handles = [mlines.Line2D([0], [0], linestyle='none', mfc=color, mew=0, alpha=0.5, marker='o', ms=math.sqrt(40.))
                for color in ['darkgrey', 'c']]
     labels = ['Place field 1', 'Place field 2']
-    axes8.legend(handles=handles, labels=labels, loc='best', frameon=False, framealpha=0.5, handletextpad=0.3,
+    axes8[0].legend(handles=handles, labels=labels, loc='best', frameon=False, framealpha=0.5, handletextpad=0.3,
                    handlelength=1.)
-    axes8.set_title('Induction: 2', fontsize=mpl.rcParams['font.size'])
+    axes8[0].set_title('Induction: 2', fontsize=mpl.rcParams['font.size'])
     r_val, p_val = pearsonr(xvals, delta_amp_at_peak2)
-    axes8.annotate('R$^{2}$ = %.3f;\np < %.3f' % (r_val ** 2., p_val if p_val > 0.001 else 0.001), xy=(0.225, 0.75),
+    axes8[0].annotate('R$^{2}$ = %.3f;\np < %.3f' % (r_val ** 2., p_val if p_val > 0.001 else 0.001), xy=(0.225, 0.75),
                    xycoords='axes fraction')
     r_val, p_val = pearsonr(xvals, delta_amp_at_peak1)
-    axes8.annotate('R$^{2}$ = %.3f; p < %.3f' % (r_val ** 2., p_val if p_val > 0.001 else 0.001), xy=(0.2, 0.33),
+    axes8[0].annotate('R$^{2}$ = %.3f; p < %.3f' % (r_val ** 2., p_val if p_val > 0.001 else 0.001), xy=(0.2, 0.33),
+                   xycoords='axes fraction')
+
+    axes8.append(fig8.add_subplot(gs8[0, 1]))
+    xvals = np.abs(delta_t_at_peak1) / 1000.
+    xmin = np.min(xvals)
+    xmax = np.max(xvals)
+    deltax = xmax - xmin
+    axes8[1].scatter(xvals, delta_amp_at_peak2, c='c', s=40, alpha=0.5, linewidth=0)
+    axes8[1].scatter(xvals, delta_amp_at_peak1, c='darkgrey', s=40, alpha=0.5, linewidth=0)
+    axes8[1].set_ylabel('Change in\nramp amplitude (mV)')
+    axes8[1].set_xlabel('Time from place field 1\nto induction 2 (s)')
+    this_ylim = [math.floor(min(delta_amp_at_peak2 + delta_amp_at_peak1)) - 3.,
+                 math.ceil(max(delta_amp_at_peak2 + delta_amp_at_peak1)) + 3.]
+    this_xlim = [0., 10.]
+    axes8[1].set_ylim(this_ylim)
+    axes8[1].set_xlim(this_xlim)
+    onset2_result = np.polyfit(xvals, delta_amp_at_peak2, 1)
+    onset2_fit = np.vectorize(lambda x: onset2_result[0] * x + onset2_result[1])
+    peak1_result = np.polyfit(xvals, delta_amp_at_peak1, 1)
+    peak1_fit = np.vectorize(lambda x: peak1_result[0] * x + peak1_result[1])
+    onset2_xlim = [math.floor(min(xvals)) - 1., math.ceil(max(xvals)) + 1.]
+    peak1_xlim = [math.floor(min(xvals)) - 1., math.ceil(max(xvals)) + 1.]
+    axes8[1].plot(onset2_xlim, onset2_fit(onset2_xlim), c='c', alpha=0.5, zorder=0, linestyle='--')
+    axes8[1].plot(peak1_xlim, peak1_fit(peak1_xlim), c='grey', alpha=0.5, zorder=0, linestyle='--')
+    axes8[1].set_aspect('auto', adjustable='box')
+    handles = [mlines.Line2D([0], [0], linestyle='none', mfc=color, mew=0, alpha=0.5, marker='o', ms=math.sqrt(40.))
+               for color in ['darkgrey', 'c']]
+    labels = ['Place field 1', 'Place field 2']
+    axes8[1].legend(handles=handles, labels=labels, loc='best', frameon=False, framealpha=0.5, handletextpad=0.3,
+                 handlelength=1.)
+    axes8[1].set_title('Induction: 2', fontsize=mpl.rcParams['font.size'])
+    r_val, p_val = pearsonr(xvals, delta_amp_at_peak2)
+    axes8[1].annotate('R$^{2}$ = %.3f;\np < %.3f' % (r_val ** 2., p_val if p_val > 0.001 else 0.001), xy=(0.225, 0.75),
+                   xycoords='axes fraction')
+    r_val, p_val = pearsonr(xvals, delta_amp_at_peak1)
+    axes8[1].annotate('R$^{2}$ = %.3f; p < %.3f' % (r_val ** 2., p_val if p_val > 0.001 else 0.001), xy=(0.2, 0.33),
                    xycoords='axes fraction')
     clean_axes(axes8)
     fig8.show()

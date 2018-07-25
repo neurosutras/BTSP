@@ -1825,7 +1825,7 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
         pprint.pprint({key: val for (key, val) in objectives.iteritems() if key in context.objective_names})
 
     if model_summary_figure:
-        append_local_peak_loc(int(context.kwargs['cell_id']), export_file_path)
+        # append_local_peak_loc(int(context.kwargs['cell_id']), export_file_path)
         plot_model_summary_figure(int(context.kwargs['cell_id']), export_file_path)
 
     if check_lsa:
