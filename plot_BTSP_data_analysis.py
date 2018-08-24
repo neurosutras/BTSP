@@ -327,12 +327,12 @@ def main(data_file_path, model_file_path, output_dir, cell_id, export, debug, la
                 if cell_key == target_cell_key:
                     if induction_key == '1':
                         color = 'k'
-                        label = 'Induction 1'
+                        label = 'After induction 1'
                     else:
                         color = 'c'
-                        label = 'Induction 2'
+                        label = 'After induction 2'
                     subaxes[2].plot(binned_x, exp_ramp[cell_key][induction_key]['after'], c=color, label=label)
-                    subaxes[3].plot(reference_delta_t / 1000., this_interp_delta_exp_ramp, c=color, label=label)
+                    subaxes[3].plot(reference_delta_t / 1000., this_interp_delta_exp_ramp, c=color)
                 pop_mean_delta_exp_ramp[group].append(this_interp_delta_exp_ramp)
             if cell_key == target_cell_key:
                 mean_induction_start_locs = []
@@ -363,13 +363,10 @@ def main(data_file_path, model_file_path, output_dir, cell_id, export, debug, la
                     subaxes[row].set_xlim(0., xmax)
                     if induction_key == '1':
                         color = 'k'
-                        label = 'After induction 1'
                     else:
                         color = 'c'
-                        label = 'After induction 2'
                     subaxes[row].scatter(this_complete_t[induction_start_indexes] / 1000.,
-                                         pretty_position[induction_start_indexes], c=color, label=label, s=40,
-                                         linewidth=0, zorder=1)
+                                         pretty_position[induction_start_indexes], c=color, s=40, linewidth=0, zorder=1)
                     subaxes[row].set_yticks(np.arange(0., track_length, 60.))
                     subaxes[2].hlines(this_ymax * 0.95, xmin=mean_induction_start_locs[row],
                                       xmax=mean_induction_stop_locs[row], color=color)

@@ -1259,10 +1259,10 @@ def plot_model_summary_figure(cell_id, export_file_path):
     resolution = 10
     input_sample_indexes = np.arange(0, len(context.peak_locs), resolution)
 
-    field_peak_indexes = {'de-potentiating input':
+    field_peak_indexes = {'De-potentiating input':
                               sorted(input_sample_indexes, key=lambda x:
                               abs(context.peak_locs[x] - np.argmax(initial_weights)))[0],
-                          'potentiating input':
+                          'Potentiating input':
                               sorted(input_sample_indexes, key=lambda x:
                               abs(context.peak_locs[x] - np.argmax(final_weights)))[0]}
 
@@ -1304,7 +1304,7 @@ def plot_model_summary_figure(cell_id, export_file_path):
         this_axis.plot(context.binned_x, ramp, c=color, label=label)
         ymax = max(ymax, np.max(ramp))
     this_axis.set_ylabel('Ramp\namplitude (mV)')
-    # this_axis.set_xlabel('Location (cm)')
+    this_axis.set_xlabel('Position (cm)')
     ymax = math.ceil(ymax) + 1.
     this_axis.set_ylim(-1., ymax)
     this_axis.set_xlim(0., context.track_length)
@@ -1368,7 +1368,7 @@ def plot_model_summary_figure(cell_id, export_file_path):
                                 facecolor=colors[i])
         axes1[1][i].plot(context.down_t / 1000., this_weight_dynamics, c=colors[i])
         ymax2 = max(ymax2, np.max(this_weight_dynamics))
-        # axes1[0][i].set_xlabel('Time (s)')
+        axes1[0][i].set_xlabel('Time (s)')
         for label in axes1[0][i].get_xticklabels():
             label.set_visible(True)
         axes1[1][i].set_xlabel('Time (s)')
@@ -1411,15 +1411,16 @@ def plot_model_summary_figure(cell_id, export_file_path):
             rate_map *= weights[i] * context.ramp_scaling_factor
             ymax = max(ymax, np.max(rate_map))
             this_axis.plot(context.binned_x, rate_map, c='lightgray', zorder=0, linewidth=0.75)  # , alpha=0.5)
-        for i, index in enumerate(field_peak_indexes.itervalues()):
+        for i, (name, index) in enumerate(field_peak_indexes.iteritems()):
             rate_map = np.array(context.input_rate_maps[index])
             rate_map *= weights[index] * context.ramp_scaling_factor
             ymax = max(ymax, np.max(rate_map))
-            this_axis.plot(context.binned_x, rate_map, c=colors[i], zorder=1)
+            this_axis.plot(context.binned_x, rate_map, c=colors[i], zorder=1, label=name)
         this_axis.set_xlim(0., context.track_length)
         this_axis.set_ylabel('Input\namplitude (mV)')
         this_axis.set_xticks(np.arange(0., context.track_length, 45.))
-    axes2[1].set_xlabel('Location (cm)')
+        this_axis.set_xlabel('Position (cm)')
+    axes2[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
 
     ymax = math.ceil(10. * ymax / 0.95) / 10.
     bar_loc = ymax * 0.95
