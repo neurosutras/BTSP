@@ -1197,38 +1197,31 @@ def append_local_peak_loc(export_file_path):
                 group.attrs['model_local_peak_shift'] = local_peak_shift['model']
 
 
-def plot_model_summary_figure(cell_id, export_file_path):
+def plot_model_summary_figure(cell_id, model_file_path=None):
     """
 
     :param cell_id: int
-    :param data_file_path: str (path)
+    :param model_file_path: str (path)
     :return: dict
     """
     if (cell_id, 2) not in context.data_keys:
-        raise KeyError('plot_bidirectional_plasticity_dynamics: cell_id: %i, induction: 2 not found' % cell_id)
-    if not os.path.isfile(export_file_path):
-        raise IOError('plot_bidirectional_plasticity_dynamics: invalid file path: %s' % export_file_path)
-    with h5py.File(export_file_path, 'r') as f:
+        raise KeyError('plot_model_summary_figure: cell_id: %i, induction: 2 not found' % cell_id)
+    if model_file_path is None:
+        raise IOError('plot_model_summary_figure: no model file path provided')
+    elif not os.path.isfile(model_file_path):
+        raise IOError('plot_model_summary_figure: invalid model file path: %s' % model_file_path)
+    with h5py.File(model_file_path, 'r') as f:
         if 'exported_data' not in f or str(cell_id) not in f['exported_data'] or \
                 '2' not in f['exported_data'][str(cell_id)] or \
                 'model_ramp_features' not in f['exported_data'][str(cell_id)]['2']:
-            raise KeyError('plot_bidirectional_plasticity_dynamics: problem loading model results for cell_id: %i, '
-                           'induction 2; from file: %s' % (cell_id, export_file_path))
-    with h5py.File(export_file_path, 'r') as f:
+            raise KeyError('plot_model_summary_figure: problem loading model results for cell_id: %i, '
+                           'induction 2; from file: %s' % (cell_id, model_file_path))
+    with h5py.File(model_file_path, 'r') as f:
         group = f['exported_data'][str(cell_id)]['2']['model_ramp_features']
         x = group['param_array'][:]
         if 'local_signal_peak' not in group.attrs or 'global_signal_peak' not in group.attrs:
-            raise KeyError('plot_bidirectional_plasticity_dynamics: missing required attributes for cell_id: %i, '
-                           'induction 2; from file: %s' % (cell_id, export_file_path))
-            """
-            args = get_args_static_signal_amplitudes()
-            group_size = len(args[0])
-            sequences = [[x] * group_size] + args + [[context.export] * group_size]
-            primitives = map(compute_features_signal_amplitudes, *sequences)
-            features = filter_features_signal_amplitudes(primitives, dict())
-            group.attrs['local_signal_peak'] = features['local_signal_max']
-            group.attrs['global_signal_peak'] = features['global_signal_max']
-            """
+            raise KeyError('plot_model_summary_figure: missing required attributes for cell_id: %i, '
+                           'induction 2; from file: %s' % (cell_id, model_file_path))
         group = f['exported_data'][str(cell_id)]['2']['model_ramp_features']
         local_signal_peak = group.attrs['local_signal_peak']
         global_signal_peak = group.attrs['global_signal_peak']
@@ -1433,23 +1426,25 @@ def plot_model_summary_figure(cell_id, export_file_path):
     context.update(locals())
 
 
-def plot_weights_snapshots(cell_id, export_file_path):
+def plot_weights_snapshots(cell_id, model_file_path=None):
     """
 
     :param cell_id: int
-    :param data_file_path: str (path)
+    :param model_file_path: str (path)
     :return: dict
     """
     if (cell_id, 2) not in context.data_keys:
-        raise KeyError('plot_bidirectional_plasticity_dynamics: cell_id: %i, induction: 2 not found' % cell_id)
-    if not os.path.isfile(export_file_path):
-        raise IOError('plot_bidirectional_plasticity_dynamics: invalid file path: %s' % export_file_path)
-    with h5py.File(export_file_path, 'r') as f:
+        raise KeyError('plot_weights_snapshots: cell_id: %i, induction: 2 not found' % cell_id)
+    if model_file_path is None:
+        raise IOError('plot_weights_snapshots: no model file path provided')
+    elif not os.path.isfile(model_file_path):
+        raise IOError('plot_weights_snapshots: invalid file path: %s' % model_file_path)
+    with h5py.File(model_file_path, 'r') as f:
         if 'exported_data' not in f or str(cell_id) not in f['exported_data'] or \
                 '2' not in f['exported_data'][str(cell_id)] or \
                 'model_ramp_features' not in f['exported_data'][str(cell_id)]['2']:
-            raise KeyError('plot_bidirectional_plasticity_dynamics: problem loading model results for cell_id: %i, '
-                           'induction 2; from file: %s' % (cell_id, export_file_path))
+            raise KeyError('plot_weights_snapshots: problem loading model results for cell_id: %i, '
+                           'induction 2; from file: %s' % (cell_id, model_file_path))
         group = f['exported_data'][str(cell_id)]['2']['model_ramp_features']
         x = group['param_array'][:]
         local_signal_peak = group.attrs['local_signal_peak']
@@ -1722,30 +1717,45 @@ def get_features_interactive(x, plot=False):
     return features
 
 
-def get_model_ramp_error(x, check_bounds=None, plot=False, full_output=False):
+def check_lsa():
     """
 
-    :param x:
-    :param check_bounds: callable
-    :param plot: bool
-    :param full_output: bool
-    :return: float
     """
-    if check_bounds is not None:
-        if not check_bounds(x):
-            return 1e9
-    features = get_features_interactive(x, plot=plot)
-    features, objectives = get_objectives(features)
-    Err = np.sum(objectives.values())
-    indiv = Individual(x=x)
-    indiv.objectives = np.array([objectives[key] for key in context.objective_names])
-    indiv.features = np.array([objectives[key] for key in context.feature_names])
-    context.storage.append([indiv])
-    print 'Process: %i: absolute sum of model_ramp objectives: %.4E' % (os.getpid(), Err)
-    if full_output:
-        return Err, features, objectives
-    else:
-        return Err
+    prev_cell_id = None
+    for cell_id, induction in context.data_keys:
+        import_data(cell_id, induction)
+        if induction == 1:
+            if 'before' in context.exp_ramp:
+                initial_ramp, initial_delta_weights, ramp_offset, discard_residual_score = \
+                    get_delta_weights_LSA(context.exp_ramp['after'], context.input_rate_maps,
+                                          context.LSA_weights['after'],
+                                          bounds=(context.min_delta_weight, context.peak_delta_weight),
+                                          allow_offset=False, verbose=context.verbose, plot=context.plot)
+            else:
+                initial_ramp, initial_delta_weights, ramp_offset, discard_residual_score = \
+                    get_delta_weights_LSA(context.exp_ramp['after'], context.input_rate_maps,
+                                          context.LSA_weights['after'],
+                                          bounds=(context.min_delta_weight, context.peak_delta_weight),
+                                          allow_offset=True, verbose=context.verbose, plot=context.plot)
+        else:
+            if prev_cell_id is None or prev_cell_id != cell_id:
+                initial_ramp, initial_delta_weights, ramp_offset, discard_residual_score = \
+                    get_delta_weights_LSA(context.exp_ramp['before'], context.input_rate_maps,
+                                          context.LSA_weights['before'],
+                                          bounds=(context.min_delta_weight, context.peak_delta_weight),
+                                          allow_offset=True, verbose=context.verbose, plot=context.plot)
+                print 'cell_id: %i, induction: before: %i, ramp_offset: %.3f' % (cell_id, induction, ramp_offset)
+            initial_ramp2, initial_delta_weights2, ramp_offset2, discard_residual_score = \
+                get_delta_weights_LSA(context.exp_ramp['after'], context.input_rate_maps,
+                                      context.LSA_weights['after'],
+                                      bounds=(context.min_delta_weight, context.peak_delta_weight),
+                                      allow_offset=False, impose_offset=ramp_offset, verbose=context.verbose,
+                                      plot=context.plot)
+            prev_allow_offset = False
+        print 'cell_id: %i, induction: %i, ramp_offset: %.3f' % (cell_id, induction, ramp_offset)
+        prev_cell_id = cell_id
+
+    context.update(locals())
 
 
 @click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True,))
@@ -1756,15 +1766,23 @@ def get_model_ramp_error(x, check_bounds=None, plot=False, full_output=False):
 @click.option("--export-file-path", type=str, default=None)
 @click.option("--label", type=str, default=None)
 @click.option("--verbose", type=int, default=2)
-@click.option("--serial-optimize", is_flag=True)
 @click.option("--plot", is_flag=True)
 @click.option("--debug", is_flag=True)
-@click.option("--check-lsa", is_flag=True)
 @click.option("--model-summary-figure", is_flag=True)
+@click.option("--model-file-path", type=str, default=None)
 @click.pass_context
-def main(cli, config_file_path, output_dir, export, export_file_path, label, verbose, serial_optimize, plot,
-         debug, check_lsa, model_summary_figure):
+def main(cli, config_file_path, output_dir, export, export_file_path, label, verbose, plot, debug,
+         model_summary_figure, model_file_path):
     """
+    Parallel optimization is meant to be executed by the module nested.optimize using the syntax:
+    for N processes:
+    mpirun -n N python -m nested.optimize --config-file-path=$PATH_TO_CONFIG_FILE --disp --export
+
+    This script can be executed as main with the command line interface to debug the model code, and to generate plots
+    after optimization has completed, e.g.:
+
+    ipython
+    run optimize_BTSP_CA1 --model-summary-figure --cell-id=1 --model-file-path=$PATH_TO_MODEL_FILE
 
     :param cli: contains unrecognized args as list of str
     :param config_file_path: str (path)
@@ -1773,10 +1791,10 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
     :param export_file_path: str
     :param label: str
     :param verbose: int
-    :param serial_optimize: bool
     :param plot: bool
     :param debug: bool
-    :param check_lsa: bool
+    :param model_summary_figure: bool
+    :param model_file_path: bool
     """
     # requires a global variable context: :class:'Context'
     context.update(locals())
@@ -1784,7 +1802,6 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
     context.disp = verbose > 0
     config_interactive(context, __file__, config_file_path=config_file_path, output_dir=output_dir, export=export,
                        export_file_path=export_file_path, label=label, disp=context.disp, verbose=verbose, **kwargs)
-    rel_bounds_handler = context.rel_bounds_handler
 
     x1_array = context.x0_array
     if 'params_path' in context.kwargs and os.path.isfile(context.kwargs['params_path']):
@@ -1806,15 +1823,7 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
             raise RuntimeError('optimize_BTSP: problem loading params from params_path: %s' %
                                context.kwargs['params_path'])
 
-    if serial_optimize:
-        context.storage = PopulationStorage(param_names=context.param_names, feature_names=context.feature_names,
-                                            objective_names=context.objective_names)
-        result = minimize(get_model_ramp_error, x1_array, method='Nelder-Mead',
-                                   args=(rel_bounds_handler.check_bounds,),
-                                   options={'disp': verbose > 1, 'maxiter': 20})
-        x1_array = result.x
-
-    if debug or serial_optimize:
+    if debug:
         features = get_features_interactive(x1_array, plot=plot)
         features, objectives = get_objectives(features)
         if export and os.path.isfile(context.temp_output_path):
@@ -1826,42 +1835,7 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
         pprint.pprint({key: val for (key, val) in objectives.iteritems() if key in context.objective_names})
 
     if model_summary_figure:
-        # append_local_peak_loc(int(context.kwargs['cell_id']), export_file_path)
-        plot_model_summary_figure(int(context.kwargs['cell_id']), export_file_path)
-
-    if check_lsa:
-        prev_cell_id = None
-        for cell_id, induction in context.data_keys:
-            import_data(cell_id, induction)
-            if induction == 1:
-                if 'before' in context.exp_ramp:
-                    initial_ramp, initial_delta_weights, ramp_offset, discard_residual_score = \
-                        get_delta_weights_LSA(context.exp_ramp['after'], context.input_rate_maps,
-                                              context.LSA_weights['after'],
-                                              bounds=(context.min_delta_weight, context.peak_delta_weight),
-                                              allow_offset=False, verbose=verbose, plot=plot)
-                else:
-                    initial_ramp, initial_delta_weights, ramp_offset, discard_residual_score = \
-                        get_delta_weights_LSA(context.exp_ramp['after'], context.input_rate_maps,
-                                              context.LSA_weights['after'],
-                                              bounds=(context.min_delta_weight, context.peak_delta_weight),
-                                              allow_offset=True, verbose=verbose, plot=plot)
-            else:
-                if prev_cell_id is None or prev_cell_id != cell_id:
-                    initial_ramp, initial_delta_weights, ramp_offset, discard_residual_score = \
-                        get_delta_weights_LSA(context.exp_ramp['before'], context.input_rate_maps,
-                                              context.LSA_weights['before'],
-                                              bounds=(context.min_delta_weight, context.peak_delta_weight),
-                                              allow_offset=True, verbose=verbose, plot=plot)
-                    print 'cell_id: %i, induction: before: %i, ramp_offset: %.3f' % (cell_id, induction, ramp_offset)
-                initial_ramp2, initial_delta_weights2, ramp_offset2, discard_residual_score = \
-                    get_delta_weights_LSA(context.exp_ramp['after'], context.input_rate_maps,
-                                          context.LSA_weights['after'],
-                                          bounds=(context.min_delta_weight, context.peak_delta_weight),
-                                          allow_offset=False, impose_offset=ramp_offset, verbose=verbose, plot=plot)
-                prev_allow_offset = False
-            print 'cell_id: %i, induction: %i, ramp_offset: %.3f' % (cell_id, induction, ramp_offset)
-            prev_cell_id = cell_id
+        plot_model_summary_figure(int(context.kwargs['cell_id']), model_file_path)
 
     context.update(locals())
 
