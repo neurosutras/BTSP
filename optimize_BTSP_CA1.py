@@ -1,9 +1,9 @@
 """
-These methods aim to optimize a single parameterization of a model of bidirectional, state-dependent behavioral time 
-scale synaptic plasticity to account for the width and amplitude of all place fields in an experimental data set from 
-the Magee lab that includes: 
-1) Silent cells converted into place cells by spontaneous plateaus
-2) Silent cells converted into place cells by experimentally induced plateaus
+These methods aim to optimize a parametric model of bidirectional, state-dependent behavioral timescale synaptic
+plasticity to account for the width and amplitude of place fields in an experimental data set from the Magee lab that
+includes:
+1) Silent cells converted to place cells by spontaneous plateaus
+2) Silent cells converted to place cells by experimentally induced plateaus
 3) Existing place cells that shift their place field locations after an experimentally induced plateau
 
 Features/assumptions of the phenomenological model:
@@ -124,7 +124,7 @@ def init_context():
                                  ('1' not in f['data'][cell_id] or
                                   'before' not in f['data'][cell_id]['1']['raw']['exp_ramp'])]
     if context.verbose > 1:
-        print 'pid: %i; optimize_BTSP2_CA1: processing the following data_keys: %s' % \
+        print 'pid: %i; optimize_BTSP_CA1: processing the following data_keys: %s' % \
               (os.getpid(), str(context.data_keys))
     self_consistent_cell_ids = [cell_id for (cell_id, induction) in context.data_keys if induction == 1 and
                                  (cell_id, 2) in context.data_keys]
@@ -1161,23 +1161,25 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     return {context.cell_id: {context.induction: result}}
 
 
-def append_local_peak_loc(export_file_path):
+def append_local_peak_loc(model_file_path=None):
     """
 
-    :param file_path:
+    :param model_file_path:
     """
-    if not os.path.isfile(export_file_path):
-        raise IOError('plot_bidirectional_plasticity_dynamics: invalid file path: %s' % export_file_path)
-    with h5py.File(export_file_path, 'a') as f:
+    if model_file_path is None:
+        raise IOError('append_local_peak_loc: no model file path provided')
+    elif not os.path.isfile(model_file_path):
+        raise IOError('append_local_peak_loc: invalid model file path: %s' % model_file_path)
+    with h5py.File(model_file_path, 'a') as f:
         if 'exported_data' not in f:
-            raise KeyError('append_local_peak_loc: problem loading model results from file: %s' % export_file_path)
+            raise KeyError('append_local_peak_loc: problem loading model results from file: %s' % model_file_path)
         for cell_key in f['exported_data']:
             for induction_key in f['exported_data'][cell_key]:
                 cell_id = int(cell_key)
                 induction = int(induction_key)
                 if 'model_ramp_features' not in f['exported_data'][cell_key][induction_key]:
                     raise KeyError('append_local_peak_loc: problem loading model results for cell_id: %s, '
-                                   'induction: %s; from file: %s' % (cell_key, induction_key, export_file_path))
+                                   'induction: %s; from file: %s' % (cell_key, induction_key, model_file_path))
                 if (cell_id, induction) not in context.data_keys:
                     raise KeyError('append_local_peak_loc: problem loading data for cell_id: %s, induction: %s' %
                                    (cell_key, induction_key))
