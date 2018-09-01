@@ -357,8 +357,8 @@ def initialize():
     ramp_laps = meta_data[context.cell_id][context.induction]['ramp_laps']
 
     context.update(locals())
-    context.spatial_rate_maps, context.peak_locs = generate_spatial_rate_maps(num_inputs, input_field_peak_rate,
-                                                                              input_field_width, track_length, binned_x)
+    context.spatial_rate_maps, context.peak_locs = \
+        generate_spatial_rate_maps(binned_x, num_inputs, input_field_peak_rate, input_field_width, track_length)
 
 
 def export_data(export_file_path=None):
@@ -474,31 +474,6 @@ def export_data(export_file_path=None):
                                               data=context.induction_gate)
     print 'Exported data for cell: %i, induction: %i to %s' % (context.cell_id, context.induction,
                                                                context.export_file_path)
-
-
-def generate_spatial_rate_maps(n=200, peak_rate=1., field_width=90., track_length=187., x=None):
-    """
-    Return a list of spatial rate maps with peak locations that span the track. Return firing rate vs. location
-    computed at the resolution of the provided x array. Default is track_length/10000 bins.
-    :param n: int
-    :param peak_rate: float
-    :param field_width: float
-    :param track_length: float
-    :param x: array
-    :return: list of array, array
-    """
-    if x is None:
-        x = context.generic_x
-    gauss_sigma = field_width / 3. / np.sqrt(2.)  # contains 99.7% gaussian area
-    d_peak_locs = track_length / float(n)
-    peak_locs = np.arange(d_peak_locs / 2., track_length, d_peak_locs)
-    spatial_rate_maps = []
-    extended_x = np.concatenate([x - track_length, x, x + track_length])
-    for peak_loc in peak_locs:
-        gauss_force = peak_rate * np.exp(-((extended_x - peak_loc) / gauss_sigma) ** 2.)
-        gauss_force = wrap_around_and_compress(gauss_force, x)
-        spatial_rate_maps.append(gauss_force)
-    return spatial_rate_maps, peak_locs
 
 
 if __name__ == '__main__':
