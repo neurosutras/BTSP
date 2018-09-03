@@ -95,7 +95,7 @@ def init_context():
     generic_dx = binned_dx / 100.  # cm
     generic_x = np.arange(0., track_length, generic_dx)
 
-    default_run_vel = 30.  # cm/s
+    default_run_vel = 25.  # cm/s
     generic_position_dt = generic_dx / default_run_vel * 1000.  # ms
     generic_t = np.arange(0., len(generic_x) * generic_position_dt, generic_position_dt)[:len(generic_x)]
 
@@ -463,7 +463,7 @@ def get_ramp_feature_score(delta_weights, initial_ramp, input_matrix, induction_
         get_indexes_from_ramp_bounds_with_wrap(ramp_x, start_loc['before'], peak_loc['before'], end_loc['before'],
                                                min_loc['before'])
 
-    Err += ((min_val['after'] - context.target_val['min_val_2']) / context.target_range['min_val']) ** 2.
+    # Err += ((min_val['after'] - context.target_val['min_val_2']) / context.target_range['min_val']) ** 2.
     model_peak_val_initial = model_ramp[peak_index]
     delta_peak_val_initial = model_peak_val_initial - ramp_amp['before']
     Err += ((delta_peak_val_initial - context.target_val['delta_peak_val_1']) /

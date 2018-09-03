@@ -31,12 +31,12 @@ bounds:
   - 200.
   local_signal_decay: !!python/tuple
   - 50.
-  - 4000.
+  - 1500.
   global_signal_rise: !!python/tuple
   - 5.
   - 200.
   global_signal_decay: !!python/tuple
-  - 50.
+  - 100.
   - 3000.
   peak_delta_weight: !!python/tuple
   - 1.5
@@ -106,6 +106,21 @@ kwargs:
   induction_locs:
     1: 130.
     2: 10.
+  x_opt:
+    global_signal_decay: 150.
+    local_signal_rise: 6.362730E+01
+    rMC0: 2.136997E+00
+    rMC_th: 3.034372E-01
+    rMC_peak: 7.292308E-01
+    global_signal_rise: 1.051905E+01
+    peak_delta_weight: 2.682327E+00
+    rCM0: 1.306494E+00
+    local_signal_decay: 8.652857E+02
+    rCM_min2: 2.838575E-01
+    rCM_th1: 7.639369E-02
+    rCM_th2: 9.596845E-01
+    rCM_peak1: 2.086415E-01
+    rCM_peak2: 3.751629E-01
 objective_names:
 - induction1_ramp_residual_score
 - induction2_null_ramp_residual_score
@@ -141,20 +156,20 @@ target_val:
   peak_shift_2: 0.
   peak_val_1: 8.
   peak_val_2: 8.
-  min_val_2: 3.
+  # min_val_2: 3.
   delta_peak_val_1: -4.
 x0:
-  global_signal_decay: 277.323254
-  local_signal_rise: 45.131891
-  rMC_th: 0.128312
-  rMC_peak: 0.387765
-  global_signal_rise: 116.777287
-  peak_delta_weight: 3.329851
-  rCM_min2: 0.658883
-  local_signal_decay: 792.575456
-  rCM0: 1.029367
-  rMC0: 4.607720
-  rCM_th1: 0.002671
-  rCM_th2: 0.301503
-  rCM_peak1: 0.008125
-  rCM_peak2: 0.015067
+  global_signal_decay: 150.
+  local_signal_rise: 6.362730E+01
+  rMC0: 2.136997E+00
+  rMC_th: 3.034372E-01
+  rMC_peak: 7.292308E-01
+  global_signal_rise: 1.051905E+01
+  peak_delta_weight: 2.682327E+00
+  rCM0: 1.306494E+00
+  local_signal_decay: 8.652857E+02
+  rCM_min2: 2.838575E-01
+  rCM_th1: 7.639369E-02
+  rCM_th2: 9.596845E-01
+  rCM_peak1: 2.086415E-01
+  rCM_peak2: 3.751629E-01
