@@ -106,21 +106,6 @@ kwargs:
   induction_locs:
     1: 130.
     2: 10.
-  x_opt:
-    global_signal_decay: 150.
-    local_signal_rise: 6.362730E+01
-    rMC0: 2.136997E+00
-    rMC_th: 3.034372E-01
-    rMC_peak: 7.292308E-01
-    global_signal_rise: 1.051905E+01
-    peak_delta_weight: 2.682327E+00
-    rCM0: 1.306494E+00
-    local_signal_decay: 8.652857E+02
-    rCM_min2: 2.838575E-01
-    rCM_th1: 7.639369E-02
-    rCM_th2: 9.596845E-01
-    rCM_peak1: 2.086415E-01
-    rCM_peak2: 3.751629E-01
 objective_names:
 - induction1_ramp_residual_score
 - induction2_null_ramp_residual_score
