@@ -4,7 +4,7 @@ initial_ramp_peak_val: 8.
 target_peak_shift: -10.
 induction_locs:
   1: 130.
-  # 2: 10.
+  2: 10.
 seed: 616898028
 target_range:
   residuals: 0.1

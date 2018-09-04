@@ -481,74 +481,6 @@ def get_ramp_residual_score(delta_weights, target_ramp, input_matrix, induction_
         return Err
 
 
-def get_ramp_feature_score(delta_weights, initial_ramp, input_matrix, induction_loc, ramp_x=None, input_x=None,
-                           verbose=1):
-    """
-
-    :param delta_weights: array
-    :param initial_ramp: array
-    :param input_matrix: array
-    :param induction_loc
-    :param ramp_x: array
-    :param input_x: array
-    :param verbose: int
-    :return: float
-    """
-    if ramp_x is None:
-        ramp_x = context.binned_x
-    if input_x is None:
-        input_x = context.binned_x
-    if len(initial_ramp) != len(input_x):
-        interp_initial_ramp = np.interp(input_x, ramp_x, initial_ramp)
-    else:
-        interp_initial_ramp = np.array(initial_ramp)
-    
-    model_ramp = delta_weights.dot(input_matrix)
-    if len(model_ramp) != len(ramp_x):
-        model_ramp = np.interp(ramp_x, input_x, model_ramp)
-    
-    Err = 0.
-    
-    ramp_amp, ramp_width, peak_shift, ratio, start_loc, peak_loc, end_loc, min_val, min_loc = {}, {}, {}, {}, {}, {}, \
-                                                                                              {}, {}, {}
-    ramp_amp['before'], ramp_width['before'], peak_shift['before'], ratio['before'], start_loc['before'], \
-    peak_loc['before'], end_loc['before'], min_val['before'], min_loc['before'] = \
-        calculate_ramp_features(context, interp_initial_ramp, induction_loc)
-
-    ramp_amp['after'], ramp_width['after'], peak_shift['after'], ratio['after'], start_loc['after'], \
-    peak_loc['after'], end_loc['after'], min_val['after'], min_loc['after'] = \
-        calculate_ramp_features(context, model_ramp, induction_loc)
-
-    start_index, peak_index, end_index, min_index = \
-        get_indexes_from_ramp_bounds_with_wrap(ramp_x, start_loc['before'], peak_loc['before'], end_loc['before'],
-                                               min_loc['before'])
-
-    Err += ((min_val['after'] - context.target_val['min_val_2']) / context.target_range['min_val']) ** 2.
-    model_peak_val_initial = model_ramp[peak_index]
-    delta_peak_val_initial = model_peak_val_initial - ramp_amp['before']
-    Err += ((delta_peak_val_initial - context.target_val['delta_peak_val_1']) /
-            context.target_range['delta_peak_val']) ** 2.
-    Err += ((peak_shift['after'] - context.target_val['peak_shift_2']) / context.target_range['peak_loc']) ** 2.
-    Err += ((ramp_amp['after'] - context.target_val['peak_shift_2']) / context.target_range['peak_loc']) ** 2.
-
-    # regularization
-    for delta in np.diff(np.insert(delta_weights, 0, delta_weights[-1])):
-        Err += (delta / context.target_range['weights_smoothness']) ** 2.
-
-    if verbose > 1:
-        print 'before: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, ' \
-              'peak_loc: %.1f, end_loc: %.1f, min_val: %.1f, min_loc: %.1f' % \
-              (ramp_amp['before'], ramp_width['before'], peak_shift['before'], ratio['before'],
-               start_loc['before'], peak_loc['before'], end_loc['before'], min_val['before'], min_loc['before'])
-        print 'after: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f' \
-              ', end_loc: %.1f, min_val: %.1f, min_loc: %.1f, peak_val_initial: %.1f' % \
-              (ramp_amp['after'], ramp_width['after'], peak_shift['after'], ratio['after'], start_loc['after'],
-               peak_loc['after'], end_loc['after'], min_val['after'], min_loc['after'], model_peak_val_initial)
-        sys.stdout.flush()
-
-    return model_ramp, delta_weights, delta_peak_val_initial, Err
-
-
 def get_delta_weights_LSA(target_ramp, input_rate_maps, induction_loc, induction_stop_loc, initial_delta_weights=None,
                           bounds=None, beta=2., ramp_x=None, input_x=None, allow_offset=False, impose_offset=None, 
                           plot=False, verbose=1):
@@ -682,7 +614,7 @@ def calculate_ramp_population(export=False, plot=False):
     :return: dict
     """
     start_time = time.time()
-    num_cells = context.interface.num_workers  # len(context.global_signal_population)
+    num_cells = len(context.global_signal_population)  # context.interface.num_workers
     weights_history_population = context.interface.map(calculate_weight_dynamics, range(num_cells))
     weights_history_population = np.array(weights_history_population)
 
