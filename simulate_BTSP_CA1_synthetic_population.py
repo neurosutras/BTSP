@@ -614,7 +614,10 @@ def calculate_ramp_population(export=False, plot=False):
     :return: dict
     """
     start_time = time.time()
-    num_cells = len(context.global_signal_population)  # context.interface.num_workers
+    if 'debug' in context() and context.debug:
+        num_cells = context.interface.num_workers
+    else:
+        num_cells = len(context.global_signal_population)
     weights_history_population = context.interface.map(calculate_weight_dynamics, range(num_cells))
     weights_history_population = np.array(weights_history_population)
 
@@ -648,6 +651,10 @@ def calculate_ramp_population(export=False, plot=False):
                 group = f[shared_context_key]
                 group.create_dataset('peak_locs', compression='gzip', data=context.peak_locs)
                 group.create_dataset('binned_x', compression='gzip', data=context.binned_x)
+                group.create_dataset('input_rate_maps', compression='gzip', data=np.array(context.input_rate_maps))
+                group.attrs['track_length'] = context.track_length
+                group.attrs['dt'] = context.dt
+                group.attrs['down_dt'] = context.down_dt
             exported_data_key = 'exported_data'
             if exported_data_key not in f:
                 f.create_group(exported_data_key)
@@ -656,7 +663,6 @@ def calculate_ramp_population(export=False, plot=False):
             if description not in f[exported_data_key]:
                 f[exported_data_key].create_group(description)
             group = f[exported_data_key][description]
-            group.attrs['track_length'] = context.track_length
             group.attrs['num_assay_laps'] = context.num_assay_laps
             group.attrs['num_induction_laps'] = context.num_induction_laps
             group.attrs['induction_dur'] = context.induction_dur
@@ -671,48 +677,11 @@ def calculate_ramp_population(export=False, plot=False):
             group.create_dataset('down_plateau_t_indexes', compression='gzip', data=down_plateau_t_indexes)
             group.create_dataset('weights_history_population', compression='gzip',
                                  data=weights_history_population)
-            group.create_dataset('input_rate_maps', compression='gzip',
-                                 data=np.array(context.input_rate_maps))
         if context.disp:
             print 'Process: %i: exported weights history population data to file: %s' % \
                   (os.getpid(), context.export_file_path)
 
     return weights_history_population
-
-
-def get_model_ramp(delta_weights, input_x=None, ramp_x=None, plot=False):
-    """
-
-    :param delta_weights: array
-    :param input_x: array (x resolution of inputs)
-    :param ramp_x: array (x resolution of ramp)
-    :param plot: bool
-    :return: array
-    """
-    if input_x is None:
-        input_x = context.binned_x
-    if ramp_x is None:
-        ramp_x = context.binned_x
-    model_ramp = np.multiply(delta_weights.dot(context.input_rate_maps), context.ramp_scaling_factor)
-    if len(model_ramp) != len(ramp_x):
-        model_ramp = np.interp(ramp_x, input_x, model_ramp)
-    if plot:
-        fig, axes = plt.subplots(1)
-        max_ramp = max(np.max(model_ramp), np.max(context.exp_ramp['after']))
-        axes.hlines(max_ramp * 1.2,
-                       xmin=context.mean_induction_start_loc,
-                       xmax=context.mean_induction_stop_loc, linewidth=2)
-        axes.plot(context.binned_x, context.exp_ramp['after'], label='Experiment')
-        axes.plot(context.binned_x, model_ramp, label='Model')
-        axes.set_ylim(-0.5, max_ramp * 1.4)
-        axes.set_xlabel('Location (cm)')
-        axes.set_ylabel('Ramp amplitude (mV)')
-        axes.set_title('Cell_id: %i, Induction: %i' % (context.cell_id, context.induction))
-        clean_axes(axes)
-        fig.tight_layout()
-        plt.show()
-        plt.close()
-    return model_ramp
 
 
 def get_target_synthetic_ramp(induction_loc, target_peak_shift, ramp_x=None, track_length=None, target_peak_val=8.,
@@ -768,16 +737,48 @@ def analyze_simulation_output(file_path):
         if 'shared_context' not in f or 'exported_data' not in f or \
                 'weights_history_population' not in f['exported_data']:
             raise KeyError('analyze_simulation_output: invalid file contents at path: %s' % file_path)
-        weights_history_population = f['exported_data']['weights_history_population']['weights_history_population'][:]
         peak_locs = f['shared_context']['peak_locs'][:]
+        input_rate_maps = f['shared_context']['input_rate_maps'][:]
+        binned_x = f['shared_context']['binned_x'][:]
+        track_length = f['shared_context'].attrs['track_length']
+        dt = f['shared_context'].attrs['dt']
+        down_dt = f['shared_context'].attrs['down_dt']
+        group = f['exported_data']['weights_history_population']
+        ramp_scaling_factor = group.attrs['ramp_scaling_factor']
+        reward_locs = group.attrs['reward_locs']
+        down_t = group['down_t'][:]
+        t = group['t'][:]
+        weights_history_population = group['weights_history_population'][:]
+        position = group['position'][:]
+        num_assay_laps = group.attrs['num_assay_laps']
+        num_induction_laps = group.attrs['num_induction_laps']
+    snapshot_laps = [0, num_assay_laps]
+    for i in xrange(len(reward_locs)):
+        snapshot_laps.append(max(snapshot_laps) + num_induction_laps)
+        snapshot_laps.append(max(snapshot_laps) + num_assay_laps)
+    num_laps = snapshot_laps[-1]
+    ramp_snapshots = []
+    running_position = 0.
+    print 'snapshot laps: %s' % snapshot_laps
+    for lap in xrange(num_laps + 1):
+        this_pos_index = np.where(position < running_position)[0][-1]
+        this_t = t[this_pos_index]
+        this_down_index = np.where(down_t >= this_t)[0][0]
+        if lap in snapshot_laps:
+            this_ramp_snapshot = []
+            for this_weights_history in weights_history_population:
+                this_delta_weights = this_weights_history[:, this_down_index] - 1.
+                this_ramp = np.multiply(this_delta_weights.dot(input_rate_maps), ramp_scaling_factor)
+                this_ramp_snapshot.append(this_ramp)
+            ramp_snapshots.append(np.array(this_ramp_snapshot))
+        running_position += track_length
+    ramp_snapshots = np.array(ramp_snapshots)
+    print 'ramp_snapshots.shape: %s' % str(ramp_snapshots.shape)
+
     fig, axes = plt.subplots()
-    axes.plot(peak_locs,
-              np.sum([this_weights_history[:, 0] for this_weights_history in weights_history_population], axis=0),
-              label='Before')
-    axes.plot(peak_locs,
-              np.sum([this_weights_history[:, -1] for this_weights_history in weights_history_population], axis=0),
-              label='After')
-    axes.legend(loc='best', frameon=False, framealpha=0.5)
+    for this_ramp_snapshot in ramp_snapshots:
+        axes.plot(binned_x, np.sum([this_ramp for this_ramp in this_ramp_snapshot], axis=0))
+    # axes.legend(loc='best', frameon=False, framealpha=0.5)
     clean_axes(axes)
     plt.show()
 
@@ -795,8 +796,9 @@ def analyze_simulation_output(file_path):
 @click.option("--analyze", is_flag=True)
 @click.option("--data-file-path", type=str, default=None)
 @click.option("--interactive", is_flag=True)
+@click.option("--debug", is_flag=True)
 def main(config_file_path, output_dir, export, export_file_path, label, verbose, plot, simulate, analyze,
-         data_file_path, interactive):
+         data_file_path, interactive, debug):
     """
     Utilizes nested.parallel for parallel map. Requires mpi4py and NEURON.
 
@@ -820,6 +822,7 @@ def main(config_file_path, output_dir, export, export_file_path, label, verbose,
     :param analyze: bool
     :param data_file_path: str (path)
     :param interactive: bool
+    :param debug: bool
     """
     # requires a global variable context: :class:'Context'
     context.update(locals())
@@ -836,7 +839,7 @@ def main(config_file_path, output_dir, export, export_file_path, label, verbose,
 
     context.update(locals())
 
-    if not interactive:
+    if simulate and not interactive:
         try:
             context.interface.stop()
         except Exception:
