@@ -648,6 +648,8 @@ def calculate_model_ramp(induction, induction_type, export=False, plot=False):
     if induction == 2:
         if not np.all((initial_delta_weights >= context.min_delta_weight) &
                       (initial_delta_weights <= context.peak_delta_weight)):
+            initial_delta_weights = np.minimum(np.maximum(initial_delta_weights, context.min_delta_weight),
+                                               context.peak_delta_weight)
             initial_ramp, initial_delta_weights, initial_ramp_offset, discard_residual_score = \
                 get_delta_weights_LSA(context.target_ramp[1], context.input_rate_maps, induction_loc,
                                       induction_stop_loc, initial_delta_weights=initial_delta_weights,

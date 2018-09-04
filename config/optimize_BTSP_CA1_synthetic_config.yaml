@@ -100,7 +100,7 @@ get_features_stages:
 get_objectives:
   optimize_BTSP_CA1_synthetic: get_objectives
 kwargs:
-  verbose: 2
+  verbose: 1
   min_delta_weight: -0.2
   ramp_scaling_factor: 0.002956
   induction_locs:

@@ -431,7 +431,10 @@ def calculate_ramp_features(local_context, ramp, induction_loc, offset=False, sm
     after_width = end_loc - induction_loc
     if induction_loc > end_loc:
         after_width += track_length
-    ratio = before_width / after_width
+    if after_width == 0:
+        ratio = before_width
+    else:
+        ratio = before_width / after_width
     return peak_val, ramp_width, peak_shift, ratio, start_loc, peak_loc, end_loc, min_val, min_loc
 
 
