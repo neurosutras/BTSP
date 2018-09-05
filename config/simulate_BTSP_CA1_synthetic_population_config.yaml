@@ -1,4 +1,4 @@
-min_delta_weight: -0.2
+min_delta_weight: 0.
 ramp_scaling_factor: 0.002956
 initial_ramp_peak_val: 8.
 target_peak_shift: -10.
