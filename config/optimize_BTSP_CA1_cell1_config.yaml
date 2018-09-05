@@ -102,12 +102,12 @@ get_features_stages:
   get_args_static: get_args_static_signal_amplitudes
   compute_features: compute_features_signal_amplitudes
   filter_features: filter_features_signal_amplitudes
-- source: optimize_BTSP2_CA1_v12
+- source: optimize_BTSP_CA1
   get_args_dynamic: get_args_dynamic_model_ramp
   compute_features: compute_features_model_ramp
   filter_features: filter_features_model_ramp
 get_objectives:
-  optimize_BTSP2_CA1_v12: get_objectives
+  optimize_BTSP_CA1: get_objectives
 kwargs:
   data_file_name: '20180411_BTSP2_CA1_data.hdf5'
   verbose: 1

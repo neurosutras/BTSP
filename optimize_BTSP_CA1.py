@@ -47,36 +47,10 @@ import click
 context = Context()
 
 
-def config_controller(export_file_path, output_dir, **kwargs):
+def config_worker():
     """
 
-    :param export_file_path: str
-    :param output_dir: str
     """
-    context.update(locals())
-    context.update(kwargs)
-    context.data_file_path = context.output_dir + '/' + context.data_file_name
-    init_context()
-
-
-def config_worker(update_context_funcs, param_names, default_params, feature_names, objective_names, target_val,
-                  target_range, temp_output_path, export_file_path, output_dir, disp, data_file_name, **kwargs):
-    """
-    :param update_context_funcs: list of function references
-    :param param_names: list of str
-    :param default_params: dict
-    :param target_val: dict
-    :param target_range: dict
-    :param feature_names: list of str
-    :param objective_names: list of str
-    :param temp_output_path: str
-    :param export_file_path: str
-    :param output_dir: str (dir path)
-    :param disp: bool
-    :param data_file_name: str (path)
-    """
-    context.update(locals())
-    context.update(kwargs)
     context.data_file_path = context.output_dir + '/' + context.data_file_name
     init_context()
 
@@ -85,7 +59,6 @@ def init_context():
     """
 
     """
-
     if context.data_file_path is None or not os.path.isfile(context.data_file_path):
         raise IOError('init_context: invalid data_file_path: %s' % context.data_file_path)
     with h5py.File(context.data_file_path, 'r') as f:

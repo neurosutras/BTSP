@@ -52,10 +52,8 @@ context = Context()
 def config_parallel_interface(config_file_path=None, output_dir=None, temp_output_path=None, export=False,
                               export_file_path=None, label=None, disp=True, **kwargs):
     """
-    nested.optimize is meant to be executed as a module, and refers to a config_file to import required submodules and
-    create a workflow for optimization. During development of submodules, it is useful to be able to execute a submodule
-    as a standalone script (as '__main__'). config_interactive allows a single process to properly parse the
-    config_file and initialize a Context for testing purposes.
+    nested.parallel is used for parallel map operations. This method imports parameters from a config_file and
+    initializes a Context object on each worker.
     :param config_file_path: str (.yaml file path)
     :param output_dir: str (dir path)
     :param temp_output_path: str (.hdf5 file path)
@@ -92,19 +90,18 @@ def config_parallel_interface(config_file_path=None, output_dir=None, temp_outpu
     if temp_output_path is not None:
         context.temp_output_path = temp_output_path
     if 'temp_output_path' not in context() or context.temp_output_path is None:
-        context.temp_output_path = '%s%s_pid%i_%s_temp_output.hdf5' % \
-                                   (output_dir_str, datetime.datetime.today().strftime('%Y%m%d%H%M'), os.getpid(),
+        context.temp_output_path = '%s%s_pid%i%s_temp_output.hdf5' % \
+                                   (output_dir_str, datetime.datetime.today().strftime('%Y%m%d_%H%M'), os.getpid(),
                                     label)
     context.export = export
     if export_file_path is not None:
         context.export_file_path = export_file_path
     if 'export_file_path' not in context() or context.export_file_path is None:
-        context.export_file_path = '%s%s_%s_interactive_exported_output.hdf5' % \
-                                   (output_dir_str, datetime.datetime.today().strftime('%Y%m%d%H%M'), label)
+        context.export_file_path = '%s%s%s_exported_output.hdf5' % \
+                                   (output_dir_str, datetime.datetime.today().strftime('%Y%m%d_%H%M'), label)
     context.disp = disp
 
-    config_worker(context.temp_output_path, context.export_file_path, context.output_dir, context.disp,
-                    **context.kwargs)
+    config_worker()
 
     try:
         context.interface.start(disp=True)
@@ -113,16 +110,10 @@ def config_parallel_interface(config_file_path=None, output_dir=None, temp_outpu
         pass
 
 
-def config_worker(temp_output_path, export_file_path, output_dir, disp, verbose=1, **kwargs):
+def config_worker():
     """
-    :param temp_output_path: str
-    :param export_file_path: str
-    :param output_dir: str (dir path)
-    :param disp: bool
     :param verbose: int
     """
-    context.update(locals())
-    context.update(kwargs)
     init_context()
 
 
@@ -776,9 +767,9 @@ def analyze_simulation_output(file_path):
     print 'ramp_snapshots.shape: %s' % str(ramp_snapshots.shape)
 
     fig, axes = plt.subplots()
-    for this_ramp_snapshot in ramp_snapshots:
-        axes.plot(binned_x, np.sum([this_ramp for this_ramp in this_ramp_snapshot], axis=0))
-    # axes.legend(loc='best', frameon=False, framealpha=0.5)
+    for lap, this_ramp_snapshot in zip(snapshot_laps, ramp_snapshots):
+        axes.plot(binned_x, np.sum([this_ramp for this_ramp in this_ramp_snapshot], axis=0), label=lap)
+    axes.legend(loc='best', frameon=False, framealpha=0.5)
     clean_axes(axes)
     plt.show()
 

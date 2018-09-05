@@ -48,35 +48,10 @@ import click
 context = Context()
 
 
-def config_controller(export_file_path, output_dir, **kwargs):
+def config_worker():
     """
 
-    :param export_file_path: str
-    :param output_dir: str
     """
-    context.update(locals())
-    context.update(kwargs)
-    # init_context()
-
-
-def config_worker(update_context_funcs, param_names, default_params, feature_names, objective_names, target_val,
-                  target_range, temp_output_path, export_file_path, output_dir, disp, verbose=1, **kwargs):
-    """
-    :param update_context_funcs: list of function references
-    :param param_names: list of str
-    :param default_params: dict
-    :param target_val: dict
-    :param target_range: dict
-    :param feature_names: list of str
-    :param objective_names: list of str
-    :param temp_output_path: str
-    :param export_file_path: str
-    :param output_dir: str (dir path)
-    :param disp: bool
-    :param verbose: int
-    """
-    context.update(locals())
-    context.update(kwargs)
     init_context()
 
 
@@ -118,7 +93,7 @@ def init_context():
     complete_induction_locs = {}
     complete_induction_durs = {}
     induction_stop_locs = {}
-    for induction in xrange(1, 3):
+    for induction in context.induction_locs:
         complete_induction_locs[induction] = [context.induction_locs[induction] for i in xrange(num_induction_laps)]
         complete_induction_durs[induction] = [induction_dur for i in xrange(num_induction_laps)]
         induction_stop_index = np.where(default_interp_x >= context.induction_locs[induction])[0][0] + \
@@ -127,7 +102,7 @@ def init_context():
 
     position = {key: [] for key in ['pre', 'induction', 'post']}
     t = {key: [] for key in ['pre', 'induction', 'post']}
-    current = {induction: [] for induction in xrange(1, 3)}
+    current = {induction: [] for induction in context.induction_locs}
 
     position['pre'].append(default_interp_x)
     t['pre'].append(default_interp_t)
@@ -137,7 +112,7 @@ def init_context():
     position['post'].append(default_interp_x)
     t['post'].append(default_interp_t)
 
-    for induction in xrange(1, 3):
+    for induction in context.induction_locs:
         for i in xrange(num_induction_laps):
             start_index = np.where(default_interp_x >= complete_induction_locs[induction][i])[0][0]
             stop_index = np.where(default_interp_t >= default_interp_t[start_index] +
@@ -164,21 +139,21 @@ def init_context():
     complete_run_vel_gate[np.where(complete_run_vel <= 5.)[0]] = 0.
     
     # pre lap
-    induction_gate = {induction: np.zeros_like(default_interp_t) for induction in xrange(1, 3)}
-    for induction in xrange(1, 3):
+    induction_gate = {induction: np.zeros_like(default_interp_t) for induction in context.induction_locs}
+    for induction in context.induction_locs:
         for this_current in current[induction]:
             induction_gate[induction] = np.append(induction_gate[induction], this_current)
         # post lap
         induction_gate[induction] = np.append(induction_gate[induction], np.zeros_like(default_interp_t))
 
-    induction_start_indexes = {induction: [] for induction in xrange(1, 3)}
-    induction_stop_indexes = {induction: [] for induction in xrange(1, 3)}
-    induction_start_times = {induction: [] for induction in xrange(1, 3)}
-    induction_stop_times = {induction: [] for induction in xrange(1, 3)}
+    induction_start_indexes = {induction: [] for induction in context.induction_locs}
+    induction_stop_indexes = {induction: [] for induction in context.induction_locs}
+    induction_start_times = {induction: [] for induction in context.induction_locs}
+    induction_stop_times = {induction: [] for induction in context.induction_locs}
     running_position = 0.
     running_t = 0.
     for i in xrange(num_induction_laps):
-        for induction in xrange(1, 3):
+        for induction in context.induction_locs:
             this_induction_start_index = np.where(complete_position >= context.induction_locs[induction] + 
                                                   running_position)[0][0]
             this_induction_start_time = complete_t[this_induction_start_index]
@@ -190,27 +165,32 @@ def init_context():
             induction_start_indexes[induction].append(this_induction_start_index)
             induction_stop_indexes[induction].append(this_induction_stop_index)
         running_position += track_length
-    for induction in xrange(1, 3):
+    for induction in context.induction_locs:
         induction_start_times[induction] = np.array(induction_start_times[induction])
         induction_stop_times[induction] = np.array(induction_stop_times[induction])
         induction_start_indexes[induction] = np.array(induction_start_indexes[induction])
         induction_stop_indexes[induction] = np.array(induction_stop_indexes[induction])
     complete_rate_maps = get_complete_rate_maps(input_rate_maps, binned_x, position, complete_run_vel_gate)
     down_t = np.arange(complete_t[0], complete_t[-1] + down_dt / 2., down_dt)
-    down_induction_gate = {induction:
-                               np.interp(down_t, complete_t, induction_gate[induction]) for induction in xrange(1,3)}
+    down_induction_gate = {induction: np.interp(down_t, complete_t, induction_gate[induction])
+                           for induction in context.induction_locs}
 
     context.update(locals())
 
-    context.target_ramp, context.initial_delta_weights, context.initial_ramp = {}, {}, {}
-    context.target_ramp[1] = get_target_synthetic_ramp(context.induction_locs[1],
-                                                       target_peak_shift=context.target_val['peak_shift_1'],
-                                                       target_peak_val=context.target_val['peak_val_1'])
-    context.initial_delta_weights[1] = np.zeros_like(peak_locs)
-    context.initial_ramp[1] = np.zeros_like(binned_x)
-    context.initial_ramp[2], context.initial_delta_weights[2], ramp_offset, residual_score = \
-        get_delta_weights_LSA(context.target_ramp[1], input_rate_maps, context.induction_locs[1],
-                              induction_stop_locs[1], bounds=(context.min_delta_weight, 3.), verbose=context.verbose)
+    context.initial_delta_weights, context.initial_ramp = {}, {}
+    context.target_ramp = get_target_synthetic_ramp(context.induction_locs['1'],
+                                                    target_peak_shift=context.target_val['peak_shift_1'],
+                                                    target_peak_val=context.target_val['peak_val_1'])
+    context.initial_delta_weights['1'] = np.zeros_like(peak_locs)
+    context.initial_ramp['1'] = np.zeros_like(binned_x)
+    if 'plot' not in context():
+        context.plot = False
+    context.initial_ramp['2_null'], context.initial_delta_weights['2_null'], ramp_offset, residual_score = \
+        get_delta_weights_LSA(context.target_ramp, input_rate_maps, context.induction_locs['1'],
+                              induction_stop_locs['1'], bounds=(context.min_delta_weight, 3.), verbose=context.verbose,
+                              plot=context.plot)
+    context.initial_ramp['2_shift'] = context.initial_ramp['2_null']
+    context.initial_delta_weights['2_shift'] = context.initial_delta_weights['2_null']
 
 
 def update_model_params(x, local_context):
@@ -580,11 +560,10 @@ def get_delta_weights_LSA(target_ramp, input_rate_maps, induction_loc, induction
     return model_ramp, delta_weights, ramp_offset, residual_score
 
 
-def calculate_model_ramp(induction, induction_type, export=False, plot=False):
+def calculate_model_ramp(induction, export=False, plot=False):
     """
 
-    :param induction: int
-    :param induction_type: str
+    :param induction: str
     :param export: bool
     :param plot: bool
     :return: dict
@@ -592,14 +571,8 @@ def calculate_model_ramp(induction, induction_type, export=False, plot=False):
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
         get_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
                            context.global_signal_decay, context.down_dt, plot)
-    induction_key = str(induction)
-    induction_index = 1
-    if induction == 2:
-        induction_key = str(induction) + '_' + induction_type
-        if induction_type == 'shift':
-            induction_index = 2
 
-    global_signal = get_global_signal(context.down_induction_gate[induction_index], global_filter)
+    global_signal = get_global_signal(context.down_induction_gate[induction], global_filter)
     local_signals = get_local_signal_population(local_signal_filter)
     local_signal_peaks = [np.max(local_signal) for local_signal in local_signals]
 
@@ -641,8 +614,8 @@ def calculate_model_ramp(induction, induction_type, export=False, plot=False):
 
     initial_delta_weights = context.initial_delta_weights[induction]
     initial_ramp = context.initial_ramp[induction]
-    induction_loc = context.induction_locs[induction_index]
-    induction_stop_loc = context.induction_stop_locs[induction_index]
+    induction_loc = context.induction_locs[induction]
+    induction_stop_loc = context.induction_stop_locs[induction]
 
     # re-compute initial weights if they are out of the current weight bounds
     if induction == 2:
@@ -651,12 +624,12 @@ def calculate_model_ramp(induction, induction_type, export=False, plot=False):
             initial_delta_weights = np.minimum(np.maximum(initial_delta_weights, context.min_delta_weight),
                                                context.peak_delta_weight)
             initial_ramp, initial_delta_weights, initial_ramp_offset, discard_residual_score = \
-                get_delta_weights_LSA(context.target_ramp[1], context.input_rate_maps, induction_loc,
+                get_delta_weights_LSA(context.target_ramp, context.input_rate_maps, induction_loc,
                                       induction_stop_loc, initial_delta_weights=initial_delta_weights,
                                       bounds=(context.min_delta_weight, context.peak_delta_weight),
                                       verbose=context.verbose)
             if context.verbose > 1:
-                print 'Process: %i; re-computed initial weights before induction: %s' % (os.getpid(), induction_key)
+                print 'Process: %i; re-computed initial weights before induction: %s' % (os.getpid(), induction)
 
     initial_weights = np.divide(np.add(initial_delta_weights, 1.), peak_weight)
     weights = []
@@ -706,8 +679,8 @@ def calculate_model_ramp(induction, induction_type, export=False, plot=False):
     result = {}
     ramp_amp, ramp_width, peak_shift, ratio, start_loc, peak_loc, end_loc, min_val, min_loc = {}, {}, {}, {}, {}, {}, \
                                                                                               {}, {}, {}
-    target_ramp = context.target_ramp[1]
-    if induction_index == 1:
+    target_ramp = context.target_ramp
+    if induction in ['1', '2_null']:
         model_ramp, discard_delta_weights, model_ramp_offset, model_ramp_residual_score = \
             get_ramp_residual_score(np.subtract(weights, 1.), target_ramp, input_matrix, induction_loc,
                                     full_output=True)
@@ -721,7 +694,7 @@ def calculate_model_ramp(induction, induction_type, export=False, plot=False):
             get_ramp_feature_score(np.subtract(weights, 1.), initial_ramp, input_matrix, induction_loc,
                                    verbose=context.verbose)
         result['ramp_feature_score'] = model_ramp_feature_score
-    if induction == 2:
+    if induction in ['2_null', '2_shift']:
         ramp_amp['before'], ramp_width['before'], peak_shift['before'], ratio['before'], start_loc['before'], \
         peak_loc['before'], end_loc['before'], min_val['before'], min_loc['before'] = \
             calculate_ramp_features(context, initial_ramp, induction_loc)
@@ -731,13 +704,13 @@ def calculate_model_ramp(induction, induction_type, export=False, plot=False):
         calculate_ramp_features(context, model_ramp, induction_loc)
     
     if context.verbose > 0:
-        print 'Process: %i; induction: %s:' % (os.getpid(), induction_key)
-        if induction_index == 1:
+        print 'Process: %i; induction: %s:' % (os.getpid(), induction)
+        if induction in ['1', '2_null']:
             print 'target: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, ' \
                   'peak_loc: %.1f, end_loc: %.1f, min_val: %.1f, min_loc: %.1f' % \
                   (ramp_amp['target'], ramp_width['target'], peak_shift['target'], ratio['target'], 
                    start_loc['target'], peak_loc['target'], end_loc['target'], min_val['target'], min_loc['target'])
-        if induction == 2:
+        if induction in ['2_null', '2_shift']:
             print 'before: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, ' \
                   'peak_loc: %.1f, end_loc: %.1f, min_val: %.1f, min_loc: %.1f' % \
                   (ramp_amp['before'], ramp_width['before'], peak_shift['before'], ratio['before'],
@@ -752,17 +725,17 @@ def calculate_model_ramp(induction, induction_type, export=False, plot=False):
     result['peak_shift'] = peak_shift['after']
     result['min_val'] = min_val['after']
     result['ramp_width'] = ramp_width['after']
-    if induction_type == 'shift':
+    if induction == '2_shift':
         result['delta_peak_val_initial'] = delta_peak_val_initial
     
-    induction_stop_loc = context.induction_stop_locs[induction_index]
+    induction_stop_loc = context.induction_stop_locs[induction]
 
     if plot:
         bar_loc = max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1., np.max(initial_ramp) + 1. ) * 0.95
         fig, axes = plt.subplots(2)
         axes[1].plot(context.peak_locs, delta_weights)
         axes[1].hlines(peak_weight * 1.05, xmin=induction_loc, xmax=induction_stop_loc)
-        if induction_index == 1:
+        if induction in ['1', '2_null']:
             axes[0].plot(context.binned_x, target_ramp, label='Target')
         axes[0].plot(context.binned_x, initial_ramp, label='Before')
         axes[0].plot(context.binned_x, model_ramp, label='After')
@@ -776,7 +749,7 @@ def calculate_model_ramp(induction, induction_type, export=False, plot=False):
                           max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1., np.max(initial_ramp) + 1.)])
         axes[1].set_ylim([-peak_weight, peak_weight * 1.1])
         clean_axes(axes)
-        fig.suptitle('Induction: %s' % induction_key)
+        fig.suptitle('Induction: %s' % induction)
         fig.tight_layout()
         fig.show()
     
@@ -794,13 +767,13 @@ def calculate_model_ramp(induction, induction_type, export=False, plot=False):
             if exported_data_key not in f:
                 f.create_group(exported_data_key)
                 f[exported_data_key].attrs['enumerated'] = False
-            if induction_key not in f[exported_data_key]:
-                f[exported_data_key].create_group(induction_key)
+            if induction not in f[exported_data_key]:
+                f[exported_data_key].create_group(induction)
             description = 'model_ramp_features'
-            if description not in f[exported_data_key][induction_key]:
-                f[exported_data_key][induction_key].create_group(description)
-            group = f[exported_data_key][induction_key][description]
-            if induction_index == 1:
+            if description not in f[exported_data_key][induction]:
+                f[exported_data_key][induction].create_group(description)
+            group = f[exported_data_key][induction][description]
+            if induction in ['1', '2_null']:
                 group.create_dataset('target_ramp', compression='gzip', data=target_ramp)
             group.create_dataset('initial_model_ramp', compression='gzip', data=initial_ramp)
             group.create_dataset('model_ramp', compression='gzip', data=model_ramp)
@@ -821,9 +794,9 @@ def calculate_model_ramp(induction, induction_type, export=False, plot=False):
             group.attrs['global_signal_peak'] = global_signal_peak
             group.attrs['induction_start_loc'] = induction_loc
             group.attrs['induction_stop_loc'] = induction_stop_loc
-            group.attrs['induction_start_times'] = context.induction_start_times[induction_index]
-            group.attrs['induction_stop_times'] = context.induction_stop_times[induction_index]
-            if induction_index == 1:
+            group.attrs['induction_start_times'] = context.induction_start_times[induction]
+            group.attrs['induction_stop_times'] = context.induction_stop_times[induction]
+            if induction in ['1', '2_null']:
                 group.attrs['target_ramp_amp'] = ramp_amp['target']
                 group.attrs['target_ramp_width'] = ramp_width['target']
                 group.attrs['target_peak_shift'] = peak_shift['target']
@@ -833,7 +806,7 @@ def calculate_model_ramp(induction, induction_type, export=False, plot=False):
                 group.attrs['target_end_loc'] = end_loc['target']
                 group.attrs['target_min_val'] = min_val['target']
                 group.attrs['target_min_loc'] = min_loc['target']
-            if induction == 2:
+            if induction in ['2_null', '2_shift']:
                 group.attrs['initial_ramp_amp'] = ramp_amp['before']
                 group.attrs['initial_ramp_width'] = ramp_width['before']
                 group.attrs['initial_peak_shift'] = peak_shift['before']
@@ -843,7 +816,7 @@ def calculate_model_ramp(induction, induction_type, export=False, plot=False):
                 group.attrs['initial_end_loc'] = end_loc['before']
                 group.attrs['initial_min_val'] = min_val['before']
                 group.attrs['initial_min_loc'] = min_loc['before']
-                if induction_type == 'shift':
+                if induction == '2_shift':
                     group.attrs['delta_peak_val_initial'] = delta_peak_val_initial
             group.attrs['model_ramp_amp'] = ramp_amp['after']
             group.attrs['model_ramp_width'] = ramp_width['after']
@@ -855,7 +828,7 @@ def calculate_model_ramp(induction, induction_type, export=False, plot=False):
             group.attrs['model_min_val'] = min_val['after']
             group.attrs['model_min_loc'] = min_loc['after']
     
-    return {induction_key: result}
+    return {induction: result}
 
 
 def get_args_static_model_ramp():
@@ -867,32 +840,27 @@ def get_args_static_model_ramp():
     :return: list of list
     """
 
-    return [[1, 2, 2], ['', 'null', 'shift']]
+    return [context.induction_locs.keys()]
 
 
-def compute_features_model_ramp(x, induction=None, induction_type=None, export=False, plot=False):
+def compute_features_model_ramp(x, induction=None, export=False, plot=False):
     """
 
     :param x: array
-    :param induction: int
-    :param induction_type: str
+    :param induction: str
     :param export: bool
     :param plot: bool
     :return: dict
     """
     update_source_contexts(x, context)
     start_time = time.time()
-    induction = int(induction)
-    induction_key = str(induction)
-    if induction == 2:
-        induction_key = str(induction) + '_' + induction_type
     if context.disp:
         print 'Process: %i: computing model_ramp features for induction: %s with x: %s' % \
-              (os.getpid(), induction_key, ', '.join('%.3E' % i for i in x))
-    result = calculate_model_ramp(induction, induction_type, export=export, plot=plot)
+              (os.getpid(), induction, ', '.join('%.3E' % i for i in x))
+    result = calculate_model_ramp(induction, export=export, plot=plot)
     if context.disp:
         print 'Process: %i: computing model_ramp features for induction: %s took %.1f s' % \
-              (os.getpid(), induction_key, time.time() - start_time)
+              (os.getpid(), induction, time.time() - start_time)
     return result
 
 
