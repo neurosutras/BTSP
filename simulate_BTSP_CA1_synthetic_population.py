@@ -125,111 +125,100 @@ def init_context():
 
     """
     context.update(context.x0)
-    dt = 1.  # ms
+    dt = 10.  # ms
     input_field_width = 90.  # cm
     input_field_peak_rate = 40.  # Hz
-    num_inputs = 200  # 200
+    num_inputs = 200
+    num_cells = context.num_cells
+    initial_active_fraction = 0.25
+    initial_active_cells = int(num_cells * initial_active_fraction)
     track_length = 187.  # cm
+    default_run_vel = 25.  # cm/s
 
     binned_dx = track_length / 100.  # cm
-    binned_x = np.arange(0., track_length + binned_dx / 2., binned_dx)[:100] + binned_dx / 2.
-    generic_dx = binned_dx / 100.  # cm
-    generic_x = np.arange(0., track_length, generic_dx)
+    binned_x = np.linspace(0., track_length, 100, endpoint=False) + binned_dx / 2.
 
-    default_run_vel = 25.  # cm/s
-    generic_position_dt = generic_dx / default_run_vel * 1000.  # ms
-    generic_t = np.arange(0., len(generic_x) * generic_position_dt, generic_position_dt)[:len(generic_x)]
-
-    default_interp_t = np.arange(0., generic_t[-1], dt)
-    default_interp_x = np.interp(default_interp_t, generic_t, generic_x)
-    default_interp_dx = dt * default_run_vel / 1000.  # cm
-
-    extended_x = np.concatenate([generic_x - track_length, generic_x, generic_x + track_length])
+    num_steps = int(track_length / default_run_vel / dt * 1000.)
+    default_x = np.linspace(0., track_length, num_steps, endpoint=False)
+    default_t = np.linspace(0., num_steps * dt, num_steps, endpoint=False)
 
     input_rate_maps, peak_locs = \
         generate_spatial_rate_maps(binned_x, num_inputs, input_field_peak_rate, input_field_width, track_length)
 
-    down_dt = 10.  # ms, to speed up optimization
-    sm = StateMachine(dt=down_dt)
+    sm = StateMachine(dt=dt)
     num_assay_laps = 5
     num_induction_laps = 5
     initial_induction_dur = 300.  # ms
     pause_dur = 500.  # ms
     reward_dur = 500.  # ms
-    basal_plateau_dur = 50.  # ms
-    reward_plateau_dur = 300.  # ms
-    basal_total_prob_plateau = 0.05
-    reward_prob_plateau_factor = 10.
+    plateau_dur_min = 50.  # ms
+    plateau_dur_max = 300.  # ms
+    peak_plateau_prob_per_lap = 0.5
+    basal_target_fraction_active = 0.5
+    reward_target_fraction_active = 1.
 
     context.update(locals())
 
-    if context.induction_locs is None:
-        context.induction_locs = {}
-    induction_stop_locs = {}
-    for induction in context.induction_locs:
-        induction_stop_index = np.where(default_interp_x >= context.induction_locs[induction])[0][0] + \
+    if context.reward_locs is None:
+        context.reward_locs = {}
+    reward_stop_locs = {}
+    for induction in context.reward_locs:
+        reward_stop_index = np.where(default_x >= context.reward_locs[induction])[0][0] + \
                                int(reward_dur / dt)
-        induction_stop_locs[induction] = default_interp_x[induction_stop_index]
+        reward_stop_locs[induction] = default_x[reward_stop_index]
 
-    num_laps = 2 + num_assay_laps + (num_assay_laps + num_induction_laps) * len(context.induction_locs)
-    induction_lap_indexes = {}
+    num_laps = 2 + num_assay_laps + (num_assay_laps + num_induction_laps) * len(context.reward_locs)
+    reward_lap_indexes = {}
     start_lap = 1 + num_assay_laps
-    for induction in context.induction_locs:
+    for induction in context.reward_locs:
         end_lap = start_lap + num_induction_laps
-        induction_lap_indexes[induction] = range(start_lap, end_lap)
+        reward_lap_indexes[induction] = range(start_lap, end_lap)
         start_lap += num_induction_laps + num_assay_laps
 
-    induction_start_indexes, induction_stop_indexes, induction_start_times, induction_stop_times = \
-        defaultdict(list), defaultdict(list), defaultdict(list), defaultdict(list)
+    reward_start_indexes, reward_stop_indexes = defaultdict(list), defaultdict(list)
     position = np.array([])
     t = np.array([])
     reward = np.array([])
-    running_t = -len(default_interp_t) * dt
+    running_t = -len(default_t) * dt
     running_position = -track_length
+    lap_edge_indexes = []
     for lap in xrange(num_laps):
         prev_len = len(t)
-        position = np.append(position, np.add(default_interp_x, running_position))
-        t = np.append(t, np.add(default_interp_t, running_t))
-        reward = np.append(reward, np.zeros_like(default_interp_t))
+        lap_edge_indexes.append(prev_len)
+        position = np.append(position, np.add(default_x, running_position))
+        t = np.append(t, np.add(default_t, running_t))
+        reward = np.append(reward, np.zeros_like(default_t))
         running_position += track_length
-        running_t += len(default_interp_t) * dt
-        for induction in context.induction_locs:
-            if lap in induction_lap_indexes[induction]:
-                start_index = prev_len + np.where(default_interp_x >= context.induction_locs[induction])[0][0]
-                induction_start_indexes[induction].append(start_index)
+        running_t += len(default_t) * dt
+        for induction in context.reward_locs:
+            if lap in reward_lap_indexes[induction]:
+                start_index = prev_len + np.where(default_x >= context.reward_locs[induction])[0][0]
+                reward_start_indexes[induction].append(start_index)
                 stop_index = start_index + int(reward_dur / dt)
-                induction_stop_indexes[induction].append(stop_index)
-                induction_start_times[induction].append(t[start_index])
-                induction_stop_times[induction].append(t[stop_index])
+                reward_stop_indexes[induction].append(stop_index)
                 reward[start_index:stop_index] = 1.
+    lap_edge_indexes.append(len(t))
 
-    for induction in context.induction_locs:
-        induction_start_times[induction] = np.array(induction_start_times[induction])
-        induction_stop_times[induction] = np.array(induction_stop_times[induction])
-        induction_start_indexes[induction] = np.array(induction_start_indexes[induction])
-        induction_stop_indexes[induction] = np.array(induction_stop_indexes[induction])
-
-    down_t = np.arange(t[0], t[-1] + down_dt / 2., down_dt)
-    down_reward = np.interp(down_t, t, reward)
+    for induction in context.reward_locs:
+        reward_start_indexes[induction] = np.array(reward_start_indexes[induction])
+        reward_stop_indexes[induction] = np.array(reward_stop_indexes[induction])
 
     complete_rate_maps = []
-    down_rate_maps = []
+
     for this_rate_map in input_rate_maps:
-        interp_rate_map = np.interp(default_interp_x, binned_x, this_rate_map, period=track_length)
+        interp_rate_map = np.interp(default_x, binned_x, this_rate_map, period=track_length)
         this_complete_rate_map = np.array([])
         for lap in xrange(num_laps):
             this_complete_rate_map = np.append(this_complete_rate_map, interp_rate_map)
         complete_rate_maps.append(this_complete_rate_map)
-        this_down_rate_map = np.interp(down_t, t, this_complete_rate_map)
-        down_rate_maps.append(this_down_rate_map)
 
     context.update(locals())
 
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
         get_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
-                           context.global_signal_decay, down_dt)
+                           context.global_signal_decay, dt)
 
-    local_signals = get_local_signal_population(local_signal_filter)
+    local_signals = get_local_signal_population(complete_rate_maps, local_signal_filter, dt)
     local_signal_peak = np.max(local_signals)
     local_signals /= local_signal_peak
 
@@ -240,89 +229,41 @@ def init_context():
 
     target_initial_ramp = get_target_synthetic_ramp(-context.target_peak_shift,
                                                     target_peak_shift=context.target_peak_shift,
-                                                    target_peak_val=context.initial_ramp_peak_val,
-                                                    ramp_x=peak_locs)
-    target_initial_ramp = np.interp(binned_x, peak_locs, target_initial_ramp, period=track_length)
+                                                    target_peak_val=context.initial_ramp_peak_val)
     target_initial_induction_loc = -context.target_peak_shift
     target_initial_induction_stop_loc = target_initial_induction_loc + initial_induction_dur / 1000. * default_run_vel
-    if 'plot' not in context():
-        context.plot = False
     initial_ramp, initial_delta_weights, discard_ramp_offset, discard_residual_score = \
         get_delta_weights_LSA(target_initial_ramp, input_rate_maps, target_initial_induction_loc,
                               target_initial_induction_stop_loc,
-                              bounds=(context.min_delta_weight, context.peak_delta_weight), verbose=context.verbose,
-                              plot=context.plot)
-    interp_initial_ramp = np.interp(peak_locs, binned_x, initial_ramp, period=track_length)
-
-    ramp_xrange = np.linspace(0., 10., 10000)
-    basal_prob_plateau = np.vectorize(scaled_single_sigmoid(8., 10., ramp_xrange))
-
-    target_basal_prob_plateau = np.array(basal_prob_plateau(interp_initial_ramp))
-    low_indexes = np.where(target_basal_prob_plateau < 0.05)[0]
-    target_basal_prob_plateau[low_indexes] = 0.
-    target_basal_prob_plateau *= basal_total_prob_plateau / \
-                           np.trapz(target_basal_prob_plateau, dx=track_length/float(len(peak_locs)))
-
-    reward_prob_plateau = np.vectorize(scaled_single_sigmoid(4., 10., ramp_xrange))
-    target_reward_prob_plateau = np.array(reward_prob_plateau(interp_initial_ramp))
-    low_indexes = np.where(target_reward_prob_plateau < 0.05)[0]
-    target_reward_prob_plateau[low_indexes] = 0.
-    target_reward_prob_plateau *= reward_prob_plateau_factor * basal_total_prob_plateau / \
-                                 np.trapz(target_reward_prob_plateau, dx=track_length / float(len(peak_locs)))
-
-    binned_ramp_population = []
+                              bounds=(context.min_delta_weight, context.peak_delta_weight), verbose=context.verbose)
+    
+    max_ramp_population_sum = np.mean(initial_ramp) * num_cells
+    
     initial_weights_population = []
-    down_prob_plateau_population = []
-    reward_indexes = np.where(down_reward == 1.)[0]
-    for i in xrange(len(peak_locs)):
-        this_initial_ramp = np.interp(binned_x, peak_locs, np.roll(interp_initial_ramp, i), period=track_length)
-        this_weights = np.add(np.roll(initial_delta_weights, i), 1.)
-        binned_ramp_population.append(this_initial_ramp)
-        initial_weights_population.append(this_weights)
-        this_prob_plateau = np.interp(default_interp_x, peak_locs,
-                                      np.roll(target_basal_prob_plateau, i), period=track_length)
-        this_reward_prob_plateau = np.interp(default_interp_x, peak_locs,
-                                      np.roll(target_reward_prob_plateau, i), period=track_length)
-        this_complete_prob_plateau = np.zeros_like(default_interp_x)
-        this_complete_reward_prob_plateau = np.zeros_like(default_interp_x)
-        for lap in xrange(1, num_laps - 1):
-            this_complete_prob_plateau = np.append(this_complete_prob_plateau, this_prob_plateau)
-            this_complete_reward_prob_plateau = np.append(this_complete_reward_prob_plateau, this_reward_prob_plateau)
-        this_complete_prob_plateau = np.append(this_complete_prob_plateau, np.zeros_like(default_interp_x))
-        this_complete_reward_prob_plateau = np.append(this_complete_reward_prob_plateau,
-                                                      np.zeros_like(default_interp_x))
-        this_down_prob_plateau = np.interp(down_t, t, this_complete_prob_plateau)
-        this_down_reward_prob_plateau = np.interp(down_t, t, this_complete_reward_prob_plateau)
-        this_down_prob_plateau[reward_indexes] = this_down_reward_prob_plateau[reward_indexes]
-        down_prob_plateau_population.append(this_down_prob_plateau)
+    d_peak_indexes = int(len(peak_locs) / initial_active_cells)
+    initial_peak_indexes = np.linspace(0, len(peak_locs), initial_active_cells, dtype=int, endpoint=False) + \
+                           int(d_peak_indexes / 2)
+    for i in xrange(num_cells):
+        if i < initial_active_cells:
+            roll_indexes = initial_peak_indexes[i]
+            this_weights = np.add(np.roll(initial_delta_weights, roll_indexes), 1.)
+            initial_weights_population.append(this_weights)
+        else:
+            initial_weights_population.append(np.ones_like(peak_locs))
 
-    plateau_start_indexes_population = []
-    down_induction_gate_population = []
-    global_signal_population = []
-    pause_len = int(pause_dur / down_dt)
-    basal_plateau_len = int(basal_plateau_dur / down_dt)
-    reward_plateau_len = int(reward_plateau_dur / down_dt)
-    local_random = random.Random()
-    local_random.seed(context.seed)
+    ramp_xscale = np.linspace(0., 10., 10000)
+    plateau_prob_f = scaled_single_sigmoid(4., 8., ramp_xscale, ylim=[0.5, 1.])
+    plateau_prob_f = np.vectorize(plateau_prob_f)
 
-    for i in xrange(len(down_prob_plateau_population)):
-        this_prob_plateau = np.array(down_prob_plateau_population[i])
-        this_induction_gate = np.zeros_like(this_prob_plateau)
-        this_plateau_start_indexes = []
-        for j in xrange(len(this_prob_plateau)):
-            if this_prob_plateau[j] > 0. and local_random.random() < this_prob_plateau[j]:
-                this_plateau_start_indexes.append(j)
-                if down_reward[j] == 1.:
-                    plateau_len = reward_plateau_len
-                else:
-                    plateau_len = basal_plateau_len
-                this_induction_gate[j:j+plateau_len] = 1.
-                this_prob_plateau[j:j+plateau_len+pause_len] = 0.
-        this_global_signal = get_global_signal(this_induction_gate, global_filter)
-        plateau_start_indexes_population.append(this_plateau_start_indexes)
-        down_induction_gate_population.append(this_induction_gate)
-        global_signal_population.append(this_global_signal)
-    global_signal_population = np.divide(global_signal_population, context.global_signal_peak)
+    interp_target_ramp = np.interp(default_x, binned_x, target_initial_ramp, period=track_length)
+    target_plateau_prob = plateau_prob_f(interp_target_ramp)
+    context.plateau_prob_norm_factor = context.peak_plateau_prob_per_lap / np.sum(target_plateau_prob)
+
+    reward_delta_modulation = reward_target_fraction_active / basal_target_fraction_active - 1.
+    plateau_modulation_f = lambda this_population_activity, this_reward: \
+        min(1., max(0., 1. + this_reward * reward_delta_modulation -
+                    this_population_activity / basal_target_fraction_active))
+    plateau_modulation_f = np.vectorize(plateau_modulation_f)
 
     context.update(locals())
 
@@ -400,20 +341,83 @@ def get_global_signal(induction_gate, global_filter):
     return np.convolve(induction_gate, global_filter)[:len(induction_gate)]
 
 
-def get_local_signal_population(local_filter):
+def get_local_signal_population(input_rate_maps, local_filter, dt):
     """
 
-    :param local_filter:
+    :param input_rate_maps: list of array
+    :param local_filter: array
+    :param dt: float
     :return:
     """
     local_signals = []
-    for rate_map in context.down_rate_maps:
-        local_signals.append(get_local_signal(rate_map, local_filter, context.down_dt))
+    for rate_map in input_rate_maps:
+        local_signals.append(get_local_signal(rate_map, local_filter, dt))
     return local_signals
 
 
+def calculate_ramp_features(ramp, induction_loc, offset=False, smooth=False):
+    """
+
+    :param ramp: array
+    :param induction_loc: float
+    :param offset: bool
+    :param smooth: bool
+    :return tuple of float
+    """
+    binned_x = context.binned_x
+    track_length = context.track_length
+    default_x = context.default_x
+    extended_binned_x = np.concatenate([binned_x - track_length, binned_x, binned_x + track_length])
+    if smooth:
+        local_ramp = signal.savgol_filter(ramp, 21, 3, mode='wrap')
+    else:
+        local_ramp = np.array(ramp)
+    extended_binned_ramp = np.concatenate([local_ramp] * 3)
+    extended_interp_x = np.concatenate([default_x - track_length, default_x,
+                                        default_x + track_length])
+    extended_ramp = np.interp(extended_interp_x, extended_binned_x, extended_binned_ramp)
+    interp_ramp = extended_ramp[len(default_x):2 * len(default_x)]
+    baseline_indexes = np.where(interp_ramp <= np.percentile(interp_ramp, 10.))[0]
+    baseline = np.mean(interp_ramp[baseline_indexes])
+    if offset:
+        interp_ramp -= baseline
+        extended_ramp -= baseline
+    peak_index = np.where(interp_ramp == np.max(interp_ramp))[0][0] + len(interp_ramp)
+    peak_val = extended_ramp[peak_index]
+    peak_x = extended_interp_x[peak_index]
+    start_index = np.where(extended_ramp[:peak_index] <=
+                           0.15 * (peak_val - baseline) + baseline)[0][-1]
+    end_index = peak_index + np.where(extended_ramp[peak_index:] <= 0.15 *
+                                      (peak_val - baseline) + baseline)[0][0]
+    start_loc = float(start_index % len(default_x)) / float(len(default_x)) * track_length
+    end_loc = float(end_index % len(default_x)) / float(len(default_x)) * track_length
+    peak_loc = float(peak_index % len(default_x)) / float(len(default_x)) * track_length
+    min_index = np.where(interp_ramp == np.min(interp_ramp))[0][0] + len(interp_ramp)
+    min_val = extended_ramp[min_index]
+    min_loc = float(min_index % len(default_x)) / float(len(default_x)) * track_length
+    peak_shift = peak_x - induction_loc
+    if peak_shift > track_length / 2.:
+        peak_shift = -(track_length - peak_shift)
+    elif peak_shift < -track_length / 2.:
+        peak_shift += track_length
+    # ramp_width = extended_interp_x[end_index] - extended_interp_x[start_index]
+    scaled_ramp = np.divide(local_ramp, peak_val)
+    ramp_width = np.trapz(scaled_ramp, binned_x)
+    before_width = induction_loc - start_loc
+    if induction_loc < start_loc:
+        before_width += track_length
+    after_width = end_loc - induction_loc
+    if induction_loc > end_loc:
+        after_width += track_length
+    if after_width == 0:
+        ratio = before_width
+    else:
+        ratio = before_width / after_width
+    return peak_val, ramp_width, peak_shift, ratio, start_loc, peak_loc, end_loc, min_val, min_loc
+
+
 def get_ramp_residual_score(delta_weights, target_ramp, input_matrix, induction_loc, ramp_x=None, input_x=None,
-                         bounds=None, allow_offset=False, impose_offset=None, disp=False, full_output=False):
+                            bounds=None, allow_offset=False, impose_offset=None, disp=False, full_output=False):
     """
 
     :param delta_weights: array
@@ -462,11 +466,11 @@ def get_ramp_residual_score(delta_weights, target_ramp, input_matrix, induction_
                                                                                               {}, {}, {}
     ramp_amp['target'], ramp_width['target'], peak_shift['target'], ratio['target'], start_loc['target'], \
     peak_loc['target'], end_loc['target'], min_val['target'], min_loc['target'] = \
-        calculate_ramp_features(context, interp_target_ramp, induction_loc)
+        calculate_ramp_features(interp_target_ramp, induction_loc)
 
     ramp_amp['model'], ramp_width['model'], peak_shift['model'], ratio['model'], start_loc['model'], \
     peak_loc['model'], end_loc['model'], min_val['model'], min_loc['model'] = \
-        calculate_ramp_features(context, model_ramp, induction_loc)
+        calculate_ramp_features(model_ramp, induction_loc)
 
     if disp:
         print 'target: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f, ' \
@@ -508,7 +512,7 @@ def get_delta_weights_LSA(target_ramp, input_rate_maps, induction_loc, induction
     Uses least square approximation to estimate a set of weights to match any arbitrary place field ramp, agnostic
     about underlying kernel, induction velocity, etc.
     :param target_ramp: dict of array
-    :param input_rate_maps: array; x=default_interp_x
+    :param input_rate_maps: array; x=default_x
     :param induction_loc: float
     :param induction_stop_loc: float
     :param initial_delta_weights: array
@@ -592,41 +596,127 @@ def get_delta_weights_LSA(target_ramp, input_rate_maps, induction_loc, induction
     return model_ramp, delta_weights, ramp_offset, residual_score
 
 
-def calculate_weight_dynamics(cell_index):
+def calculate_weight_dynamics(cell_index, lap, initial_weights, initial_ramp, initial_global_signal,
+                              plateau_modulation_factor, last_plateau_stop_time):
     """
 
     :param cell_index: int
+    :param lap: int
+    :param initial_weights: array
+    :param initial_ramp: array
+    :param initial_global_signal: array
+    :param plateau_modulation_factor: array
+    :param last_plateau_stop_time: float
     :return: array
     """
     start_time = time.time()
     cell_index = int(cell_index)
-    global_signal = context.global_signal_population[cell_index]
-    initial_weights = context.initial_weights_population[cell_index]
+    lap = int(lap)
+    seed = context.seed_offset + 1e6 * lap + cell_index
+    local_random = random.Random()
+    local_random.seed(seed)
+
+    lap_start_index, lap_end_index = context.lap_edge_indexes[lap], context.lap_edge_indexes[lap + 1]
+    # compute convolution of induction gate and global signal filter for this and next lap
+    # if there is no next lap, the carryover signal array will be empty
+    if len(context.lap_edge_indexes) > lap + 2:
+        next_lap_end_index = context.lap_edge_indexes[lap + 2]
+    else:
+        next_lap_end_index = context.lap_edge_indexes[lap + 1]
+    this_lap_t = context.t[lap_start_index:lap_end_index]
+    this_epoch_t = context.t[lap_start_index:next_lap_end_index]
+
+    plateau_start_times = []
+    plateau_stop_times = []
+    induction_gate = np.zeros_like(this_epoch_t)
+
+    pause_len = int(context.pause_dur / context.dt)
+
+    if last_plateau_stop_time > this_lap_t[0]:
+        start_index = np.where(this_lap_t > last_plateau_stop_time)[0][0]
+        induction_gate[:start_index] = 1.
+        start_index += pause_len
+    else:
+        start_index = 0
+
+    plateau_prob = get_plateau_probability(initial_ramp)
+    plateau_prob = np.multiply(plateau_prob, plateau_modulation_factor)
+    initial_plateau_prob = np.array(plateau_prob)
+
+    for j in xrange(start_index, len(this_lap_t)):
+        this_t = this_lap_t[j]
+        if plateau_prob[j] > 0. and local_random.random() < plateau_prob[j]:
+            plateau_start_times.append(this_t)
+            this_plateau_dur = context.plateau_dur_min + (context.plateau_dur_max - context.plateau_dur_min) * \
+                               plateau_modulation_factor[j]
+            plateau_stop_times.append(this_t + this_plateau_dur)
+            plateau_len = int(this_plateau_dur / context.dt)
+            induction_gate[j:j + plateau_len] = 1.
+            plateau_prob[j:j + plateau_len + pause_len] = 0.
+
+    global_signal = get_global_signal(induction_gate, context.global_filter)
+    global_signal /= context.global_signal_peak
+    global_signal[:len(initial_global_signal)] += initial_global_signal
+
     peak_weight = context.peak_delta_weight + 1.
     norm_initial_weights = np.divide(initial_weights, peak_weight)
     weights_history = []
-    for i in xrange(len(context.peak_locs)):
-        # normalize total number of receptors
-        this_initial_weight = norm_initial_weights[i]
-        available = 1. - this_initial_weight
-        context.sm.update_states({'M': available, 'C': this_initial_weight})
-        local_signal = context.local_signals[i]
-        context.sm.update_rates(
-            {'M': {'C': context.rMC0 * np.multiply(context.pot_rate(local_signal), global_signal)},
-             'C': {'M': context.rCM0 * np.multiply(context.depot_rate(local_signal), global_signal)}})
-        context.sm.reset()
-        context.sm.run()
-        weights_history.append(context.sm.states_history['C'] * peak_weight)
+    if len(plateau_start_times) > 0:
+        for i in xrange(len(context.peak_locs)):
+            # normalize total number of receptors
+            this_initial_weight = norm_initial_weights[i]
+            available = 1. - this_initial_weight
+            context.sm.update_states({'M': available, 'C': this_initial_weight})
+            local_signal = context.local_signals[i][lap_start_index:next_lap_end_index]
+            context.sm.update_rates(
+                {'M': {'C': context.rMC0 * np.multiply(context.pot_rate(local_signal), global_signal)},
+                 'C': {'M': context.rCM0 * np.multiply(context.depot_rate(local_signal), global_signal)}})
+            context.sm.reset()
+            context.sm.run()
+            weights_history.append(context.sm.states_history['C'] * peak_weight)
+    else:
+        weights_history = \
+            [np.append(np.ones_like(this_epoch_t), 1.) * initial_weight for initial_weight in initial_weights]
+
     weights_history = np.array(weights_history)
 
+    next_global_signal = global_signal[len(context.default_t):]
+
     if context.disp:
-        print 'Process: %i: calculating ramp for cell: %i took %.1f s' % \
-              (os.getpid(), cell_index, time.time() - start_time)
+        print 'Process: %i: calculating ramp for cell: %i, lap: %i took %.1f s' % \
+              (os.getpid(), cell_index, lap, time.time() - start_time)
 
-    return weights_history
+    return plateau_start_times, plateau_stop_times, next_global_signal, weights_history, initial_plateau_prob
 
 
-def calculate_ramp_population(export=False, plot=False):
+def get_plateau_modulation_factor(ramp_population, reward):
+    """
+
+    :param ramp_population: list of array (like binned_x)
+    :param reward: array (like default_t)
+    :return: array (like default_t)
+    """
+    binned_ramp_population_sum = np.sum(ramp_population, axis=0)
+    ramp_population_sum = np.interp(context.default_x, context.binned_x, binned_ramp_population_sum,
+                                    period=context.track_length)
+    population_activity_density = ramp_population_sum / context.max_ramp_population_sum
+    plateau_modulation_factor = context.plateau_modulation_f(population_activity_density, reward)
+    return plateau_modulation_factor
+
+
+def get_plateau_probability(ramp):
+    """
+
+    :param ramp: array (like binned_x)
+    :return: array (like default_t)
+    """
+    interp_ramp = np.interp(context.default_x, context.binned_x, ramp, period=context.track_length)
+    plateau_prob = context.plateau_prob_f(interp_ramp)
+    plateau_prob *= context.plateau_prob_norm_factor
+    return plateau_prob
+
+
+def calculate_population_dynamics(export=False, plot=False):
     """
 
     :param export: bool
@@ -634,35 +724,76 @@ def calculate_ramp_population(export=False, plot=False):
     :return: dict
     """
     start_time = time.time()
-    cell_indexes = range(len(context.global_signal_population))
+    cell_indexes = range(len(context.initial_weights_population))
     if 'debug' in context() and context.debug:
-        cell_indexes = cell_indexes[::int(len(context.global_signal_population)/context.interface.num_workers)]
+        cell_indexes = cell_indexes[::int(len(context.initial_weights_population)/context.interface.num_workers)]
         cell_indexes = cell_indexes[:context.interface.num_workers]
         print 'cell_indexes: %s' % cell_indexes
-    weights_history_population = context.interface.map(calculate_weight_dynamics, cell_indexes)
-    weights_history_population = np.array(weights_history_population)
+    group_size = len(cell_indexes)
+
+    plateau_start_times_population = defaultdict(list)
+    plateau_stop_times_population = defaultdict(list)
+    weights_population_full_history = []
+    plateau_probability_history = []
+    weights_snapshots = []
+    ramp_snapshots = []
+    current_weights_population = np.array(context.initial_weights_population)[cell_indexes]
+    weights_snapshots.append(current_weights_population)
+    current_ramp_population = map(get_model_ramp, current_weights_population)
+    ramp_snapshots.append(current_ramp_population)
+    initial_global_signal_population = [np.zeros_like(context.default_t)] * group_size
+
+    for lap in xrange(1, context.num_laps -1):
+        lap_start_index, lap_end_index = context.lap_edge_indexes[lap], context.lap_edge_indexes[lap+1]
+        current_reward = context.reward[lap_start_index:lap_end_index]
+        plateau_modulation_factor = get_plateau_modulation_factor(current_ramp_population, current_reward)
+        last_plateau_stop_times = []
+        for cell_index in cell_indexes:
+            if cell_index in plateau_stop_times_population and len(plateau_stop_times_population[cell_index]) > 0:
+                last_plateau_stop_times.append(plateau_stop_times_population[cell_index][-1])
+            else:
+                last_plateau_stop_times.append(0.)
+
+        result = context.interface.map(calculate_weight_dynamics, cell_indexes,
+                                       [lap] * group_size, current_weights_population, current_ramp_population,
+                                       initial_global_signal_population,
+                                       [plateau_modulation_factor] * group_size,
+                                       last_plateau_stop_times)
+        this_plateau_start_times_population, this_plateau_stop_times_population, initial_global_signal_population, \
+            this_weights_population_history, this_plateau_probability_population = zip(*result)
+        weights_population_full_history.append(np.array(this_weights_population_history))
+        plateau_probability_history.append(this_plateau_probability_population)
+        for cell_index, this_plateau_start_times, this_plateau_stop_times in \
+                zip(cell_indexes, this_plateau_start_times_population, this_plateau_stop_times_population):
+            plateau_start_times_population[cell_index].extend(this_plateau_start_times)
+            plateau_stop_times_population[cell_index].extend(this_plateau_stop_times)
+        current_weights_population = []
+        for this_weights_history in this_weights_population_history:
+            current_weights_population.append(this_weights_history[:,-1])
+        weights_snapshots.append(current_weights_population)
+        current_ramp_population = map(get_model_ramp, current_weights_population)
+        ramp_snapshots.append(current_ramp_population)
+
+    weights_population_full_history = np.array(weights_population_full_history)
+    weights_snapshots = np.array(ramp_snapshots)
+    ramp_snapshots = np.array(ramp_snapshots)
 
     if context.disp:
         print 'Process: %i: calculating ramp population took %.1f s' % (os.getpid(), time.time() - start_time)
 
-    if plot:
-        fig, axes = plt.subplots()
-        axes.plot(context.peak_locs,
-                     np.sum([this_weights_history[:,0] for this_weights_history in weights_history_population], axis=0),
-                  label='Before')
-        axes.plot(context.peak_locs,
-                  np.sum([this_weights_history[:,-1] for this_weights_history in weights_history_population], axis=0),
-                  label='After')
-        axes.legend(loc='best', frameon=False, framealpha=0.5)
-        clean_axes(axes)
-        fig.show()
+    reward_locs_array = [context.reward_locs[induction] for induction in context.reward_locs]
 
-    reward_locs = [context.induction_locs[induction] for induction in context.induction_locs]
-    down_plateau_t_indexes = []
-    plateau_cell_indexes = []
-    for i, plateau_indexes in enumerate(context.plateau_start_indexes_population):
-        plateau_cell_indexes.extend([i] * len(plateau_indexes))
-        down_plateau_t_indexes.extend(plateau_indexes)
+    if plot:
+        plot_ramp_snapshots(ramp_snapshots, reward_locs_array, context.binned_x, context.track_length,
+                            context.num_assay_laps, context.num_induction_laps)
+
+    plateau_start_times_array = []
+    plateau_stop_times_array = []
+    plateau_times_cell_indexes = []
+    for cell_index, this_plateau_start_times in plateau_start_times_population.iteritems():
+        plateau_start_times_array.extend(this_plateau_start_times)
+        plateau_stop_times_array.extend(plateau_start_times_population[cell_index])
+        plateau_times_cell_indexes.extend([cell_index] * len(this_plateau_start_times))
 
     if export:
         with h5py.File(context.export_file_path, 'a') as f:
@@ -675,36 +806,39 @@ def calculate_ramp_population(export=False, plot=False):
                 group.create_dataset('input_rate_maps', compression='gzip', data=np.array(context.input_rate_maps))
                 group.attrs['track_length'] = context.track_length
                 group.attrs['dt'] = context.dt
-                group.attrs['down_dt'] = context.down_dt
             exported_data_key = 'exported_data'
             if exported_data_key not in f:
                 f.create_group(exported_data_key)
                 f[exported_data_key].attrs['enumerated'] = False
-            description = 'weights_history_population'
+            description = 'weights_population_history'
             if description not in f[exported_data_key]:
                 f[exported_data_key].create_group(description)
             group = f[exported_data_key][description]
             group.attrs['num_assay_laps'] = context.num_assay_laps
             group.attrs['num_induction_laps'] = context.num_induction_laps
-            group.attrs['basal_plateau_dur'] = context.basal_plateau_dur
-            group.attrs['reward_plateau_dur'] = context.reward_plateau_dur
+            group.attrs['plateau_dur_max'] = context.plateau_dur_max
+            group.attrs['plateau_dur_min'] = context.plateau_dur_min
             group.attrs['reward_dur'] = context.reward_dur
-            group.attrs['reward_locs'] = reward_locs
+            group.attrs['reward_locs_array'] = reward_locs_array
             group.attrs['ramp_scaling_factor'] = context.ramp_scaling_factor
-            group.create_dataset('down_t', compression='gzip', data=context.down_t)
             group.create_dataset('t', compression='gzip', data=context.t)
             group.create_dataset('position', compression='gzip', data=context.position)
-            group.create_dataset('down_reward', compression='gzip', data=context.down_reward)
             group.create_dataset('reward', compression='gzip', data=context.reward)
-            group.create_dataset('plateau_cell_indexes', compression='gzip', data=plateau_cell_indexes)
-            group.create_dataset('down_plateau_t_indexes', compression='gzip', data=down_plateau_t_indexes)
-            group.create_dataset('weights_history_population', compression='gzip',
-                                 data=weights_history_population)
+            group.create_dataset('plateau_times_cell_indexes', compression='gzip', data=plateau_times_cell_indexes)
+            group.create_dataset('plateau_start_times_array', compression='gzip', data=plateau_start_times_array)
+            group.create_dataset('plateau_stop_times_array', compression='gzip', data=plateau_stop_times_array)
+            group.create_dataset('weights_population_full_history', compression='gzip',
+                                 data=weights_population_full_history)
+            group.create_dataset('plateau_probability_history', compression='gzip',
+                                 data=plateau_probability_history)
+            group.create_dataset('weights_snapshots', compression='gzip', data=weights_snapshots)
+            group.create_dataset('ramp_snapshots', compression='gzip', data=ramp_snapshots)
         if context.disp:
-            print 'Process: %i: exported weights history population data to file: %s' % \
+            print 'Process: %i: exported weights population history data to file: %s' % \
                   (os.getpid(), context.export_file_path)
 
-    return weights_history_population
+    return plateau_start_times_population, plateau_stop_times_population, weights_population_full_history, \
+           plateau_probability_history, weights_snapshots, ramp_snapshots
 
 
 def get_target_synthetic_ramp(induction_loc, target_peak_shift, ramp_x=None, track_length=None, target_peak_val=8.,
@@ -749,6 +883,76 @@ def get_target_synthetic_ramp(induction_loc, target_peak_shift, ramp_x=None, tra
     return target_ramp
 
 
+def get_model_ramp(weights):
+    """
+
+    :param weights: array
+    :return: array
+    """
+    this_delta_weights = weights - 1.
+    this_ramp = np.multiply(this_delta_weights.dot(context.input_rate_maps), context.ramp_scaling_factor)
+    return this_ramp
+
+
+def plot_ramp_snapshots(ramp_snapshots, reward_locs_array, binned_x, track_length, num_assay_laps, num_induction_laps):
+    """
+
+    :param ramp_snapshots: 3D array
+    :param reward_locs_array: array
+    :param binned_x: array
+    :param track_length: float
+    :param num_assay_laps: int
+    :param num_induction_laps: int
+    """
+    snapshot_laps = [0, num_assay_laps]
+    lap_labels = ['Lap 1: Before', 'Laps 2-%i: No reward' % (num_assay_laps + 1)]
+    for reward_loc in reward_locs_array:
+        start = max(snapshot_laps)
+        stop = start + num_induction_laps
+        snapshot_laps.append(stop)
+        lap_labels.append('Laps %i-%i: Reward at %i cm' % (start + 2, stop + 1, reward_loc))
+        start = max(snapshot_laps)
+        stop = start + num_induction_laps
+        snapshot_laps.append(stop)
+        lap_labels.append('Laps %i-%i: No reward' % (start + 2, stop + 1))
+    pprint.pprint(lap_labels)
+
+    peak_locs_snapshots = []
+    running_position = 0.
+    for this_ramp_snapshot in ramp_snapshots:
+        this_peak_locs_snapshot = []
+        for this_ramp in this_ramp_snapshot:
+            peak_index = np.argmax(this_ramp)
+            this_peak_loc = binned_x[peak_index]
+            this_peak_locs_snapshot.append(this_peak_loc)
+        peak_locs_snapshots.append(np.array(this_peak_locs_snapshot))
+    peak_locs_snapshots = np.array(peak_locs_snapshots)
+
+    edges = np.linspace(0., track_length, 51)
+    bin_width = edges[1] - edges[0]
+    context.update(locals())
+
+    fig1, axes1 = plt.subplots()
+    fig2, axes2 = plt.subplots()
+    for lap, lap_label in zip(snapshot_laps, lap_labels):
+        this_ramp_snapshot = ramp_snapshots[lap]
+        this_peak_locs_snapshot = peak_locs_snapshots[lap]
+        axes1.plot(binned_x, np.sum(this_ramp_snapshot, axis=0), label=lap_label)
+        hist, _edges = np.histogram(this_peak_locs_snapshot, bins=edges, density=True)
+        axes2.plot(edges[:-1] + bin_width / 2., hist * bin_width, label=lap_label)
+    axes1.set_xlabel('Location (cm)')
+    axes1.set_ylabel('Summed population activity')
+    axes1.set_ylim([0., axes1.get_ylim()[1]])
+    axes1.legend(loc='best', frameon=False, framealpha=0.5)
+    axes2.set_xlabel('Place field peak locations (cm)')
+    axes2.set_ylabel('Probability')
+    axes2.legend(loc='best', frameon=False, framealpha=0.5)
+    clean_axes([axes1, axes2])
+    fig1.tight_layout()
+    fig2.tight_layout()
+    plt.show()
+
+
 def analyze_simulation_output(file_path):
     """
 
@@ -760,70 +964,15 @@ def analyze_simulation_output(file_path):
         if 'shared_context' not in f or 'exported_data' not in f or \
                 'weights_history_population' not in f['exported_data']:
             raise KeyError('analyze_simulation_output: invalid file contents at path: %s' % file_path)
-        peak_locs = f['shared_context']['peak_locs'][:]
-        input_rate_maps = f['shared_context']['input_rate_maps'][:]
         binned_x = f['shared_context']['binned_x'][:]
         track_length = f['shared_context'].attrs['track_length']
-        dt = f['shared_context'].attrs['dt']
-        down_dt = f['shared_context'].attrs['down_dt']
         group = f['exported_data']['weights_history_population']
-        ramp_scaling_factor = group.attrs['ramp_scaling_factor']
-        reward_locs = group.attrs['reward_locs']
-        down_t = group['down_t'][:]
-        t = group['t'][:]
-        weights_history_population = group['weights_history_population'][:]
-        position = group['position'][:]
+        reward_locs_array = group.attrs['reward_locs_array']
+        ramp_snapshots = group['ramp_snapshots'][:]
         num_assay_laps = group.attrs['num_assay_laps']
         num_induction_laps = group.attrs['num_induction_laps']
-    snapshot_laps = [0, num_assay_laps]
-    for i in xrange(len(reward_locs)):
-        snapshot_laps.append(max(snapshot_laps) + num_induction_laps)
-        snapshot_laps.append(max(snapshot_laps) + num_assay_laps)
-    num_laps = snapshot_laps[-1]
-    ramp_snapshots = []
-    peak_locs_snapshots = []
-    running_position = 0.
-    print 'snapshot laps: %s' % snapshot_laps
-    for lap in xrange(num_laps + 1):
-        this_pos_index = np.where(position < running_position)[0][-1]
-        this_t = t[this_pos_index]
-        this_down_index = np.where(down_t >= this_t)[0][0]
-        if lap in snapshot_laps:
-            this_ramp_snapshot = []
-            this_peak_locs_snapshot = []
-            for this_weights_history in weights_history_population:
-                this_delta_weights = this_weights_history[:, this_down_index] - 1.
-                this_ramp = np.multiply(this_delta_weights.dot(input_rate_maps), ramp_scaling_factor)
-                this_ramp_snapshot.append(this_ramp)
-                peak_index = np.argmax(this_ramp)
-                this_peak_loc = binned_x[peak_index]
-                this_peak_locs_snapshot.append(this_peak_loc)
-            ramp_snapshots.append(np.array(this_ramp_snapshot))
-            peak_locs_snapshots.append(np.array(this_peak_locs_snapshot))
-        running_position += track_length
-    ramp_snapshots = np.array(ramp_snapshots)
-    print 'ramp_snapshots.shape: %s' % str(ramp_snapshots.shape)
-    peak_locs_snapshots = np.array(peak_locs_snapshots)
 
-    context.update(locals())
-
-    fig, axes = plt.subplots(2)
-    edges = np.linspace(0., track_length, 51)
-    for lap, this_ramp_snapshot, this_peak_locs_snapshot in zip(snapshot_laps, ramp_snapshots, peak_locs_snapshots):
-        axes[0].plot(binned_x, np.sum(this_ramp_snapshot, axis=0), label=lap)
-        hist, edges = np.histogram(this_peak_locs_snapshot, bins=edges, density=True)
-        bin_width = edges[1] - edges[0]
-        axes[1].plot(edges[:-1] + bin_width/2., hist * bin_width, label=lap)
-    axes[0].set_xlabel('Location (cm)')
-    axes[0].set_ylabel('Summed population activity')
-    axes[0].set_ylim([0., axes[0].get_ylim()[1]])
-    axes[0].legend(loc='best', frameon=False, framealpha=0.5)
-    axes[1].set_xlabel('Place field peak locations (cm)')
-    axes[1].set_ylabel('Probability')
-    axes[1].legend(loc='best', frameon=False, framealpha=0.5)
-    clean_axes(axes)
-    fig.tight_layout()
-    plt.show()
+    plot_ramp_snapshots(ramp_snapshots, reward_locs_array, binned_x, track_length, num_assay_laps, num_induction_laps)
 
 
 @click.command()
@@ -875,7 +1024,8 @@ def main(config_file_path, output_dir, export, export_file_path, label, verbose,
         context.interface.apply(config_parallel_interface, config_file_path=config_file_path, output_dir=output_dir,
                                 export=export, export_file_path=export_file_path, label=label, disp=context.disp,
                                 verbose=verbose)
-        weights_history_population = calculate_ramp_population(export, plot)
+        plateau_start_times_population, plateau_stop_times_population, weights_population_full_history, \
+            plateau_probability_history, weights_snapshots, ramp_snapshots = calculate_population_dynamics(export, plot)
     elif debug:
         config_parallel_interface(config_file_path=config_file_path, output_dir=output_dir, export=export,
                                   export_file_path=export_file_path, label=label, disp=context.disp, verbose=verbose)

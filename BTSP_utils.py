@@ -200,12 +200,12 @@ class StateMachine(object):
 def generate_spatial_rate_maps(x, n=200, peak_rate=1., field_width=90., track_length=187.):
     """
     Return a list of spatial rate maps with peak locations that span the track. Return firing rate vs. location
-    computed at the resolution of the provided x array. Default is track_length/10000 bins.
+    computed at the resolution of the provided x array.
+    :param x: array
     :param n: int
     :param peak_rate: float
     :param field_width: float
     :param track_length: float
-    :param x: array
     :return: list of array, array
     """
     gauss_sigma = field_width / 3. / np.sqrt(2.)  # contains 99.7% gaussian area
