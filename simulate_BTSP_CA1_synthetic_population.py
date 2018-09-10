@@ -962,11 +962,11 @@ def analyze_simulation_output(file_path):
         raise IOError('analyze_simulation_output: invalid file path: %s' % file_path)
     with h5py.File(file_path, 'r') as f:
         if 'shared_context' not in f or 'exported_data' not in f or \
-                'weights_history_population' not in f['exported_data']:
+                'weights_population_history' not in f['exported_data']:
             raise KeyError('analyze_simulation_output: invalid file contents at path: %s' % file_path)
         binned_x = f['shared_context']['binned_x'][:]
         track_length = f['shared_context'].attrs['track_length']
-        group = f['exported_data']['weights_history_population']
+        group = f['exported_data']['weights_population_history']
         reward_locs_array = group.attrs['reward_locs_array']
         ramp_snapshots = group['ramp_snapshots'][:]
         num_assay_laps = group.attrs['num_assay_laps']
