@@ -804,6 +804,7 @@ def calculate_population_dynamics(export=False, plot=False):
                 group = f[shared_context_key]
                 group.create_dataset('peak_locs', compression='gzip', data=context.peak_locs)
                 group.create_dataset('binned_x', compression='gzip', data=context.binned_x)
+                group.create_dataset('default_x', compression='gzip', data=context.default_x)
                 group.create_dataset('input_rate_maps', compression='gzip', data=np.array(context.input_rate_maps))
                 group.attrs['track_length'] = context.track_length
                 group.attrs['dt'] = context.dt
@@ -934,7 +935,7 @@ def plot_ramp_snapshots(ramp_snapshots, reward_locs_array, binned_x, track_lengt
 
     edges = np.linspace(0., track_length, 41)
     bin_width = edges[1] - edges[0]
-    # context.update(locals())
+    context.update(locals())
 
     fig1, axes1 = plt.subplots()
     fig2, axes2 = plt.subplots()
@@ -975,16 +976,10 @@ def analyze_simulation_output(file_path):
         group = f['exported_data']['weights_population_history']
         reward_locs_array = group.attrs['reward_locs_array']
         ramp_snapshots = group['ramp_snapshots'][:]
+        num_baseline_laps = group.attrs['num_baseline_laps']
         num_assay_laps = group.attrs['num_assay_laps']
-        if 'num_baseline_laps' in group.attrs:
-            num_baseline_laps = group.attrs['num_baseline_laps']
-        else:
-            num_baseline_laps = num_assay_laps
-        if 'num_reward_laps' in group.attrs:
-            num_reward_laps = group.attrs['num_reward_laps']
-        else:
-            num_reward_laps = group.attrs['num_induction_laps']
-
+        num_reward_laps = group.attrs['num_reward_laps']
+    
     plot_ramp_snapshots(ramp_snapshots, reward_locs_array, binned_x, track_length, num_baseline_laps, num_assay_laps,
                         num_reward_laps)
 
