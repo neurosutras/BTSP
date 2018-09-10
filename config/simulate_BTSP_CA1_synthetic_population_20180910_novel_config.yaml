@@ -4,14 +4,12 @@ global_signal_peak: 0.9259394464
 initial_ramp_peak_val: 8.
 target_peak_shift: -10.
 num_cells: 400
-initial_active_fraction: 0.5
-num_baseline_laps: 5
-num_assay_laps: 5
-num_reward_laps: 5
+initial_active_fraction: 0.125
+num_baseline_laps: 10
+num_assay_laps: 0
+num_reward_laps: 0
 reward_locs:
-  1: 30.
-  2: 90.
-seed_offset: 600000000
+seed_offset: 700000000
 target_range:
   residuals: 0.1
   weights_smoothness: 0.01

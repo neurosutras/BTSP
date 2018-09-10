@@ -130,7 +130,7 @@ def init_context():
     input_field_peak_rate = 40.  # Hz
     num_inputs = 200
     num_cells = context.num_cells
-    initial_active_fraction = 0.25
+    initial_active_fraction = context.initial_active_fraction
     initial_active_cells = int(num_cells * initial_active_fraction)
     track_length = 187.  # cm
     default_run_vel = 25.  # cm/s
@@ -146,8 +146,9 @@ def init_context():
         generate_spatial_rate_maps(binned_x, num_inputs, input_field_peak_rate, input_field_width, track_length)
 
     sm = StateMachine(dt=dt)
-    num_assay_laps = 5
-    num_induction_laps = 5
+    num_baseline_laps = context.num_baseline_laps
+    num_assay_laps = context.num_assay_laps
+    num_reward_laps = context.num_reward_laps
     initial_induction_dur = 300.  # ms
     pause_dur = 500.  # ms
     reward_dur = 500.  # ms
@@ -167,13 +168,13 @@ def init_context():
                                int(reward_dur / dt)
         reward_stop_locs[induction] = default_x[reward_stop_index]
 
-    num_laps = 2 + num_assay_laps + (num_assay_laps + num_induction_laps) * len(context.reward_locs)
+    num_laps = 2 + num_baseline_laps + (num_assay_laps + num_reward_laps) * len(context.reward_locs)
     reward_lap_indexes = {}
-    start_lap = 1 + num_assay_laps
+    start_lap = 1 + num_baseline_laps
     for induction in context.reward_locs:
-        end_lap = start_lap + num_induction_laps
+        end_lap = start_lap + num_reward_laps
         reward_lap_indexes[induction] = range(start_lap, end_lap)
-        start_lap += num_induction_laps + num_assay_laps
+        start_lap += num_reward_laps + num_assay_laps
 
     reward_start_indexes, reward_stop_indexes = defaultdict(list), defaultdict(list)
     position = np.array([])
@@ -785,7 +786,7 @@ def calculate_population_dynamics(export=False, plot=False):
 
     if plot:
         plot_ramp_snapshots(ramp_snapshots, reward_locs_array, context.binned_x, context.track_length,
-                            context.num_assay_laps, context.num_induction_laps)
+                            context.num_baseline_laps, context.num_assay_laps, context.num_reward_laps)
 
     plateau_start_times_array = []
     plateau_stop_times_array = []
@@ -814,8 +815,9 @@ def calculate_population_dynamics(export=False, plot=False):
             if description not in f[exported_data_key]:
                 f[exported_data_key].create_group(description)
             group = f[exported_data_key][description]
+            group.attrs['num_baseline_laps'] = context.num_baseline_laps
             group.attrs['num_assay_laps'] = context.num_assay_laps
-            group.attrs['num_induction_laps'] = context.num_induction_laps
+            group.attrs['num_reward_laps'] = context.num_reward_laps
             group.attrs['plateau_dur_max'] = context.plateau_dur_max
             group.attrs['plateau_dur_min'] = context.plateau_dur_min
             group.attrs['reward_dur'] = context.reward_dur
@@ -894,43 +896,45 @@ def get_model_ramp(weights):
     return this_ramp
 
 
-def plot_ramp_snapshots(ramp_snapshots, reward_locs_array, binned_x, track_length, num_assay_laps, num_induction_laps):
+def plot_ramp_snapshots(ramp_snapshots, reward_locs_array, binned_x, track_length, num_baseline_laps, num_assay_laps,
+                        num_reward_laps):
     """
 
     :param ramp_snapshots: 3D array
     :param reward_locs_array: array
     :param binned_x: array
     :param track_length: float
+    :param num_baseline_laps: int
     :param num_assay_laps: int
-    :param num_induction_laps: int
+    :param num_reward_laps: int
     """
-    snapshot_laps = [0, num_assay_laps]
-    lap_labels = ['Lap 1: Before', 'Laps 2-%i: No reward' % (num_assay_laps + 1)]
+    snapshot_laps = [0, num_baseline_laps]
+    lap_labels = ['Lap 1: Before', 'Laps 2-%i: No reward' % (num_baseline_laps + 1)]
     for reward_loc in reward_locs_array:
         start = max(snapshot_laps)
-        stop = start + num_induction_laps
+        stop = start + num_reward_laps
         snapshot_laps.append(stop)
         lap_labels.append('Laps %i-%i: Reward at %i cm' % (start + 2, stop + 1, reward_loc))
         start = max(snapshot_laps)
-        stop = start + num_induction_laps
+        stop = start + num_reward_laps
         snapshot_laps.append(stop)
         lap_labels.append('Laps %i-%i: No reward' % (start + 2, stop + 1))
     pprint.pprint(lap_labels)
 
+    num_cells = len(ramp_snapshots[0])
     peak_locs_snapshots = []
-    running_position = 0.
     for this_ramp_snapshot in ramp_snapshots:
         this_peak_locs_snapshot = []
         for this_ramp in this_ramp_snapshot:
-            peak_index = np.argmax(this_ramp)
-            this_peak_loc = binned_x[peak_index]
-            this_peak_locs_snapshot.append(this_peak_loc)
+            if np.any(this_ramp > 0.):
+                peak_index = np.argmax(this_ramp)
+                this_peak_loc = binned_x[peak_index]
+                this_peak_locs_snapshot.append(this_peak_loc)
         peak_locs_snapshots.append(np.array(this_peak_locs_snapshot))
-    peak_locs_snapshots = np.array(peak_locs_snapshots)
 
-    edges = np.linspace(0., track_length, 51)
+    edges = np.linspace(0., track_length, 41)
     bin_width = edges[1] - edges[0]
-    context.update(locals())
+    # context.update(locals())
 
     fig1, axes1 = plt.subplots()
     fig2, axes2 = plt.subplots()
@@ -938,8 +942,10 @@ def plot_ramp_snapshots(ramp_snapshots, reward_locs_array, binned_x, track_lengt
         this_ramp_snapshot = ramp_snapshots[lap]
         this_peak_locs_snapshot = peak_locs_snapshots[lap]
         axes1.plot(binned_x, np.sum(this_ramp_snapshot, axis=0), label=lap_label)
-        hist, _edges = np.histogram(this_peak_locs_snapshot, bins=edges, density=True)
-        axes2.plot(edges[:-1] + bin_width / 2., hist * bin_width, label=lap_label)
+        hist, _edges = np.histogram(this_peak_locs_snapshot, bins=edges)
+        hist = hist.astype(float)
+        hist /= float(num_cells)
+        axes2.plot(edges[:-1] + bin_width / 2., hist, label=lap_label)
     axes1.set_xlabel('Location (cm)')
     axes1.set_ylabel('Summed population activity')
     axes1.set_ylim([0., axes1.get_ylim()[1]])
@@ -970,9 +976,17 @@ def analyze_simulation_output(file_path):
         reward_locs_array = group.attrs['reward_locs_array']
         ramp_snapshots = group['ramp_snapshots'][:]
         num_assay_laps = group.attrs['num_assay_laps']
-        num_induction_laps = group.attrs['num_induction_laps']
+        if 'num_baseline_laps' in group.attrs:
+            num_baseline_laps = group.attrs['num_baseline_laps']
+        else:
+            num_baseline_laps = num_assay_laps
+        if 'num_reward_laps' in group.attrs:
+            num_reward_laps = group.attrs['num_reward_laps']
+        else:
+            num_reward_laps = group.attrs['num_induction_laps']
 
-    plot_ramp_snapshots(ramp_snapshots, reward_locs_array, binned_x, track_length, num_assay_laps, num_induction_laps)
+    plot_ramp_snapshots(ramp_snapshots, reward_locs_array, binned_x, track_length, num_baseline_laps, num_assay_laps,
+                        num_reward_laps)
 
 
 @click.command()
