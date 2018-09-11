@@ -11,7 +11,7 @@ num_baseline_laps: 5
 num_assay_laps: 5
 num_reward_laps: 5
 peak_basal_plateau_prob_per_lap: 1.
-peak_reward_plateau_prob_per_lap: 5.
+peak_reward_plateau_prob_per_lap: 4.
 reward_locs:
   1: 30.
   2: 90.

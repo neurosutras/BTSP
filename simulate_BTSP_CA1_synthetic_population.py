@@ -156,8 +156,9 @@ def init_context():
     initial_induction_dur = 300.  # ms
     pause_dur = 500.  # ms
     reward_dur = 500.  # ms
-    plateau_dur_min = 50.  # ms
-    plateau_dur_max = 300.  # ms
+    plateau_dur = 300.  # ms
+    basal_prob_new_recruitment = 0.5
+    reward_prob_new_recruitment = 0.05
     peak_basal_plateau_prob_per_lap = context.peak_basal_plateau_prob_per_lap
     peak_reward_plateau_prob_per_lap = context.peak_reward_plateau_prob_per_lap
 
@@ -256,20 +257,26 @@ def init_context():
             initial_weights_population.append(np.ones_like(peak_locs))
 
     ramp_xscale = np.linspace(0., 10., 10000)
-    plateau_prob_f = scaled_single_sigmoid(4., 8., ramp_xscale, ylim=[0.125, 1.])
-    plateau_prob_f = np.vectorize(plateau_prob_f)
+    basal_plateau_prob_f = scaled_single_sigmoid(4., 8., ramp_xscale, ylim=[basal_prob_new_recruitment, 1.])
+    basal_plateau_prob_f = np.vectorize(basal_plateau_prob_f)
+    reward_plateau_prob_f = scaled_single_sigmoid(4., 8., ramp_xscale, ylim=[reward_prob_new_recruitment, 1.])
+    reward_plateau_prob_f = np.vectorize(reward_plateau_prob_f)
 
     interp_target_ramp = np.interp(default_x, binned_x, target_initial_ramp, period=track_length)
-    target_plateau_prob = plateau_prob_f(interp_target_ramp)
-    plateau_prob_norm_factor = 1. / np.sum(target_plateau_prob)
+    basal_target_plateau_prob = basal_plateau_prob_f(interp_target_ramp)
+    basal_plateau_prob_norm_factor = 1. / np.sum(basal_target_plateau_prob)
+    reward_target_plateau_prob = reward_plateau_prob_f(interp_target_ramp)
+    reward_plateau_prob_norm_factor = 1. / np.sum(reward_target_plateau_prob)
 
-    plateau_modulation_f = lambda this_representation_density, this_reward: \
-        max(0.,
-            (1. - this_reward) * peak_basal_plateau_prob_per_lap *
-            (1. - this_representation_density / basal_target_representation_density) +
-            this_reward * peak_reward_plateau_prob_per_lap *
+    basal_plateau_modulation_f = lambda this_representation_density: \
+        max(0., peak_basal_plateau_prob_per_lap *
+            (1. - this_representation_density / basal_target_representation_density))
+    basal_plateau_modulation_f = np.vectorize(basal_plateau_modulation_f)
+
+    reward_plateau_modulation_f = lambda this_representation_density, this_reward: \
+        max(0., this_reward * peak_reward_plateau_prob_per_lap *
             (1. - this_representation_density / reward_target_representation_density))
-    plateau_modulation_f = np.vectorize(plateau_modulation_f)
+    reward_plateau_modulation_f = np.vectorize(reward_plateau_modulation_f)
 
     context.update(locals())
 
@@ -603,7 +610,7 @@ def get_delta_weights_LSA(target_ramp, input_rate_maps, induction_loc, induction
 
 
 def calculate_weight_dynamics(cell_index, lap, initial_weights, initial_ramp, initial_global_signal,
-                              plateau_modulation_factor, last_plateau_stop_time):
+                              initial_plateau_prob, last_plateau_stop_time):
     """
 
     :param cell_index: int
@@ -611,7 +618,7 @@ def calculate_weight_dynamics(cell_index, lap, initial_weights, initial_ramp, in
     :param initial_weights: array
     :param initial_ramp: array
     :param initial_global_signal: array
-    :param plateau_modulation_factor: array
+    :param initial_plateau_prob: array
     :param last_plateau_stop_time: float
     :return: array
     """
@@ -636,6 +643,7 @@ def calculate_weight_dynamics(cell_index, lap, initial_weights, initial_ramp, in
     plateau_stop_times = []
     induction_gate = np.zeros_like(this_epoch_t)
 
+    plateau_len = int(context.plateau_dur / context.dt)
     pause_len = int(context.pause_dur / context.dt)
 
     if last_plateau_stop_time > this_lap_t[0]:
@@ -645,19 +653,12 @@ def calculate_weight_dynamics(cell_index, lap, initial_weights, initial_ramp, in
     else:
         start_index = 0
 
-    plateau_prob = get_plateau_probability(initial_ramp)
-    plateau_prob = np.multiply(plateau_prob, plateau_modulation_factor)
-    initial_plateau_prob = np.array(plateau_prob)
-
+    plateau_prob = np.array(initial_plateau_prob)
     for j in xrange(start_index, len(this_lap_t)):
         this_t = this_lap_t[j]
         if plateau_prob[j] > 0. and local_random.random() < plateau_prob[j]:
             plateau_start_times.append(this_t)
-            this_plateau_dur = context.plateau_dur_max
-            # this_plateau_dur = context.plateau_dur_min + (context.plateau_dur_max - context.plateau_dur_min) * \
-            #                   plateau_modulation_factor[j]
-            plateau_stop_times.append(this_t + this_plateau_dur)
-            plateau_len = int(this_plateau_dur / context.dt)
+            plateau_stop_times.append(this_t + context.plateau_dur)
             induction_gate[j:j + plateau_len] = 1.
             plateau_prob[j:j + plateau_len + pause_len] = 0.
 
@@ -693,7 +694,7 @@ def calculate_weight_dynamics(cell_index, lap, initial_weights, initial_ramp, in
         print 'Process: %i: calculating ramp for cell: %i, lap: %i took %.1f s' % \
               (os.getpid(), cell_index, lap, time.time() - start_time)
 
-    return plateau_start_times, plateau_stop_times, next_global_signal, weights_history, initial_plateau_prob
+    return plateau_start_times, plateau_stop_times, next_global_signal, weights_history
 
 
 def get_population_representation_density(ramp_population):
@@ -709,16 +710,27 @@ def get_population_representation_density(ramp_population):
     return population_representation_density
 
 
-def get_plateau_probability(ramp):
+def get_plateau_probability_population(ramp_population, population_representation_density, current_reward):
     """
 
-    :param ramp: array (like binned_x)
-    :return: array (like default_t)
+    :param ramp_population: list of array (like binned_x)
+    :param population_representation_density: array (like default_x)
+    :param current_reward: array (like default_x)
+    :return: list of array (like default_x)
     """
-    interp_ramp = np.interp(context.default_x, context.binned_x, ramp, period=context.track_length)
-    plateau_prob = context.plateau_prob_f(interp_ramp)
-    plateau_prob *= context.plateau_prob_norm_factor
-    return plateau_prob
+    basal_plateau_modulation_factor = context.basal_plateau_modulation_f(population_representation_density)
+    reward_plateau_modulation_factor = \
+        context.reward_plateau_modulation_f(population_representation_density, current_reward)
+    plateau_probability_population = []
+    for ramp in ramp_population:
+        interp_ramp = np.interp(context.default_x, context.binned_x, ramp, period=context.track_length)
+        plateau_prob = context.basal_plateau_prob_f(interp_ramp) * context.basal_plateau_prob_norm_factor * \
+                       basal_plateau_modulation_factor
+        reward_plateau_prob = context.reward_plateau_prob_f(interp_ramp) * context.reward_plateau_prob_norm_factor * \
+                              reward_plateau_modulation_factor
+        plateau_prob += reward_plateau_prob
+        plateau_probability_population.append(plateau_prob)
+    return plateau_probability_population
 
 
 def calculate_population_dynamics(export=False, plot=False):
@@ -740,7 +752,7 @@ def calculate_population_dynamics(export=False, plot=False):
     plateau_stop_times_population = defaultdict(list)
     weights_population_full_history = []
     plateau_probability_history = []
-    plateau_representation_density_history = []
+    population_representation_density_history = []
     weights_snapshots = []
     ramp_snapshots = []
     current_weights_population = np.array(context.initial_weights_population)[cell_indexes]
@@ -753,8 +765,10 @@ def calculate_population_dynamics(export=False, plot=False):
         lap_start_index, lap_end_index = context.lap_edge_indexes[lap], context.lap_edge_indexes[lap+1]
         current_reward = context.reward[lap_start_index:lap_end_index]
         population_representation_density = get_population_representation_density(current_ramp_population)
-        plateau_representation_density_history.append(population_representation_density)
-        plateau_modulation_factor = context.plateau_modulation_f(population_representation_density, current_reward)
+        population_representation_density_history.append(population_representation_density)
+        current_plateau_probability_population = \
+            get_plateau_probability_population(current_ramp_population, population_representation_density,
+                                               current_reward)
         last_plateau_stop_times = []
         for cell_index in cell_indexes:
             if cell_index in plateau_stop_times_population and len(plateau_stop_times_population[cell_index]) > 0:
@@ -765,12 +779,12 @@ def calculate_population_dynamics(export=False, plot=False):
         result = context.interface.map(calculate_weight_dynamics, cell_indexes,
                                        [lap] * group_size, current_weights_population, current_ramp_population,
                                        initial_global_signal_population,
-                                       [plateau_modulation_factor] * group_size,
+                                       current_plateau_probability_population,
                                        last_plateau_stop_times)
         this_plateau_start_times_population, this_plateau_stop_times_population, initial_global_signal_population, \
-            this_weights_population_history, this_plateau_probability_population = zip(*result)
+            this_weights_population_history = zip(*result)
         weights_population_full_history.append(np.array(this_weights_population_history))
-        plateau_probability_history.append(this_plateau_probability_population)
+        plateau_probability_history.append(current_plateau_probability_population)
         for cell_index, this_plateau_start_times, this_plateau_stop_times in \
                 zip(cell_indexes, this_plateau_start_times_population, this_plateau_stop_times_population):
             plateau_start_times_population[cell_index].extend(this_plateau_start_times)
@@ -783,8 +797,8 @@ def calculate_population_dynamics(export=False, plot=False):
         ramp_snapshots.append(current_ramp_population)
 
     population_representation_density = get_population_representation_density(current_ramp_population)
-    plateau_representation_density_history.append(population_representation_density)
-    plateau_representation_density_history = np.array(plateau_representation_density_history)
+    population_representation_density_history.append(population_representation_density)
+    population_representation_density_history = np.array(population_representation_density_history)
     weights_population_full_history = np.array(weights_population_full_history)
     weights_snapshots = np.array(ramp_snapshots)
     ramp_snapshots = np.array(ramp_snapshots)
@@ -829,8 +843,7 @@ def calculate_population_dynamics(export=False, plot=False):
             group.attrs['num_baseline_laps'] = context.num_baseline_laps
             group.attrs['num_assay_laps'] = context.num_assay_laps
             group.attrs['num_reward_laps'] = context.num_reward_laps
-            group.attrs['plateau_dur_max'] = context.plateau_dur_max
-            group.attrs['plateau_dur_min'] = context.plateau_dur_min
+            group.attrs['plateau_dur'] = context.plateau_dur
             group.attrs['reward_dur'] = context.reward_dur
             group.attrs['reward_locs_array'] = reward_locs_array
             group.attrs['ramp_scaling_factor'] = context.ramp_scaling_factor
@@ -844,8 +857,8 @@ def calculate_population_dynamics(export=False, plot=False):
                                  data=weights_population_full_history)
             group.create_dataset('plateau_probability_history', compression='gzip',
                                  data=plateau_probability_history)
-            group.create_dataset('plateau_representation_density_history', compression='gzip',
-                                 data=plateau_representation_density_history)
+            group.create_dataset('population_representation_density_history', compression='gzip',
+                                 data=population_representation_density_history)
             group.create_dataset('weights_snapshots', compression='gzip', data=weights_snapshots)
             group.create_dataset('ramp_snapshots', compression='gzip', data=ramp_snapshots)
         if context.disp:
