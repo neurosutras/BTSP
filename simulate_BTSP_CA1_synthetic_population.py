@@ -129,9 +129,6 @@ def init_context():
     input_field_width = 90.  # cm
     input_field_peak_rate = 40.  # Hz
     num_inputs = 200
-    num_cells = context.num_cells
-    initial_active_fraction = context.initial_active_fraction
-    initial_active_cells = int(num_cells * initial_active_fraction)
     track_length = 187.  # cm
     default_run_vel = 25.  # cm/s
 
@@ -146,6 +143,13 @@ def init_context():
         generate_spatial_rate_maps(binned_x, num_inputs, input_field_peak_rate, input_field_width, track_length)
 
     sm = StateMachine(dt=dt)
+
+    num_cells = context.num_cells
+    initial_fraction_active = context.initial_fraction_active
+    initial_active_cells = int(num_cells * initial_fraction_active)
+    basal_target_fraction_active = context.basal_target_fraction_active
+    reward_target_fraction_active = context.reward_target_fraction_active
+
     num_baseline_laps = context.num_baseline_laps
     num_assay_laps = context.num_assay_laps
     num_reward_laps = context.num_reward_laps
@@ -154,9 +158,7 @@ def init_context():
     reward_dur = 500.  # ms
     plateau_dur_min = 50.  # ms
     plateau_dur_max = 300.  # ms
-    peak_plateau_prob_per_lap = 0.5
-    basal_target_fraction_active = 0.5
-    reward_target_fraction_active = 1.
+    peak_plateau_prob_per_lap = context.peak_plateau_prob_per_lap
 
     context.update(locals())
 
@@ -253,12 +255,12 @@ def init_context():
             initial_weights_population.append(np.ones_like(peak_locs))
 
     ramp_xscale = np.linspace(0., 10., 10000)
-    plateau_prob_f = scaled_single_sigmoid(4., 8., ramp_xscale, ylim=[0.5, 1.])
+    plateau_prob_f = scaled_single_sigmoid(4., 8., ramp_xscale, ylim=[0.125, 1.])
     plateau_prob_f = np.vectorize(plateau_prob_f)
 
     interp_target_ramp = np.interp(default_x, binned_x, target_initial_ramp, period=track_length)
     target_plateau_prob = plateau_prob_f(interp_target_ramp)
-    context.plateau_prob_norm_factor = context.peak_plateau_prob_per_lap / np.sum(target_plateau_prob)
+    plateau_prob_norm_factor = peak_plateau_prob_per_lap / np.sum(target_plateau_prob)
 
     reward_delta_modulation = reward_target_fraction_active / basal_target_fraction_active - 1.
     plateau_modulation_f = lambda this_population_activity, this_reward: \
@@ -922,18 +924,44 @@ def plot_ramp_snapshots(ramp_snapshots, reward_locs_array, binned_x, track_lengt
         lap_labels.append('Laps %i-%i: No reward' % (start + 2, stop + 1))
     pprint.pprint(lap_labels)
 
+    peak_loc_history = defaultdict(list)
+    delta_peak_loc_history = defaultdict(list)
+    active_cell_index_set = set()
+
     num_cells = len(ramp_snapshots[0])
     peak_locs_snapshots = []
-    for this_ramp_snapshot in ramp_snapshots:
+    for lap, this_ramp_snapshot in enumerate(ramp_snapshots):
         this_peak_locs_snapshot = []
-        for this_ramp in this_ramp_snapshot:
+        for cell_index, this_ramp in enumerate(this_ramp_snapshot):
             if np.any(this_ramp > 0.):
+                active_cell_index_set.add(cell_index)
                 peak_index = np.argmax(this_ramp)
                 this_peak_loc = binned_x[peak_index]
                 this_peak_locs_snapshot.append(this_peak_loc)
+            else:
+                this_peak_loc = np.nan
+            if lap > 0:
+                if np.isnan(this_peak_loc) or np.isnan(peak_loc_history[cell_index][-1]):
+                    this_delta_peak_loc = np.nan
+                else:
+                    this_delta_peak_loc = this_peak_loc - peak_loc_history[cell_index][-1]
+                    if this_delta_peak_loc < -track_length / 2.:
+                        this_delta_peak_loc += track_length
+                    elif this_delta_peak_loc > track_length / 2.:
+                        this_delta_peak_loc -= track_length
+                delta_peak_loc_history[cell_index].append(this_delta_peak_loc)
+            peak_loc_history[cell_index].append(this_peak_loc)
         peak_locs_snapshots.append(np.array(this_peak_locs_snapshot))
 
-    edges = np.linspace(0., track_length, 41)
+    peak_shift_count = 0
+    for cell_index, this_delta_peak_loc_history in delta_peak_loc_history.iteritems():
+        this_delta_peak_loc_history_array = np.array(this_delta_peak_loc_history)
+        valid = this_delta_peak_loc_history_array[~np.isnan(this_delta_peak_loc_history_array)]
+        if np.any(valid > 0.):
+            peak_shift_count += 1
+    print 'peak_shift_count: %i / %i active cells' % (peak_shift_count, len(active_cell_index_set))
+
+    edges = np.linspace(0., track_length, 51)
     bin_width = edges[1] - edges[0]
     context.update(locals())
 
@@ -979,7 +1007,7 @@ def analyze_simulation_output(file_path):
         num_baseline_laps = group.attrs['num_baseline_laps']
         num_assay_laps = group.attrs['num_assay_laps']
         num_reward_laps = group.attrs['num_reward_laps']
-    
+
     plot_ramp_snapshots(ramp_snapshots, reward_locs_array, binned_x, track_length, num_baseline_laps, num_assay_laps,
                         num_reward_laps)
 
