@@ -245,9 +245,10 @@ def init_context():
     max_ramp_population_sum = np.mean(initial_ramp) * num_cells
     
     initial_weights_population = []
-    d_peak_indexes = int(len(peak_locs) / initial_active_cells)
-    initial_peak_indexes = np.linspace(0, len(peak_locs), initial_active_cells, dtype=int, endpoint=False) + \
-                           int(d_peak_indexes / 2)
+    if initial_active_cells > 0:
+        d_peak_indexes = int(len(peak_locs) / initial_active_cells)
+        initial_peak_indexes = np.linspace(0, len(peak_locs), initial_active_cells, dtype=int, endpoint=False) + \
+                               int(d_peak_indexes / 2)
     for i in xrange(num_cells):
         if i < initial_active_cells:
             roll_indexes = initial_peak_indexes[i]
