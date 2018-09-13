@@ -157,7 +157,7 @@ def init_context():
     pause_dur = 500.  # ms
     reward_dur = 500.  # ms
     plateau_dur = 300.  # ms
-    peak_basal_prob_new_recruitment = 0.5
+    peak_basal_prob_new_recruitment = 0.75
     peak_reward_prob_new_recruitment = 0.05
     peak_basal_plateau_prob_per_lap = context.peak_basal_plateau_prob_per_lap
     peak_reward_plateau_prob_per_lap = context.peak_reward_plateau_prob_per_lap
@@ -266,7 +266,8 @@ def init_context():
     basal_target_plateau_prob = basal_plateau_prob_f(interp_target_ramp)
     basal_plateau_prob_norm_factor = 1. / np.sum(basal_target_plateau_prob)
     reward_target_plateau_prob = reward_plateau_prob_f(interp_target_ramp)
-    reward_plateau_prob_norm_factor = 1. / np.sum(reward_target_plateau_prob)
+    reward_occupancy_per_lap = default_run_vel * reward_dur / 1000. / track_length
+    reward_plateau_prob_norm_factor = 1. / np.sum(reward_target_plateau_prob) / reward_occupancy_per_lap
 
     basal_plateau_modulation_f = lambda this_representation_density: \
         max(0., peak_basal_plateau_prob_per_lap *
@@ -809,8 +810,9 @@ def calculate_population_dynamics(export=False, plot=False):
     reward_locs_array = [context.reward_locs[induction] for induction in context.reward_locs]
 
     if plot:
-        plot_ramp_snapshots(ramp_snapshots, reward_locs_array, context.binned_x, context.track_length,
-                            context.num_baseline_laps, context.num_assay_laps, context.num_reward_laps)
+        plot_population_history_snapshots(ramp_snapshots, population_representation_density_history, reward_locs_array,
+                                          context.binned_x, context.default_x, context.track_length,
+                                          context.num_baseline_laps, context.num_assay_laps, context.num_reward_laps)
 
     plateau_start_times_array = []
     plateau_stop_times_array = []
@@ -922,29 +924,40 @@ def get_model_ramp(weights):
     return this_ramp
 
 
-def plot_ramp_snapshots(ramp_snapshots, reward_locs_array, binned_x, track_length, num_baseline_laps, num_assay_laps,
-                        num_reward_laps):
+def plot_population_history_snapshots(ramp_snapshots, population_representation_density_history, reward_locs_array,
+                                      binned_x, default_x, track_length, num_baseline_laps, num_assay_laps,
+                                      num_reward_laps):
     """
 
     :param ramp_snapshots: 3D array
+    :param population_representation_density_history: 2D array
     :param reward_locs_array: array
     :param binned_x: array
+    :param default_x: array
     :param track_length: float
     :param num_baseline_laps: int
     :param num_assay_laps: int
     :param num_reward_laps: int
     """
+    import matplotlib as mpl
+    mpl.rcParams['svg.fonttype'] = 'none'
+    mpl.rcParams['font.size'] = 11.
+    mpl.rcParams['font.sans-serif'] = 'Arial'
+    mpl.rcParams['text.usetex'] = False
+    mpl.rcParams['axes.titlepad'] = 2.
+    mpl.rcParams['mathtext.default'] = 'regular'
+
     snapshot_laps = [0, num_baseline_laps]
-    lap_labels = ['Lap 1: Before', 'Laps 2-%i: No reward' % (num_baseline_laps + 1)]
+    lap_labels = ['Lap 0: Before', 'Laps 1-%i: No reward' % num_baseline_laps]
     for reward_loc in reward_locs_array:
         start = max(snapshot_laps)
         stop = start + num_reward_laps
         snapshot_laps.append(stop)
-        lap_labels.append('Laps %i-%i: Reward at %i cm' % (start + 2, stop + 1, reward_loc))
+        lap_labels.append('Laps %i-%i: Reward at %i cm' % (start + 1, stop, reward_loc))
         start = max(snapshot_laps)
-        stop = start + num_reward_laps
+        stop = start + num_assay_laps
         snapshot_laps.append(stop)
-        lap_labels.append('Laps %i-%i: No reward' % (start + 2, stop + 1))
+        lap_labels.append('Laps %i-%i: No reward' % (start + 1, stop))
     pprint.pprint(lap_labels)
 
     peak_loc_history = defaultdict(list)
@@ -952,6 +965,7 @@ def plot_ramp_snapshots(ramp_snapshots, reward_locs_array, binned_x, track_lengt
     active_cell_index_set = set()
 
     num_cells = len(ramp_snapshots[0])
+    num_laps = len(ramp_snapshots)
     peak_locs_snapshots = []
     for lap, this_ramp_snapshot in enumerate(ramp_snapshots):
         this_peak_locs_snapshot = []
@@ -984,30 +998,70 @@ def plot_ramp_snapshots(ramp_snapshots, reward_locs_array, binned_x, track_lengt
             peak_shift_count += 1
     print 'peak_shift_count: %i / %i active cells' % (peak_shift_count, len(active_cell_index_set))
 
-    edges = np.linspace(0., track_length, 51)
+    num_bins = 50
+    edges = np.linspace(0., track_length, num_bins + 1)
     bin_width = edges[1] - edges[0]
-    context.update(locals())
+
+    peak_locs_histogram_history = []
+    for lap in xrange(num_laps):
+        this_peak_locs_snapshot = peak_locs_snapshots[lap]
+        hist, _edges = np.histogram(this_peak_locs_snapshot, bins=edges)
+        hist = hist.astype(float) / num_cells
+        peak_locs_histogram_history.append(hist)
+    peak_locs_histogram_history = np.array(peak_locs_histogram_history)
 
     fig1, axes1 = plt.subplots()
     fig2, axes2 = plt.subplots()
     for lap, lap_label in zip(snapshot_laps, lap_labels):
-        this_ramp_snapshot = ramp_snapshots[lap]
-        this_peak_locs_snapshot = peak_locs_snapshots[lap]
-        axes1.plot(binned_x, np.sum(this_ramp_snapshot, axis=0), label=lap_label)
-        hist, _edges = np.histogram(this_peak_locs_snapshot, bins=edges)
-        hist = hist.astype(float)
-        hist /= float(num_cells)
-        axes2.plot(edges[:-1] + bin_width / 2., hist, label=lap_label)
-    axes1.set_xlabel('Location (cm)')
-    axes1.set_ylabel('Summed population activity')
+        this_population_representation_density = population_representation_density_history[lap]
+        this_peak_locs_hist = peak_locs_histogram_history[lap]
+        axes1.plot(default_x, this_population_representation_density, label=lap_label)
+        axes2.plot(edges[:-1] + bin_width / 2., this_peak_locs_hist, label=lap_label)
+    axes1.set_xlabel('Position (cm)')
+    axes1.set_xticks(np.arange(0., track_length, 30.))
+    axes1.set_title('Summed population activity', fontsize=mpl.rcParams['font.size'])
+    axes1.set_ylabel('Normalized population activity')
     axes1.set_ylim([0., axes1.get_ylim()[1]])
     axes1.legend(loc='best', frameon=False, framealpha=0.5)
-    axes2.set_xlabel('Place field peak locations (cm)')
-    axes2.set_ylabel('Probability')
+    axes2.set_title('Place field peak locations', fontsize=mpl.rcParams['font.size'])
+    axes2.set_xlabel('Position (cm)')
+    axes2.set_xticks(np.arange(0., track_length, 30.))
+    axes2.set_ylabel('Fraction of cells')
     axes2.legend(loc='best', frameon=False, framealpha=0.5)
     clean_axes([axes1, axes2])
     fig1.tight_layout()
     fig2.tight_layout()
+
+    fig3, axes3 = plt.subplots()
+    hm3 = axes3.imshow(peak_locs_histogram_history, extent=(0., track_length, num_laps, 0),
+                       aspect='auto', vmin=0., cmap='Greys')
+    cbar3 = plt.colorbar(hm3)
+    cbar3.ax.set_ylabel('Fraction of cells', rotation=270)
+    cbar3.ax.get_yaxis().labelpad = 15
+    axes3.set_xticks(np.arange(0., track_length, 30.))
+    axes3.set_xlabel('Position (cm)')
+    axes3.set_ylabel('Lap')
+    axes3.set_yticks(range(num_laps), minor=True)
+    axes3.set_yticks(range(0, num_laps + 1, 5))
+    axes3.set_yticklabels(range(0, num_laps + 1, 5))
+    axes3.set_title('Place field peak locations', fontsize=mpl.rcParams['font.size'])
+
+    fig4, axes4 = plt.subplots()
+    hm4 = axes4.imshow(population_representation_density_history, extent=(0., track_length, len(ramp_snapshots), 0),
+                       aspect='auto', vmin=0., cmap='Greys')
+    cbar4 = plt.colorbar(hm4)
+    cbar4.ax.set_ylabel('Normalized population activity', rotation=270)
+    cbar4.ax.get_yaxis().labelpad = 15
+    axes4.set_xticks(np.arange(0., track_length, 30.))
+    axes4.set_xlabel('Position (cm)')
+    axes4.set_ylabel('Lap')
+    axes4.set_yticks(range(num_laps), minor=True)
+    axes4.set_yticks(range(0, num_laps + 1, 5))
+    axes4.set_yticklabels(range(0, num_laps + 1, 5))
+    axes4.set_title('Summed population activity', fontsize=mpl.rcParams['font.size'])
+
+    context.update(locals())
+
     plt.show()
 
 
@@ -1023,16 +1077,19 @@ def analyze_simulation_output(file_path):
                 'weights_population_history' not in f['exported_data']:
             raise KeyError('analyze_simulation_output: invalid file contents at path: %s' % file_path)
         binned_x = f['shared_context']['binned_x'][:]
+        default_x = f['shared_context']['default_x'][:]
         track_length = f['shared_context'].attrs['track_length']
         group = f['exported_data']['weights_population_history']
         reward_locs_array = group.attrs['reward_locs_array']
         ramp_snapshots = group['ramp_snapshots'][:]
+        population_representation_density_history = group['population_representation_density_history'][:]
         num_baseline_laps = group.attrs['num_baseline_laps']
         num_assay_laps = group.attrs['num_assay_laps']
         num_reward_laps = group.attrs['num_reward_laps']
 
-    plot_ramp_snapshots(ramp_snapshots, reward_locs_array, binned_x, track_length, num_baseline_laps, num_assay_laps,
-                        num_reward_laps)
+    plot_population_history_snapshots(ramp_snapshots, population_representation_density_history, reward_locs_array,
+                                      binned_x, default_x, track_length, num_baseline_laps, num_assay_laps,
+                                      num_reward_laps)
 
 
 @click.command()
