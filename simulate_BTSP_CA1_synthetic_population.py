@@ -1018,14 +1018,14 @@ def plot_population_history_snapshots(ramp_snapshots, population_representation_
         axes1.plot(default_x, this_population_representation_density, label=lap_label)
         axes2.plot(edges[:-1] + bin_width / 2., this_peak_locs_hist, label=lap_label)
     axes1.set_xlabel('Position (cm)')
-    axes1.set_xticks(np.arange(0., track_length, 30.))
+    axes1.set_xticks(np.arange(0., track_length, 45.))
     axes1.set_title('Summed population activity', fontsize=mpl.rcParams['font.size'])
     axes1.set_ylabel('Normalized population activity')
     axes1.set_ylim([0., axes1.get_ylim()[1]])
     axes1.legend(loc='best', frameon=False, framealpha=0.5)
     axes2.set_title('Place field peak locations', fontsize=mpl.rcParams['font.size'])
     axes2.set_xlabel('Position (cm)')
-    axes2.set_xticks(np.arange(0., track_length, 30.))
+    axes2.set_xticks(np.arange(0., track_length, 45.))
     axes2.set_ylabel('Fraction of cells')
     axes2.legend(loc='best', frameon=False, framealpha=0.5)
     clean_axes([axes1, axes2])
@@ -1034,11 +1034,11 @@ def plot_population_history_snapshots(ramp_snapshots, population_representation_
 
     fig3, axes3 = plt.subplots()
     hm3 = axes3.imshow(peak_locs_histogram_history, extent=(0., track_length, num_laps, 0),
-                       aspect='auto', vmin=0., cmap='Greys')
+                       aspect='auto', vmin=0.)
     cbar3 = plt.colorbar(hm3)
     cbar3.ax.set_ylabel('Fraction of cells', rotation=270)
     cbar3.ax.get_yaxis().labelpad = 15
-    axes3.set_xticks(np.arange(0., track_length, 30.))
+    axes3.set_xticks(np.arange(0., track_length, 45.))
     axes3.set_xlabel('Position (cm)')
     axes3.set_ylabel('Lap')
     axes3.set_yticks(range(num_laps), minor=True)
@@ -1048,11 +1048,11 @@ def plot_population_history_snapshots(ramp_snapshots, population_representation_
 
     fig4, axes4 = plt.subplots()
     hm4 = axes4.imshow(population_representation_density_history, extent=(0., track_length, len(ramp_snapshots), 0),
-                       aspect='auto', vmin=0., cmap='Greys')
+                       aspect='auto')
     cbar4 = plt.colorbar(hm4)
     cbar4.ax.set_ylabel('Normalized population activity', rotation=270)
     cbar4.ax.get_yaxis().labelpad = 15
-    axes4.set_xticks(np.arange(0., track_length, 30.))
+    axes4.set_xticks(np.arange(0., track_length, 45.))
     axes4.set_xlabel('Position (cm)')
     axes4.set_ylabel('Lap')
     axes4.set_yticks(range(num_laps), minor=True)
