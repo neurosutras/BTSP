@@ -157,7 +157,7 @@ def init_context():
     pause_dur = 500.  # ms
     reward_dur = 500.  # ms
     plateau_dur = 300.  # ms
-    peak_basal_prob_new_recruitment = 0.75
+    peak_basal_prob_new_recruitment = 0.9
     peak_reward_prob_new_recruitment = 0.05
     peak_basal_plateau_prob_per_lap = context.peak_basal_plateau_prob_per_lap
     peak_reward_plateau_prob_per_lap = context.peak_reward_plateau_prob_per_lap

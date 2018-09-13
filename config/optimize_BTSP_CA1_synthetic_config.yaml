@@ -105,7 +105,7 @@ kwargs:
   ramp_scaling_factor: 0.002956
   induction_locs:
     '1': 130.
-    '2_null': 120.
+    '2_null': 130.
     '2_shift': 10.
 objective_names:
 - induction1_ramp_residual_score
@@ -144,17 +144,17 @@ target_val:
   peak_val_2: 8.
   delta_peak_val_1: -4.
 x0:
-  global_signal_decay: 150.
-  local_signal_rise: 6.362730E+01
-  rMC0: 2.136997E+00
-  rMC_th: 3.034372E-01
-  rMC_peak: 7.292308E-01
-  global_signal_rise: 1.051905E+01
-  peak_delta_weight: 2.682327E+00
-  rCM0: 1.306494E+00
-  local_signal_decay: 8.652857E+02
-  rCM_min2: 2.838575E-01
-  rCM_th1: 7.639369E-02
-  rCM_th2: 9.596845E-01
-  rCM_peak1: 2.086415E-01
-  rCM_peak2: 3.751629E-01
+  global_signal_decay: 1.001524E+02
+  local_signal_rise: 8.536373E+01
+  rMC0: 2.536076E+00
+  rMC_th: 5.158179E-01
+  rMC_peak: 9.238480E-01
+  global_signal_rise: 1.524528E+01
+  peak_delta_weight: 2.413031E+00
+  rCM0: 9.286024E-01
+  local_signal_decay: 1.073788E+03
+  rCM_min2: 2.336212E-01
+  rCM_th1: 8.968046E-02
+  rCM_th2: 9.791894E-01
+  rCM_peak1: 3.890336E-01
+  rCM_peak2: 4.902626E-01
