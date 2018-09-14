@@ -10,7 +10,7 @@ reward_target_representation_density: 1.25
 num_baseline_laps: 15
 num_assay_laps: 0
 num_reward_laps: 0
-peak_basal_plateau_prob_per_lap: 0.3
+peak_basal_plateau_prob_per_lap: 0.5
 peak_reward_plateau_prob_per_lap: 0.5
 reward_locs:
 seed_offset: 70000000000

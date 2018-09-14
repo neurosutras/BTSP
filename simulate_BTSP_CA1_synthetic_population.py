@@ -270,16 +270,29 @@ def init_context():
     reward_occupancy_per_lap = default_run_vel * reward_dur / 1000. / track_length
     reward_plateau_prob_norm_factor = 1. / np.sum(reward_target_plateau_prob) / reward_occupancy_per_lap
 
+    """
     basal_plateau_modulation_f = lambda this_representation_density: \
         max(0., peak_basal_plateau_prob_per_lap *
             (1. - this_representation_density / basal_target_representation_density))
-    basal_plateau_modulation_f = np.vectorize(basal_plateau_modulation_f)
-
+    
     reward_plateau_modulation_f = lambda this_representation_density, this_reward: \
         max(0., this_reward * peak_reward_plateau_prob_per_lap *
             (1. - this_representation_density / reward_target_representation_density))
-    reward_plateau_modulation_f = np.vectorize(reward_plateau_modulation_f)
+    """
+    basal_representation_xscale = np.linspace(0., basal_target_representation_density, 10000)
+    basal_plateau_modulation_f = \
+        scaled_single_sigmoid(basal_target_representation_density / 2., 0., basal_representation_xscale,
+                              ylim=[context.peak_basal_plateau_prob_per_lap, 0.])
+    basal_plateau_modulation_f = np.vectorize(basal_plateau_modulation_f)
 
+    reward_representation_xscale = np.linspace(0., reward_target_representation_density, 10000)
+    reward_delta_representation_density = reward_target_representation_density - basal_target_representation_density
+    reward_plateau_modulation_f = lambda this_representation_density, this_reward: \
+        this_reward * scaled_single_sigmoid(
+            basal_target_representation_density / 2. + reward_delta_representation_density,
+            reward_delta_representation_density, reward_representation_xscale,
+            ylim=[context.peak_reward_plateau_prob_per_lap, 0.])(this_representation_density)
+    reward_plateau_modulation_f = np.vectorize(reward_plateau_modulation_f)
     context.update(locals())
 
 
