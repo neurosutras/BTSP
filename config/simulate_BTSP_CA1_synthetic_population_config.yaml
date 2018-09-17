@@ -12,7 +12,7 @@ num_assay_laps: 5
 num_reward_laps: 10
 peak_basal_plateau_prob_per_lap: 0.5
 peak_reward_plateau_prob_per_lap: 0.5
-peak_basal_prob_new_recruitment: 0.95
+peak_basal_prob_new_recruitment: 0.5
 peak_reward_prob_new_recruitment: 0.05
 reward_locs:
   1: 45.  # 30.
