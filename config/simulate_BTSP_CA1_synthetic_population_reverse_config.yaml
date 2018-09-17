@@ -1,0 +1,40 @@
+min_delta_weight: 0.
+ramp_scaling_factor: 0.002956
+global_signal_peak: 0.9259394464
+initial_ramp_peak_val: 8.
+target_peak_shift: -10.
+num_cells: 400
+initial_fraction_active: 0.75
+basal_target_representation_density: 0.75
+reward_target_representation_density: 1.25
+num_baseline_laps: 5
+num_assay_laps: 5
+num_reward_laps: 10
+peak_basal_plateau_prob_per_lap: 0.5
+peak_reward_plateau_prob_per_lap: 0.5
+peak_basal_prob_new_recruitment: 0.5
+peak_reward_prob_new_recruitment: 0.05
+reward_locs:
+  1: 90.
+  2: 45.
+seed_offset: 80000000000
+target_range:
+  residuals: 0.1
+  weights_smoothness: 0.01
+  delta_min_val: 0.01
+  delta_peak_val: 0.01
+x0:
+  global_signal_decay: 1.001524E+02
+  local_signal_rise: 8.536373E+01
+  rMC0: 2.536076E+00
+  rMC_th: 5.158179E-01
+  rMC_peak: 9.238480E-01
+  global_signal_rise: 1.524528E+01
+  peak_delta_weight: 2.413031E+00
+  rCM0: 9.286024E-01
+  local_signal_decay: 1.073788E+03
+  rCM_min2: 2.336212E-01
+  rCM_th1: 8.968046E-02
+  rCM_th2: 9.791894E-01
+  rCM_peak1: 3.890336E-01
+  rCM_peak2: 4.902626E-01
