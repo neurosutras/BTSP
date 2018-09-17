@@ -17,7 +17,7 @@ peak_reward_prob_new_recruitment: 0.05
 reward_locs:
   1: 45.  # 30.
   2: 90. # 90.
-seed_offset: 600000000
+seed_offset: 70000000000
 target_range:
   residuals: 0.1
   weights_smoothness: 0.01
