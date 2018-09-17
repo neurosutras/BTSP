@@ -157,8 +157,8 @@ def init_context():
     pause_dur = 500.  # ms
     reward_dur = 500.  # ms
     plateau_dur = 300.  # ms
-    peak_basal_prob_new_recruitment = 0.5
-    peak_reward_prob_new_recruitment = 0.05
+    peak_basal_prob_new_recruitment = context.peak_basal_prob_new_recruitment
+    peak_reward_prob_new_recruitment = context.peak_reward_prob_new_recruitment
     peak_basal_plateau_prob_per_lap = context.peak_basal_plateau_prob_per_lap
     peak_reward_plateau_prob_per_lap = context.peak_reward_plateau_prob_per_lap
 
@@ -258,7 +258,7 @@ def init_context():
             initial_weights_population.append(np.ones_like(peak_locs))
 
     ramp_xscale = np.linspace(0., 10., 10000)
-    basal_plateau_prob_f = scaled_single_sigmoid(4., 8., ramp_xscale, ylim=[peak_basal_prob_new_recruitment, 1.])
+    basal_plateau_prob_f = scaled_single_sigmoid(0., 4., ramp_xscale, ylim=[peak_basal_prob_new_recruitment, 1.])
     basal_plateau_prob_f = np.vectorize(basal_plateau_prob_f)
     reward_plateau_prob_f = scaled_single_sigmoid(0., 4., ramp_xscale, ylim=[peak_reward_prob_new_recruitment, 1.])
     reward_plateau_prob_f = np.vectorize(reward_plateau_prob_f)
