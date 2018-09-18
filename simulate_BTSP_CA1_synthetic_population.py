@@ -640,7 +640,7 @@ def calculate_weight_dynamics(cell_index, lap, initial_weights, initial_ramp, in
     start_time = time.time()
     cell_index = int(cell_index)
     lap = int(lap)
-    seed = context.seed_offset + 1e6 * lap + cell_index
+    seed = context.seed_offset + 1e8 * context.trial + 1e6 * lap + cell_index
     local_random = random.Random()
     local_random.seed(seed)
 
@@ -848,14 +848,13 @@ def calculate_population_dynamics(export=False, plot=False):
                 group.create_dataset('input_rate_maps', compression='gzip', data=np.array(context.input_rate_maps))
                 group.attrs['track_length'] = context.track_length
                 group.attrs['dt'] = context.dt
-            exported_data_key = 'exported_data'
+            exported_data_key = 'BTSP_population_history'
             if exported_data_key not in f:
                 f.create_group(exported_data_key)
-                f[exported_data_key].attrs['enumerated'] = False
-            description = 'weights_population_history'
-            if description not in f[exported_data_key]:
-                f[exported_data_key].create_group(description)
-            group = f[exported_data_key][description]
+                f[exported_data_key].attrs['enumerated'] = True
+            group_id = str(len(f[exported_data_key]))
+            f[exported_data_key].create_group(group_id)
+            group = f[exported_data_key][group_id]
             group.attrs['num_baseline_laps'] = context.num_baseline_laps
             group.attrs['num_assay_laps'] = context.num_assay_laps
             group.attrs['num_reward_laps'] = context.num_reward_laps
@@ -863,6 +862,17 @@ def calculate_population_dynamics(export=False, plot=False):
             group.attrs['reward_dur'] = context.reward_dur
             group.attrs['reward_locs_array'] = reward_locs_array
             group.attrs['ramp_scaling_factor'] = context.ramp_scaling_factor
+            group.attrs['num_cells'] = context.num_cells
+            group.attrs['initial_fraction_active'] = context.initial_fraction_active
+            group.attrs['initial_active_cells'] = context.initial_active_cells
+            group.attrs['basal_target_representation_density'] = context.basal_target_representation_density
+            group.attrs['reward_target_representation_density'] = context.reward_target_representation_density
+            group.attrs['peak_basal_prob_new_recruitment'] = context.peak_basal_prob_new_recruitment
+            group.attrs['peak_reward_prob_new_recruitment'] = context.peak_reward_prob_new_recruitment
+            group.attrs['peak_basal_plateau_prob_per_lap'] = context.peak_basal_plateau_prob_per_lap
+            group.attrs['peak_reward_plateau_prob_per_lap'] = context.peak_reward_plateau_prob_per_lap
+            group.attrs['random_seed_offset'] = context.seed_offset
+            group.attrs['trial'] = context.trial
             group.create_dataset('t', compression='gzip', data=context.t)
             group.create_dataset('position', compression='gzip', data=context.position)
             group.create_dataset('reward', compression='gzip', data=context.reward)
@@ -940,7 +950,7 @@ def get_model_ramp(weights):
 
 def plot_population_history_snapshots(ramp_snapshots, population_representation_density_history, reward_locs_array,
                                       binned_x, default_x, track_length, num_baseline_laps, num_assay_laps,
-                                      num_reward_laps):
+                                      num_reward_laps, trial):
     """
 
     :param ramp_snapshots: 3D array
@@ -952,6 +962,7 @@ def plot_population_history_snapshots(ramp_snapshots, population_representation_
     :param num_baseline_laps: int
     :param num_assay_laps: int
     :param num_reward_laps: int
+    :param trial: int
     """
     import matplotlib as mpl
     mpl.rcParams['svg.fonttype'] = 'none'
@@ -972,6 +983,7 @@ def plot_population_history_snapshots(ramp_snapshots, population_representation_
         stop = start + num_assay_laps
         snapshot_laps.append(stop)
         lap_labels.append('Laps %i-%i: No reward' % (start + 1, stop))
+    print 'Trial: %i' % trial
     pprint.pprint(lap_labels)
 
     peak_loc_history = defaultdict(list)
@@ -1048,7 +1060,7 @@ def plot_population_history_snapshots(ramp_snapshots, population_representation_
 
     fig3, axes3 = plt.subplots()
     hm3 = axes3.imshow(peak_locs_histogram_history, extent=(0., track_length, num_laps, 0),
-                       aspect='auto', vmin=0.)
+                       aspect='auto', vmin=0.)  #, vmax=max(np.max(peak_locs_histogram_history), 0.12))
     cbar3 = plt.colorbar(hm3)
     cbar3.ax.set_ylabel('Fraction of cells', rotation=270)
     cbar3.ax.get_yaxis().labelpad = 15
@@ -1062,7 +1074,7 @@ def plot_population_history_snapshots(ramp_snapshots, population_representation_
 
     fig4, axes4 = plt.subplots()
     hm4 = axes4.imshow(population_representation_density_history, extent=(0., track_length, len(ramp_snapshots), 0),
-                       aspect='auto')
+                       aspect='auto') # , vmin=min(0.5, np.min(population_representation_density_history)), vmax=max(1.35, np.max(population_representation_density_history)))
     cbar4 = plt.colorbar(hm4)
     cbar4.ax.set_ylabel('Normalized population activity', rotation=270)
     cbar4.ax.get_yaxis().labelpad = 15
@@ -1086,29 +1098,34 @@ def analyze_simulation_output(file_path):
     """
     if not os.path.isfile(file_path):
         raise IOError('analyze_simulation_output: invalid file path: %s' % file_path)
+    exported_data_key = 'BTSP_population_history'
     with h5py.File(file_path, 'r') as f:
-        if 'shared_context' not in f or 'exported_data' not in f or \
-                'weights_population_history' not in f['exported_data']:
+        if 'shared_context' not in f or exported_data_key not in f or 'enumerated' not in f[exported_data_key].attrs \
+                or not f[exported_data_key].attrs['enumerated']:
             raise KeyError('analyze_simulation_output: invalid file contents at path: %s' % file_path)
         binned_x = f['shared_context']['binned_x'][:]
         default_x = f['shared_context']['default_x'][:]
         track_length = f['shared_context'].attrs['track_length']
-        group = f['exported_data']['weights_population_history']
-        reward_locs_array = group.attrs['reward_locs_array']
-        ramp_snapshots = group['ramp_snapshots'][:]
-        population_representation_density_history = group['population_representation_density_history'][:]
-        num_baseline_laps = group.attrs['num_baseline_laps']
-        num_assay_laps = group.attrs['num_assay_laps']
-        num_reward_laps = group.attrs['num_reward_laps']
-
-    plot_population_history_snapshots(ramp_snapshots, population_representation_density_history, reward_locs_array,
-                                      binned_x, default_x, track_length, num_baseline_laps, num_assay_laps,
-                                      num_reward_laps)
+        num_groups = len(f[exported_data_key])
+        for i in xrange(num_groups):
+            group_id = str(i)
+            group = f[exported_data_key][group_id]
+            reward_locs_array = group.attrs['reward_locs_array']
+            ramp_snapshots = group['ramp_snapshots'][:]
+            population_representation_density_history = group['population_representation_density_history'][:]
+            num_baseline_laps = group.attrs['num_baseline_laps']
+            num_assay_laps = group.attrs['num_assay_laps']
+            num_reward_laps = group.attrs['num_reward_laps']
+            trial = group.attrs['trial']
+            plot_population_history_snapshots(ramp_snapshots, population_representation_density_history, reward_locs_array,
+                                              binned_x, default_x, track_length, num_baseline_laps, num_assay_laps,
+                                              num_reward_laps, trial)
 
 
 @click.command()
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
               default='config/simulate_BTSP_CA1_synthetic_population_config.yaml')
+@click.option("--trial", type=int, default=0)
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
 @click.option("--export-file-path", type=str, default=None)
@@ -1120,7 +1137,7 @@ def analyze_simulation_output(file_path):
 @click.option("--data-file-path", type=str, default=None)
 @click.option("--interactive", is_flag=True)
 @click.option("--debug", is_flag=True)
-def main(config_file_path, output_dir, export, export_file_path, label, verbose, plot, simulate, analyze,
+def main(config_file_path, trial, output_dir, export, export_file_path, label, verbose, plot, simulate, analyze,
          data_file_path, interactive, debug):
     """
     Utilizes nested.parallel for parallel map. Requires mpi4py and NEURON.
