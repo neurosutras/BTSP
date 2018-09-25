@@ -1220,23 +1220,52 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     depot_rate = np.vectorize(scaled_double_sigmoid(context.rCM_th1, context.rCM_peak1, context.rCM_th2,
                                                     context.rCM_peak2, signal_xrange, y_end=context.rCM_min2))
 
+    resolution = 10
+    input_sample_indexes = np.arange(0, len(context.peak_locs), resolution)
+
+    example_input_dict = {}
+
+    sample_time_delays = []
+    mean_induction_start_time_index = np.where(context.mean_position > context.mean_induction_start_loc)[0][0]
+    mean_induction_start_time = context.mean_t[mean_induction_start_time_index]
+    for index in input_sample_indexes:
+        this_peak_loc = context.peak_locs[index]
+        this_time_index = np.where(context.mean_position > this_peak_loc)[0][0]
+        this_delay = context.mean_t[this_time_index] - mean_induction_start_time
+        sample_time_delays.append(this_delay)
+    sample_time_delays = np.abs(sample_time_delays)
+
+    target_time_delay = 5000.
+
+    relative_indexes = np.where((sample_time_delays > target_time_delay) &
+                                (final_weights[input_sample_indexes] > initial_weights[input_sample_indexes]))[0]
+    distant_potentiating_indexes = input_sample_indexes[relative_indexes]
+    if np.any(distant_potentiating_indexes):
+        relative_index = np.argmax(np.subtract(final_weights, initial_weights)[distant_potentiating_indexes])
+        this_example_index = distant_potentiating_indexes[relative_index]
+    else:
+        relative_index = np.argmax(np.subtract(final_weights, initial_weights)[input_sample_indexes])
+        this_example_index = input_sample_indexes[relative_index]
+    example_input_dict['Potentiating input example'] = this_example_index
+
+    relative_indexes = np.where((sample_time_delays > target_time_delay) &
+                                (final_weights[input_sample_indexes] < initial_weights[input_sample_indexes]))[0]
+    distant_depotentiating_indexes = input_sample_indexes[relative_indexes]
+    if np.any(distant_depotentiating_indexes):
+        relative_index = np.argmin(np.subtract(final_weights, initial_weights)[distant_depotentiating_indexes])
+        this_example_index = distant_depotentiating_indexes[relative_index]
+    else:
+        relative_index = np.argmin(np.subtract(final_weights, initial_weights)[input_sample_indexes])
+        this_example_index = input_sample_indexes[relative_index]
+    example_input_dict['De-potentiating input example'] = this_example_index
+
     # normalize total number of receptors
     peak_weight = context.peak_delta_weight + 1.
     initial_weights /= peak_weight
 
-    resolution = 10
-    input_sample_indexes = np.arange(0, len(context.peak_locs), resolution)
-
-    field_peak_indexes = {'De-potentiating input':
-                              sorted(input_sample_indexes, key=lambda x:
-                              abs(context.peak_locs[x] - np.argmax(initial_weights)))[0],
-                          'Potentiating input':
-                              sorted(input_sample_indexes, key=lambda x:
-                              abs(context.peak_locs[x] - np.argmax(final_weights)))[0]}
-
     weight_dynamics_history = {}
     local_signal_history = {}
-    for i in field_peak_indexes.itervalues():
+    for i in example_input_dict.itervalues():
         initial_weight = initial_weights[i]
         available = 1. - initial_weight
         context.sm.update_states({'M': available, 'C': initial_weight})
@@ -1261,14 +1290,15 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     mpl.rcParams['mathtext.default'] = 'regular'
     import matplotlib.gridspec as gridspec
 
-    fig, axes = plt.figure(figsize=(11, 7)), []
-    gs0 = gridspec.GridSpec(3, 4, wspace=0.55, hspace=0.5, left=0.075, right=0.975, top=0.95, bottom=0.075)
-    gs1 = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=gs0[1:, 1:], wspace=0.15, hspace=0.5)
+    fig, axes = plt.figure(figsize=(12, 8.5)), []
+    gs0 = gridspec.GridSpec(3, 4, wspace=0.55, hspace=0.9, left=0.075, right=0.975, top=0.925, bottom=0.075)
+    gs1 = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=gs0[1:, 1:], wspace=0.15, hspace=0.9)
 
     this_axis = fig.add_subplot(gs0[0, 0])
     axes.append(this_axis)
     ymax = 0.
-    for color, label, ramp in zip(['lightgray', 'k'], ['Before', 'After'], [initial_ramp, model_ramp]):
+    for color, label, ramp in zip(['k', 'c'], ['Before induction 2', 'After induction 2'],
+                                  [initial_ramp, model_ramp]):
         this_axis.plot(context.binned_x, ramp, c=color, label=label)
         ymax = max(ymax, np.max(ramp))
     this_axis.set_ylabel('Ramp\namplitude (mV)')
@@ -1278,8 +1308,8 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     this_axis.set_xlim(0., context.track_length)
     bar_loc = ymax - 0.5
     this_axis.hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
-    this_axis.set_title('Place field translocation', fontsize=mpl.rcParams['font.size'])
-    this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
+    # this_axis.set_title('Bidirectional BTSP model', fontsize=mpl.rcParams['font.size'])
+    this_axis.legend(loc=(0.05, 0.95), frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
     this_axis.set_xticks(np.arange(0., context.track_length, 45.))
 
     this_axis = fig.add_subplot(gs0[0, 2])
@@ -1287,9 +1317,9 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     xmax = max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.
     xmax = math.ceil(xmax)
     this_axis.plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='lightgray',
-                   label='Local signal')
+                   label='Synaptic\neligibility signal')
     this_axis.plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
-                   label='Global signal')
+                   label='Dendritic\ngating signal')
     this_axis.set_xlabel('Time (s)')
     this_axis.set_ylabel('Normalized amplitude')
     this_axis.set_ylim(0., this_axis.get_ylim()[1])
@@ -1308,7 +1338,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
         depot_scale = 1.
     this_axis.plot(signal_xrange, pot_rate(signal_xrange) * pot_scale, label='Potentiation', c='r')
     this_axis.plot(signal_xrange, depot_rate(signal_xrange) * depot_scale, label='De-potentiation', c='c')
-    this_axis.set_xlabel('Normalized signal amplitude')
+    this_axis.set_xlabel('Normalized eligibility signal')
     this_axis.set_ylabel('Normalized rate')
     this_axis.set_ylim(0., this_axis.get_ylim()[1])
     this_axis.set_xlim(0., 1.)
@@ -1324,26 +1354,29 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     ymax1 = np.max(global_signal)
     ymax2 = 0.
     colors = ['r', 'c']
-    for i, (name, index) in enumerate(field_peak_indexes.iteritems()):
+    for i, (name, index) in enumerate(example_input_dict.iteritems()):
+        this_rate_map = context.complete_rate_maps[index]
         this_local_signal = local_signal_history[index]
         this_weight_dynamics = weight_dynamics_history[index]
         ymax1 = max(ymax1, np.max(this_local_signal))
-        axes1[0][i].plot(context.down_t / 1000., this_local_signal, c=colors[i],
-                        label='Local signal (%s)' % name)
-        axes1[0][i].plot(context.down_t / 1000., global_signal, c='k', label='Global signal', linewidth=0.75)
-        # axes1[0][i].set_title(name, fontsize=mpl.rcParams['font.size'])
+        axes1[0][i].plot(context.complete_t / 1000., this_rate_map / np.max(this_rate_map) * np.max(this_local_signal),
+                        c='grey', linewidth=1., label='Presynaptic firing rate', linestyle='--')
+        axes1[0][i].plot(context.down_t / 1000., this_local_signal, c=colors[i], label='Synaptic eligibility signal')
+        axes1[0][i].plot(context.down_t / 1000., global_signal, c='k', label='Dendritic gating signal', linewidth=0.75)
+        axes1[0][i].set_title('%s:' % name, fontsize=mpl.rcParams['font.size'])
         axes1[0][i].fill_between(context.down_t / 1000., 0., np.minimum(this_local_signal, global_signal), alpha=0.5,
-                                facecolor=colors[i])
+                                facecolor=colors[i], label='Signal overlap')
         axes1[1][i].plot(context.down_t / 1000., this_weight_dynamics, c=colors[i])
         ymax2 = max(ymax2, np.max(this_weight_dynamics))
         axes1[0][i].set_xlabel('Time (s)')
         for label in axes1[0][i].get_xticklabels():
             label.set_visible(True)
         axes1[1][i].set_xlabel('Time (s)')
-        axes1[0][i].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1,
+        axes1[0][i].legend(loc=(0.4, 1.), frameon=False, framealpha=0.5, handlelength=1,
                            fontsize=mpl.rcParams['font.size'])
-        axes1[0][i].set_xlim(-5., context.induction_start_times[-1] / 1000. + 5.)
-        axes1[1][i].set_xlim(-5., context.induction_start_times[-1] / 1000. + 5.)
+        end = min(2, len(context.induction_start_times) - 1)
+        axes1[0][i].set_xlim(-2., context.induction_start_times[end] / 1000. + 5.)
+        axes1[1][i].set_xlim(-2., context.induction_start_times[end] / 1000. + 5.)
     ymax1 = math.ceil(10. * ymax1 / 0.95) / 10.
     ymax2 = math.ceil(ymax2 / 0.95)
     axes1[0][0].set_ylim([0., ymax1])
@@ -1374,12 +1407,12 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
         this_axis = fig.add_subplot(gs0[row, 0])
         axes2.append(this_axis)
         this_max_rate_map = np.zeros_like(context.input_rate_maps[0])
-        for i in (index for index in input_sample_indexes if index not in field_peak_indexes.itervalues()):
+        for i in (index for index in input_sample_indexes if index not in example_input_dict.itervalues()):
             rate_map = np.array(context.input_rate_maps[i])
             rate_map *= weights[i] * context.ramp_scaling_factor
             ymax = max(ymax, np.max(rate_map))
             this_axis.plot(context.binned_x, rate_map, c='lightgray', zorder=0, linewidth=0.75)  # , alpha=0.5)
-        for i, (name, index) in enumerate(field_peak_indexes.iteritems()):
+        for i, (name, index) in enumerate(example_input_dict.iteritems()):
             rate_map = np.array(context.input_rate_maps[index])
             rate_map *= weights[index] * context.ramp_scaling_factor
             ymax = max(ymax, np.max(rate_map))
@@ -1388,7 +1421,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
         this_axis.set_ylabel('Input\namplitude (mV)')
         this_axis.set_xticks(np.arange(0., context.track_length, 45.))
         this_axis.set_xlabel('Position (cm)')
-    axes2[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
+    axes2[0].legend(loc=(-0.1, 1.), frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
 
     ymax = math.ceil(10. * ymax / 0.95) / 10.
     bar_loc = ymax * 0.95
@@ -1757,7 +1790,7 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
     after optimization has completed, e.g.:
 
     ipython
-    run optimize_BTSP_CA1 --model-summary-figure --cell-id=1 --model-file-path=$PATH_TO_MODEL_FILE
+    run optimize_BTSP_CA1 --model-summary-figure --cell_id=1 --model-file-path=$PATH_TO_MODEL_FILE
 
     :param cli: contains unrecognized args as list of str
     :param config_file_path: str (path)

@@ -171,8 +171,8 @@ def plot_BTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, expor
     :param output_dir: str (dir)
     :param label: str
     """
-    fig, axes = plt.figure(figsize=(11, 7)), []
-    gs0 = gridspec.GridSpec(3, 4, wspace=0.55, hspace=0.5, left=0.075, right=0.975, top=0.95, bottom=0.075)
+    fig, axes = plt.figure(figsize=(12, 8.5)), []
+    gs0 = gridspec.GridSpec(3, 4, wspace=0.55, hspace=0.9, left=0.075, right=0.975, top=0.925, bottom=0.075)
     axes = []
     tick_locs = [np.arange(0., 16., 3.), np.arange(30., 151., 30.), np.arange(-120., 121., 60.), np.arange(-2., 9., 2.)]
     for col, (parameter, label, tick_loc) in \
@@ -182,7 +182,7 @@ def plot_BTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, expor
         this_axis = fig.add_subplot(gs0[2, col])
         axes.append(this_axis)
         target_vals, model_vals = {}, {}
-        for color, induction_key in zip(['darkgrey', 'r'], ['1', '2']):
+        for color, induction_key in zip(['darkgrey', 'c'], ['1', '2']):
             target_vals[induction_key] = []
             model_vals[induction_key] = []
             for cell_key in (cell_key for cell_key in parameter if induction_key in parameter[cell_key]):
@@ -195,7 +195,8 @@ def plot_BTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, expor
                            xy=(0.25, 0.05), xycoords='axes fraction')
         this_axis.set_title(label, fontsize=mpl.rcParams['font.size'])
         if col == 0:
-            this_axis.legend(loc='best', frameon=False, framealpha=0.5, fontsize=mpl.rcParams['font.size'])
+            this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, handletextpad=0.5,
+                             fontsize=mpl.rcParams['font.size'])
         this_axis.set_xlim(np.min(tick_loc), np.max(tick_loc))
         this_axis.set_ylim(np.min(tick_loc), np.max(tick_loc))
         this_axis.set_xticks(tick_loc)

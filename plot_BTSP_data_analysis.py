@@ -152,6 +152,7 @@ def main(data_file_path, model_file_path, output_dir, cell_id, export, debug, la
     context.update(locals())
 
     delta_ramp_amp1 = []
+    peak_ramp_amp = []
     total_induction_dur = []
     spont_indexes = []
     exp1_indexes = []
@@ -166,10 +167,10 @@ def main(data_file_path, model_file_path, output_dir, cell_id, export, debug, la
     pop_mean_min_delta_t = {}
     pop_mean_delta_exp_ramp = {}
 
-    fig, axes = plt.figure(figsize=(11, 7)), []
-    gs0 = gridspec.GridSpec(3, 4, wspace=0.55, hspace=0.5, left=0.075, right=0.975, top=0.95, bottom=0.075)
+    fig, axes = plt.figure(figsize=(11.5, 7.5)), []
+    gs0 = gridspec.GridSpec(3, 4, wspace=0.65, hspace=0.75, left=0.075, right=0.975, top=0.95, bottom=0.1)
     subaxes = []
-    gs1 = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs0[1, :2], wspace=0.15, hspace=0.5)
+    gs1 = gridspec.GridSpecFromSubplotSpec(2, 1, subplot_spec=gs0[1, :2], wspace=0.65, hspace=0.75)
 
     for col in xrange(4):
         axes.append(fig.add_subplot(gs0[2, col]))
@@ -190,10 +191,10 @@ def main(data_file_path, model_file_path, output_dir, cell_id, export, debug, la
                     else:
                         exp1_indexes.append(len(total_induction_dur))
                         group = 'exp1'
-                    total_induction_dur.append(np.sum(induction_durs))
                 else:
                     exp2_indexes.append(len(total_induction_dur))
                     group = 'exp2'
+                total_induction_dur.append(np.sum(induction_durs))
                 if group not in pop_mean_min_delta_t:
                     pop_mean_min_delta_t[group] = []
                     pop_mean_delta_exp_ramp[group] = []
@@ -223,8 +224,9 @@ def main(data_file_path, model_file_path, output_dir, cell_id, export, debug, la
                 else:
                     delta_exp_ramp[cell_key][induction_key], discard = \
                         subtract_baseline(exp_ramp[cell_key][induction_key]['after'])
-                if induction_key == '1':
-                    delta_ramp_amp1.append(np.max(delta_exp_ramp[cell_key][induction_key]))
+                # if induction_key == '1':
+                delta_ramp_amp1.append(np.max(delta_exp_ramp[cell_key][induction_key]))
+                peak_ramp_amp.append(np.max(exp_ramp[cell_key][induction_key]['after']))
                 mean_induction_loc[cell_key][induction_key] = np.mean(induction_locs)
                 extended_delta_exp_ramp[cell_key][induction_key] = \
                     np.concatenate([delta_exp_ramp[cell_key][induction_key]] * 3)
@@ -308,16 +310,9 @@ def main(data_file_path, model_file_path, output_dir, cell_id, export, debug, la
                     fig1.show()
                 indexes = np.where((this_extended_delta_position > -track_length) &
                                    (this_extended_delta_position < track_length))[0]
-                if induction_key == '1':
-                    if f['data'][cell_key].attrs['spont']:
-                        axes[0].plot(extended_min_delta_t[cell_key][induction_key][indexes] / 1000.,
-                                 extended_delta_exp_ramp[cell_key][induction_key][indexes], c='r', alpha=0.25)
-                    else:
-                        axes[0].plot(extended_min_delta_t[cell_key][induction_key][indexes] / 1000.,
-                                   extended_delta_exp_ramp[cell_key][induction_key][indexes], c='grey', alpha=0.25)
-                else:
-                    axes[2].plot(extended_min_delta_t[cell_key][induction_key][indexes] / 1000.,
-                               extended_delta_exp_ramp[cell_key][induction_key][indexes], c='grey', alpha=0.25)
+                if induction_key == '2':
+                    axes[0].plot(extended_min_delta_t[cell_key][induction_key][indexes] / 1000.,
+                                 extended_delta_exp_ramp[cell_key][induction_key][indexes], c='grey', alpha=0.25)
                 mask = ~np.isnan(extended_min_delta_t[cell_key][induction_key])
                 indexes = np.where((extended_min_delta_t[cell_key][induction_key][mask] >= -5000.) &
                                    (extended_min_delta_t[cell_key][induction_key][mask] <= 5000.))[0]
@@ -340,7 +335,7 @@ def main(data_file_path, model_file_path, output_dir, cell_id, export, debug, la
                 this_ylim = subaxes[2].get_ylim()
                 this_ymax = this_ylim[1] * 1.1
                 subaxes[2].set_ylim(this_ylim[0], this_ymax)
-                subaxes[2].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1., handletextpad=0.5)
+                subaxes[2].legend(loc=(0.1, 0.95), frameon=False, framealpha=0.5, handlelength=1., handletextpad=0.5)
                 for row in xrange(2):
                     induction_key = str(row + 1)
                     this_complete_position = f['data'][cell_key][induction_key]['complete']['position'][:]
@@ -384,66 +379,57 @@ def main(data_file_path, model_file_path, output_dir, cell_id, export, debug, la
     subaxes[3].set_xlabel('Time relative to plateau onset (s)')
     subaxes[3].set_xlim(-4., 4.)
     subaxes[3].set_xticks([-4., -2., 0., 2., 4.])
+    subaxes[3].set_yticks(np.arange(-10., 16., 5.))
     clean_axes(subaxes)
 
-    axes[0].set_title('Induction 1', fontsize=mpl.rcParams['font.size'])
+    axes[0].set_title('After induction 2', fontsize=mpl.rcParams['font.size'])
     axes[0].set_xlim(-5., 5.)
-    axes[2].set_title('Induction 2', fontsize=mpl.rcParams['font.size'])
-    axes[2].set_xlim(-5., 5.)
-    axes[0].plot(reference_delta_t / 1000., np.mean(pop_mean_delta_exp_ramp['spont'], axis=0), c='r', label='Spont',
-               linewidth=1.5)
-    axes[0].plot(reference_delta_t / 1000., np.mean(pop_mean_delta_exp_ramp['exp1'], axis=0), c='k', label='Exp',
-               linewidth=1.5)
-    ylim2 = axes[0].get_ylim()
+    axes[0].plot(reference_delta_t / 1000., np.mean(pop_mean_delta_exp_ramp['exp2'], axis=0), c='c', linewidth=1.5)
     axes[0].set_ylabel('Change in\nramp amplitude (mV)')
     axes[0].set_xlabel('Time relative to plateau onset (s)')
-    # box = axes[0].get_position()
-    axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1., handletextpad=0.5)
-
-    axes[2].plot(reference_delta_t / 1000., np.mean(pop_mean_delta_exp_ramp['exp2'], axis=0), c='c', linewidth=1.5)
-    axes[2].set_ylabel('Change in\nramp amplitude (mV)')
-    axes[2].set_xlabel('Time relative to plateau onset (s)')
-    ylim5 = axes[2].get_ylim()
-    ylim = [math.floor(min(ylim2[0], ylim5[0])), math.ceil(max(ylim2[1], ylim5[1]))]
-    axes[2].set_ylim(ylim)
-    axes[0].set_ylim(ylim)
+    axes[0].set_yticks(np.arange(-10., 16., 5.))
+    axes[0].set_xticks(np.arange(-4., 5., 2.))
 
     total_induction_dur = np.array(total_induction_dur)
     delta_ramp_amp1 = np.array(delta_ramp_amp1)
-    
-    axes[1].scatter(total_induction_dur[spont_indexes], delta_ramp_amp1[spont_indexes], c='r', s=40., alpha=0.5,
-                  linewidth=0)
-    axes[1].scatter(total_induction_dur[exp1_indexes], delta_ramp_amp1[exp1_indexes], c='darkgrey', s=40., alpha=0.5,
-                  linewidth=0)
-    axes[1].set_ylabel('Change in\nramp amplitude (mV)')
-    axes[1].set_xlabel('Total plateau duration (ms)')
-    this_ylim = [0., math.ceil(np.max(delta_ramp_amp1[exp1_indexes+spont_indexes]) + 1.)]
-    this_xlim = [0., (math.ceil(np.max(total_induction_dur[exp1_indexes+spont_indexes]) / 100.) + 1.) * 100.]
-    result = np.polyfit(total_induction_dur[exp1_indexes+spont_indexes],
-                        delta_ramp_amp1[exp1_indexes+spont_indexes], 1)
+    peak_ramp_amp = np.array(peak_ramp_amp)
+
+    axes[1].scatter(total_induction_dur[exp1_indexes+spont_indexes], peak_ramp_amp[exp1_indexes+spont_indexes],
+                    c='darkgrey', s=40., alpha=0.5, linewidth=0)
+    axes[1].scatter(total_induction_dur[exp2_indexes], peak_ramp_amp[exp2_indexes], c='c', s=40., alpha=0.5,
+                    linewidth=0)
+    axes[1].set_ylabel('Peak ramp\namplitude (mV)')
+    axes[1].set_xlabel('Total accumulated\nplateau duration (ms)')
+    ylim = [0., math.ceil(np.max(peak_ramp_amp) + 3.)]
+    xlim = [0., (math.ceil(np.max(total_induction_dur) / 100.) + 1.) * 100.]
+    result = np.polyfit(total_induction_dur, peak_ramp_amp, 1)
     fit = np.vectorize(lambda x: result[0] * x + result[1])
-    axes[1].plot(this_xlim, fit(this_xlim), c='grey', alpha=0.5, zorder=0, linestyle='--')
-    axes[1].set_ylim(this_ylim)
-    axes[1].set_xlim(this_xlim)
+    fit_xlim = [(math.floor(np.min(total_induction_dur) / 100.) - 1.) * 100.,
+            (math.ceil(np.max(total_induction_dur) / 100.) + 1.) * 100.]
+    axes[1].plot(fit_xlim, fit(fit_xlim), c='grey', alpha=0.5, zorder=0, linestyle='--')
+    axes[1].set_ylim(ylim)
+    axes[1].set_xlim(xlim)
     handles = [mlines.Line2D([0], [0], linestyle='none', mfc=color, mew=0, alpha=0.5, marker='o', ms=math.sqrt(40.))
-               for color in ['r', 'darkgrey']]
-    labels = ['Spont', 'Exp']
-    axes[1].legend(handles=handles, labels=labels, loc='best', frameon=False, framealpha=0.5, handletextpad=0.3,
+               for color in ['darkgrey', 'c']]
+    labels = ['After induction 1', 'After induction 2']
+    axes[1].legend(handles=handles, labels=labels, loc=(0.05, 0.95), frameon=False, framealpha=0.5, handletextpad=0.3,
                    handlelength=1.)
-    axes[1].set_title('Induction 1', fontsize=mpl.rcParams['font.size'])
-    r_val, p_val = pearsonr(total_induction_dur[exp1_indexes+spont_indexes],
-                            delta_ramp_amp1[exp1_indexes+spont_indexes])
-    axes[1].annotate('R$^{2}$ = %.3f; p < %.3f' % (r_val**2., p_val if p_val > 0.001 else 0.001), xy=(0.05, 0.025),
-                   xycoords='axes fraction')
+    r_val, p_val = pearsonr(total_induction_dur, peak_ramp_amp)
+    axes[1].annotate('R$^{2}$ = %.3f; p %s %.3f' %
+                     (r_val**2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001), xy=(0.03, 0.025),
+                     xycoords='axes fraction')
 
     delta_amp_at_peak2 = []
     amp1_at_peak2 = []
     delta_amp_at_peak1 = []
     amp1_at_peak1 = []
-    delta_t_at_peak1 = []
+    delta_amp1_forward = []
+    delta_amp2_forward = []
+    delta_amp1_backward = []
+    delta_amp2_backward = []
+    forward_delta_t_at_peak1 = []
+    backward_delta_t_at_peak1 = []
     delta_x_at_peak1 = []
-    amp1_at_delta_t_val = {}
-    delta_amp_at_delta_t_val = {}
 
     with h5py.File(data_file_path, 'r') as f:
         with h5py.File(model_file_path, 'r') as g:
@@ -467,19 +453,17 @@ def main(data_file_path, model_file_path, output_dir, cell_id, export, debug, la
                 if abs(extended_min_delta_t[cell_key][induction_key][indexes][peak1_pre_index]) > \
                         abs(extended_min_delta_t[cell_key][induction_key][indexes][peak1_post_index]):
                     peak1_index = peak1_post_index
+                    delta_amp2_forward.append(extended_delta_exp_ramp[cell_key][induction_key][indexes][peak2_index])
+                    delta_amp1_forward.append(extended_delta_exp_ramp[cell_key][induction_key][indexes][peak1_index])
+                    forward_delta_t_at_peak1.append(
+                        extended_min_delta_t[cell_key][induction_key][indexes][peak1_index])
                 else:
                     peak1_index = peak1_pre_index
-                delta_t_at_peak1.append(extended_min_delta_t[cell_key][induction_key][indexes][peak1_index])
+                    delta_amp2_backward.append(extended_delta_exp_ramp[cell_key][induction_key][indexes][peak2_index])
+                    delta_amp1_backward.append(extended_delta_exp_ramp[cell_key][induction_key][indexes][peak1_index])
+                    backward_delta_t_at_peak1.append(
+                        extended_min_delta_t[cell_key][induction_key][indexes][peak1_index])
                 this_delta_x = abs(this_extended_delta_position[indexes][peak1_index])
-                if this_delta_x > track_length / 2.:
-                    this_delta_x = track_length - this_delta_x
-                """
-                this_delta_x = this_extended_delta_position[indexes][peak1_index]
-                if this_delta_x > track_length / 2.:
-                    this_delta_x = this_delta_x - track_length
-                elif this_delta_x < -track_length / 2.:
-                    this_delta_x = this_delta_x + track_length
-                """
                 delta_x_at_peak1.append(this_delta_x)
                 amp1_at_peak1.append(extended_exp_ramp[cell_key][induction_key]['before'][indexes][peak1_index])
                 delta_amp_at_peak1.append(extended_delta_exp_ramp[cell_key][induction_key][indexes][peak1_index])
@@ -500,17 +484,53 @@ def main(data_file_path, model_file_path, output_dir, cell_id, export, debug, la
         fig6.suptitle('Induction: %s; Cell: %s' % (induction_key, cell_key),
                       fontsize=mpl.rcParams['font.size'])
         fig6.show()
+
+    xvals = np.abs(delta_x_at_peak1)
+    xmin = np.min(xvals)
+    xmax = np.max(xvals)
+    axes[2].scatter(xvals, delta_amp_at_peak2, c='c', s=40, alpha=0.5, linewidth=0)
+    axes[2].scatter(xvals, delta_amp_at_peak1, c='darkgrey', s=40, alpha=0.5, linewidth=0)
+    axes[2].set_ylabel('Change in\nramp amplitude (mV)')
+    axes[2].set_xlabel('Distance from initial peak\nto induction 2 (cm)')
+    this_ylim = [math.floor(min(delta_amp_at_peak2 + delta_amp_at_peak1)) - 4.,
+                 math.ceil(max(delta_amp_at_peak2 + delta_amp_at_peak1)) + 4.]
+    axes[2].set_ylim(this_ylim)
+    axes[2].set_xticks(np.arange(0., 125., 30.))
+    axes[2].set_yticks(np.arange(-10., 16., 5.))
+    onset2_result = np.polyfit(xvals, delta_amp_at_peak2, 1)
+    onset2_fit = np.vectorize(lambda x: onset2_result[0] * x + onset2_result[1])
+    peak1_result = np.polyfit(xvals, delta_amp_at_peak1, 1)
+    peak1_fit = np.vectorize(lambda x: peak1_result[0] * x + peak1_result[1])
+    onset2_xlim = [math.floor(min(xvals)) - 1., math.ceil(max(xvals)) + 1.]
+    peak1_xlim = [math.floor(min(xvals)) - 1., math.ceil(max(xvals)) + 1.]
+    axes[2].plot(onset2_xlim, onset2_fit(onset2_xlim), c='c', alpha=0.5, zorder=0, linestyle='--')
+    axes[2].plot(peak1_xlim, peak1_fit(peak1_xlim), c='grey', alpha=0.5, zorder=0, linestyle='--')
+    axes[2].set_aspect('auto', adjustable='box')
+    handles = [mlines.Line2D([0], [0], linestyle='none', mfc=color, mew=0, alpha=0.5, marker='o', ms=math.sqrt(40.))
+               for color in ['darkgrey', 'c']]
+    labels = ['Initial peak position', 'Translocated peak position']
+    axes[2].legend(handles=handles, labels=labels, loc=(-0.1, 0.95), frameon=False, framealpha=0.5, handletextpad=0.3,
+                    handlelength=1.)
+    r_val, p_val = pearsonr(xvals, delta_amp_at_peak2)
+    axes[2].annotate('R$^{2}$ = %.3f;\np %s %.3f' %
+                     (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001), xy=(0.03, 0.7),
+                     xycoords='axes fraction')
+    r_val, p_val = pearsonr(xvals, delta_amp_at_peak1)
+    axes[2].annotate('R$^{2}$ = %.3f; p %s %.3f' %
+                     (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001), xy=(0.03, 0.025),
+                     xycoords='axes fraction')
     
     axes[3].scatter(amp1_at_peak2, delta_amp_at_peak2, c='c', s=40, alpha=0.5, linewidth=0)
     axes[3].scatter(amp1_at_peak1, delta_amp_at_peak1, c='darkgrey', s=40, alpha=0.5, linewidth=0)
     axes[3].set_ylabel('Change in\nramp amplitude (mV)')
     axes[3].set_xlabel('Initial ramp amplitude (mV)')
-    this_ylim = [math.floor(min(delta_amp_at_peak2 + delta_amp_at_peak1)) - 1.,
-                 math.ceil(max(delta_amp_at_peak2 + delta_amp_at_peak1)) + 1.]
+    this_ylim = [math.floor(min(delta_amp_at_peak2 + delta_amp_at_peak1)) - 4.,
+                 math.ceil(max(delta_amp_at_peak2 + delta_amp_at_peak1)) + 4.]
     this_xlim = [math.floor(min(amp1_at_peak2 + amp1_at_peak1)) - 1.,
                  math.ceil(max(amp1_at_peak2 + amp1_at_peak1)) + 1.]
     axes[3].set_ylim(this_ylim)
     axes[3].set_xlim(this_xlim)
+    axes[3].set_yticks(np.arange(-10., 16., 5.))
     onset2_result = np.polyfit(amp1_at_peak2, delta_amp_at_peak2, 1)
     onset2_fit = np.vectorize(lambda x: onset2_result[0] * x + onset2_result[1])
     peak1_result = np.polyfit(amp1_at_peak1, delta_amp_at_peak1, 1)
@@ -519,98 +539,75 @@ def main(data_file_path, model_file_path, output_dir, cell_id, export, debug, la
     peak1_xlim = [math.floor(min(amp1_at_peak1)) - 1., math.ceil(max(amp1_at_peak1)) + 1.]
     axes[3].plot(onset2_xlim, onset2_fit(onset2_xlim), c='c', alpha=0.5, zorder=0, linestyle='--')
     axes[3].plot(peak1_xlim, peak1_fit(peak1_xlim), c='grey', alpha=0.5, zorder=0, linestyle='--')
-
-    handles = [mlines.Line2D([0], [0], linestyle='none', mfc=color, mew=0, alpha=0.5, marker='o', ms=math.sqrt(40.))
-               for color in ['darkgrey', 'c']]
-    labels = ['Place field 1', 'Place field 2']
-    axes[3].legend(handles=handles, labels=labels, loc='best', frameon=False, framealpha=0.5, handletextpad=0.3,
-                   handlelength=1.)
-    axes[3].set_title('Induction 2', fontsize=mpl.rcParams['font.size'])
     r_val, p_val = pearsonr(amp1_at_peak2, delta_amp_at_peak2)
-    axes[3].annotate('R$^{2}$ = %.3f; p < %.3f' % (r_val**2., p_val if p_val > 0.001 else 0.001), xy=(0.225, 0.75),
-                   xycoords='axes fraction')
+    axes[3].annotate('R$^{2}$ = %.3f; p %s %.3f' %
+                     (r_val**2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001), xy=(0.15, 0.85),
+                     xycoords='axes fraction')
     r_val, p_val = pearsonr(amp1_at_peak1, delta_amp_at_peak1)
-    axes[3].annotate('R$^{2}$ = %.3f; p < %.3f' % (r_val**2., p_val if p_val > 0.001 else 0.001), xy=(0.025, 0.025),
-                   xycoords='axes fraction')
+    axes[3].annotate('R$^{2}$ = %.3f; p %s %.3f' % 
+                     (r_val**2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001), xy=(0.03, 0.025),
+                     xycoords='axes fraction')
     clean_axes(axes)
     fig.show()
 
+    """
     fig8, axes8 = plt.figure(figsize=(11, 7)), []
     gs8 = gridspec.GridSpec(3, 4, wspace=0.55, hspace=0.5, left=0.075, right=0.975, top=0.95, bottom=0.075)
-    axes8 = []
     axes8.append(fig8.add_subplot(gs8[0,0]))
-    xvals = np.abs(delta_x_at_peak1)
-    xmin = np.min(xvals)
-    xmax = np.max(xvals)
-    deltax = xmax - xmin
-    axes8[0].scatter(xvals, delta_amp_at_peak2, c='c', s=40, alpha=0.5, linewidth=0)
-    axes8[0].scatter(xvals, delta_amp_at_peak1, c='darkgrey', s=40, alpha=0.5, linewidth=0)
-    axes8[0].set_ylabel('Change in\nramp amplitude (mV)')
-    axes8[0].set_xlabel('Distance from place field 1\nto induction 2 (cm)')
-    this_ylim = [math.floor(min(delta_amp_at_peak2 + delta_amp_at_peak1)) - 3.,
-                 math.ceil(max(delta_amp_at_peak2 + delta_amp_at_peak1)) + 3.]
-    this_xlim = [0., 120.]
-    axes8[0].set_ylim(this_ylim)
-    axes8[0].set_xlim(this_xlim)
-    onset2_result = np.polyfit(xvals, delta_amp_at_peak2, 1)
-    onset2_fit = np.vectorize(lambda x: onset2_result[0] * x + onset2_result[1])
-    peak1_result = np.polyfit(xvals, delta_amp_at_peak1, 1)
-    peak1_fit = np.vectorize(lambda x: peak1_result[0] * x + peak1_result[1])
-    onset2_xlim = [math.floor(min(xvals)) - 1., math.ceil(max(xvals)) + 1.]
-    peak1_xlim = [math.floor(min(xvals)) - 1., math.ceil(max(xvals)) + 1.]
-    axes8[0].plot(onset2_xlim, onset2_fit(onset2_xlim), c='c', alpha=0.5, zorder=0, linestyle='--')
-    axes8[0].plot(peak1_xlim, peak1_fit(peak1_xlim), c='grey', alpha=0.5, zorder=0, linestyle='--')
-    axes8[0].set_aspect('auto', adjustable='box')
-    handles = [mlines.Line2D([0], [0], linestyle='none', mfc=color, mew=0, alpha=0.5, marker='o', ms=math.sqrt(40.))
-               for color in ['darkgrey', 'c']]
-    labels = ['Place field 1', 'Place field 2']
-    axes8[0].legend(handles=handles, labels=labels, loc='best', frameon=False, framealpha=0.5, handletextpad=0.3,
-                   handlelength=1.)
-    axes8[0].set_title('Induction: 2', fontsize=mpl.rcParams['font.size'])
-    r_val, p_val = pearsonr(xvals, delta_amp_at_peak2)
-    axes8[0].annotate('R$^{2}$ = %.3f;\np < %.3f' % (r_val ** 2., p_val if p_val > 0.001 else 0.001), xy=(0.225, 0.75),
-                   xycoords='axes fraction')
-    r_val, p_val = pearsonr(xvals, delta_amp_at_peak1)
-    axes8[0].annotate('R$^{2}$ = %.3f; p < %.3f' % (r_val ** 2., p_val if p_val > 0.001 else 0.001), xy=(0.2, 0.33),
-                   xycoords='axes fraction')
 
-    axes8.append(fig8.add_subplot(gs8[0, 1]))
-    xvals = np.abs(delta_t_at_peak1) / 1000.
+    axes8[0].set_ylabel('Change in\nramp amplitude (mV)')
+    axes8[0].set_xlabel('Time from initial peak\nto induction 2 (s)')
+    ymin = math.floor(min(delta_amp2_forward + delta_amp1_forward + delta_amp2_backward + delta_amp1_backward))
+    ymax = math.ceil(max(delta_amp2_forward + delta_amp1_forward + delta_amp2_backward + delta_amp1_backward))
+    axes8[0].set_ylim([ymin - 4., ymax + 4.])
+    axes8[0].set_yticks(np.arange(-10., 16., 5.))
+    axes8[0].set_xticks(np.arange(-5., 11., 5.))
+    xvals = np.array(forward_delta_t_at_peak1) / 1000.
     xmin = np.min(xvals)
     xmax = np.max(xvals)
-    deltax = xmax - xmin
-    axes8[1].scatter(xvals, delta_amp_at_peak2, c='c', s=40, alpha=0.5, linewidth=0)
-    axes8[1].scatter(xvals, delta_amp_at_peak1, c='darkgrey', s=40, alpha=0.5, linewidth=0)
-    axes8[1].set_ylabel('Change in\nramp amplitude (mV)')
-    axes8[1].set_xlabel('Time from place field 1\nto induction 2 (s)')
-    this_ylim = [math.floor(min(delta_amp_at_peak2 + delta_amp_at_peak1)) - 3.,
-                 math.ceil(max(delta_amp_at_peak2 + delta_amp_at_peak1)) + 3.]
-    this_xlim = [0., 10.]
-    axes8[1].set_ylim(this_ylim)
-    axes8[1].set_xlim(this_xlim)
-    onset2_result = np.polyfit(xvals, delta_amp_at_peak2, 1)
+    axes8[0].scatter(xvals, delta_amp2_forward, c='c', s=40, alpha=0.5, linewidth=0)
+    axes8[0].scatter(xvals, delta_amp1_forward, c='darkgrey', s=40, alpha=0.5, linewidth=0)
+    onset2_result = np.polyfit(xvals, delta_amp2_forward, 1)
     onset2_fit = np.vectorize(lambda x: onset2_result[0] * x + onset2_result[1])
-    peak1_result = np.polyfit(xvals, delta_amp_at_peak1, 1)
+    peak1_result = np.polyfit(xvals, delta_amp1_forward, 1)
     peak1_fit = np.vectorize(lambda x: peak1_result[0] * x + peak1_result[1])
-    onset2_xlim = [math.floor(min(xvals)) - 1., math.ceil(max(xvals)) + 1.]
-    peak1_xlim = [math.floor(min(xvals)) - 1., math.ceil(max(xvals)) + 1.]
-    axes8[1].plot(onset2_xlim, onset2_fit(onset2_xlim), c='c', alpha=0.5, zorder=0, linestyle='--')
-    axes8[1].plot(peak1_xlim, peak1_fit(peak1_xlim), c='grey', alpha=0.5, zorder=0, linestyle='--')
-    axes8[1].set_aspect('auto', adjustable='box')
+    fit_xlim = [math.floor(min(xvals)) - 1., math.ceil(max(xvals)) + 1.]
+    axes8[0].plot(fit_xlim, onset2_fit(fit_xlim), c='c', alpha=0.5, zorder=0, linestyle='--')
+    axes8[0].plot(fit_xlim, peak1_fit(fit_xlim), c='grey', alpha=0.5, zorder=0, linestyle='--')
     handles = [mlines.Line2D([0], [0], linestyle='none', mfc=color, mew=0, alpha=0.5, marker='o', ms=math.sqrt(40.))
                for color in ['darkgrey', 'c']]
-    labels = ['Place field 1', 'Place field 2']
-    axes8[1].legend(handles=handles, labels=labels, loc='best', frameon=False, framealpha=0.5, handletextpad=0.3,
-                 handlelength=1.)
-    axes8[1].set_title('Induction: 2', fontsize=mpl.rcParams['font.size'])
-    r_val, p_val = pearsonr(xvals, delta_amp_at_peak2)
-    axes8[1].annotate('R$^{2}$ = %.3f;\np < %.3f' % (r_val ** 2., p_val if p_val > 0.001 else 0.001), xy=(0.225, 0.75),
-                   xycoords='axes fraction')
-    r_val, p_val = pearsonr(xvals, delta_amp_at_peak1)
-    axes8[1].annotate('R$^{2}$ = %.3f; p < %.3f' % (r_val ** 2., p_val if p_val > 0.001 else 0.001), xy=(0.2, 0.33),
-                   xycoords='axes fraction')
+    labels = ['Initial peak position', 'Translocated peak position']
+    axes8[0].legend(handles=handles, labels=labels, loc=(0.05, 0.9), frameon=False, framealpha=0.5, handletextpad=0.3,
+                    handlelength=1.)
+    r_val, p_val = pearsonr(xvals, delta_amp2_forward)
+    print 'Peak 2 forward: R$^{2}$ = %.3f; p %s %.3f' % \
+          (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001)
+    r_val, p_val = pearsonr(xvals, delta_amp1_forward)
+    print 'Peak 1 forward: R$^{2}$ = %.3f; p %s %.3f' % \
+          (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001)
+
+    xvals = np.array(backward_delta_t_at_peak1) / 1000.
+    xmin = np.min(xvals)
+    xmax = np.max(xvals)
+    axes8[0].scatter(xvals, delta_amp2_backward, c='c', s=40, alpha=0.5, linewidth=0)
+    axes8[0].scatter(xvals, delta_amp1_backward, c='darkgrey', s=40, alpha=0.5, linewidth=0)
+    onset2_result = np.polyfit(xvals, delta_amp2_backward, 1)
+    onset2_fit = np.vectorize(lambda x: onset2_result[0] * x + onset2_result[1])
+    peak1_result = np.polyfit(xvals, delta_amp1_backward, 1)
+    peak1_fit = np.vectorize(lambda x: peak1_result[0] * x + peak1_result[1])
+    fit_xlim = [math.floor(min(xvals)) - 1., math.ceil(max(xvals)) + 1.]
+    axes8[0].plot(fit_xlim, onset2_fit(fit_xlim), c='c', alpha=0.5, zorder=0, linestyle='--')
+    axes8[0].plot(fit_xlim, peak1_fit(fit_xlim), c='grey', alpha=0.5, zorder=0, linestyle='--')
+    r_val, p_val = pearsonr(xvals, delta_amp2_backward)
+    print 'Peak 2 backward: R$^{2}$ = %.3f; p %s %.3f' % \
+          (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001)
+    r_val, p_val = pearsonr(xvals, delta_amp1_backward)
+    print 'Peak 1 backward: R$^{2}$ = %.3f; p %s %.3f' % \
+          (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001)
+    axes8[0].set_aspect('auto', adjustable='box')
     clean_axes(axes8)
     fig8.show()
+    """
 
     context.update(locals())
 
