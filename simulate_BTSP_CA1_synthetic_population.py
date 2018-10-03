@@ -1028,13 +1028,16 @@ def plot_population_history_snapshots(ramp_snapshots, population_representation_
             peak_loc_history[cell_index].append(this_peak_loc)
         peak_locs_snapshots.append(np.array(this_peak_locs_snapshot))
 
-    peak_shift_count = 0
-    for cell_index, this_delta_peak_loc_history in delta_peak_loc_history.iteritems():
-        this_delta_peak_loc_history_array = np.array(this_delta_peak_loc_history)
-        valid = this_delta_peak_loc_history_array[~np.isnan(this_delta_peak_loc_history_array)]
-        if np.any(valid > 0.):
-            peak_shift_count += 1
-    print 'peak_shift_count: %i / %i active cells' % (peak_shift_count, len(active_cell_index_set))
+    this_peak_shift_count = 0
+    for lap in range(1,snapshot_laps[-1]+1, 1):
+        for cell_index, this_delta_peak_loc_history in delta_peak_loc_history.iteritems():
+            this_delta_peak_loc = this_delta_peak_loc_history[lap-1]
+            if not np.isnan(this_delta_peak_loc) and this_delta_peak_loc > 0.:
+                this_peak_shift_count += 1
+        if lap in snapshot_laps:
+            print 'lap: %i; peak_shift_count: %i cells' % (lap, this_peak_shift_count)
+            this_peak_shift_count = 0
+    print 'total active cells: %i / %i' % (len(active_cell_index_set), num_cells)
 
     num_bins = 50
     edges = np.linspace(0., track_length, num_bins + 1)
@@ -1184,7 +1187,7 @@ def plot_plateau_modulation():
     mpl.rcParams['mathtext.default'] = 'regular'
 
     max_cols = 5
-    col_width = 3
+    col_width = 3.15
     col_height = 4
     fig6, axes6 = plt.subplots(1, max_cols, figsize=[max_cols * col_width, col_height])
     axes6[0].plot(context.basal_representation_xscale,
@@ -1193,13 +1196,31 @@ def plot_plateau_modulation():
                   context.reward_plateau_modulation_f(context.reward_representation_xscale, 1.), label='Reward', c='r')
     axes6[0].set_xticks([i * 0.25 for i in xrange(6)])
     axes6[0].set_xlim(0., 1.25)
+    axes6[0].set_ylim(0., axes6[0].get_ylim()[1])
     axes6[0].set_xlabel('Normalized population activity')
     axes6[0].set_ylabel('Plateau probability per lap')
     axes6[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
     axes6[0].set_title('Modulation of plateau probability\nby feedback inhibition and reward',
                        fontsize=mpl.rcParams['font.size'], y=1.025)
+
+    normalized_basal_plateau_prob = context.basal_plateau_prob_f(context.ramp_xscale) * \
+                                    context.basal_plateau_prob_norm_factor
+    normalized_basal_plateau_prob /= np.max(normalized_basal_plateau_prob)
+    normalized_reward_plateau_prob = context.reward_plateau_prob_f(context.ramp_xscale) * \
+                                     context.reward_plateau_prob_norm_factor
+    normalized_reward_plateau_prob /= np.max(normalized_reward_plateau_prob)
+    # axes6[1].plot(context.ramp_xscale, normalized_basal_plateau_prob, label='No reward', c='k')
+    axes6[1].plot(context.ramp_xscale, normalized_reward_plateau_prob, c='k')  #, label='Reward', c='r')
+    axes6[1].set_xlim(0., 10.)
+    axes6[1].set_ylim(0., 1.)
+    axes6[1].set_xlabel('Ramp amplitude (mV)')
+    axes6[1].set_ylabel('Normalized plateau probability')
+    axes6[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+    axes6[1].set_title('Modulation of plateau probability\nby ramp amplitude',
+                       fontsize=mpl.rcParams['font.size'], y=1.025)
+    
     clean_axes(axes6)
-    fig6.tight_layout(w_pad=0.7)
+    fig6.tight_layout(w_pad=0.8)
     plt.show()
 
 

@@ -1292,7 +1292,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
 
     fig, axes = plt.figure(figsize=(12, 8.5)), []
     gs0 = gridspec.GridSpec(3, 4, wspace=0.55, hspace=0.9, left=0.075, right=0.975, top=0.925, bottom=0.075)
-    gs1 = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=gs0[1:, 1:], wspace=0.15, hspace=0.9)
+    gs1 = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=gs0[1:, 1:], wspace=0.325, hspace=0.9)
 
     this_axis = fig.add_subplot(gs0[0, 0])
     axes.append(this_axis)
@@ -1354,17 +1354,18 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     ymax1 = np.max(global_signal)
     ymax2 = 0.
     colors = ['r', 'c']
+    axes1_0_right = [axes1[0][0].twinx(), axes1[0][1].twinx()]
     for i, (name, index) in enumerate(example_input_dict.iteritems()):
         this_rate_map = context.complete_rate_maps[index]
         this_local_signal = local_signal_history[index]
         this_weight_dynamics = weight_dynamics_history[index]
         ymax1 = max(ymax1, np.max(this_local_signal))
-        axes1[0][i].plot(context.complete_t / 1000., this_rate_map / np.max(this_rate_map) * np.max(this_local_signal),
-                        c='grey', linewidth=1., label='Presynaptic firing rate', linestyle='--')
-        axes1[0][i].plot(context.down_t / 1000., this_local_signal, c=colors[i], label='Synaptic eligibility signal')
-        axes1[0][i].plot(context.down_t / 1000., global_signal, c='k', label='Dendritic gating signal', linewidth=0.75)
-        axes1[0][i].set_title('%s:' % name, fontsize=mpl.rcParams['font.size'])
-        axes1[0][i].fill_between(context.down_t / 1000., 0., np.minimum(this_local_signal, global_signal), alpha=0.5,
+        axes1[0][i].plot(context.complete_t / 1000., this_rate_map, c='grey', linewidth=1.,
+                         label='Presynaptic firing rate', linestyle='--')
+        axes1_0_right[i].plot(context.down_t / 1000., this_local_signal, c=colors[i], label='Synaptic eligibility signal')
+        axes1_0_right[i].plot(context.down_t / 1000., global_signal, c='k', label='Dendritic gating signal', linewidth=0.75)
+        axes1_0_right[i].set_title('%s:' % name, fontsize=mpl.rcParams['font.size'])
+        axes1_0_right[i].fill_between(context.down_t / 1000., 0., np.minimum(this_local_signal, global_signal), alpha=0.5,
                                 facecolor=colors[i], label='Signal overlap')
         axes1[1][i].plot(context.down_t / 1000., this_weight_dynamics, c=colors[i])
         ymax2 = max(ymax2, np.max(this_weight_dynamics))
@@ -1372,17 +1373,23 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
         for label in axes1[0][i].get_xticklabels():
             label.set_visible(True)
         axes1[1][i].set_xlabel('Time (s)')
-        axes1[0][i].legend(loc=(0.4, 1.), frameon=False, framealpha=0.5, handlelength=1,
+        axes1_0_right[i].legend(loc=(0.4, 1.), frameon=False, framealpha=0.5, handlelength=1,
                            fontsize=mpl.rcParams['font.size'])
+        axes1[0][i].legend(loc=(-0.2, 1.2), frameon=False, framealpha=0.5, handlelength=1,
+                                fontsize=mpl.rcParams['font.size'])
         end = min(2, len(context.induction_start_times) - 1)
         axes1[0][i].set_xlim(-2., context.induction_start_times[end] / 1000. + 5.)
         axes1[1][i].set_xlim(-2., context.induction_start_times[end] / 1000. + 5.)
-    ymax1 = math.ceil(10. * ymax1 / 0.95) / 10.
+    ymax1_right = ymax1 / 0.9
+    ymax1_left = context.input_field_peak_rate / 0.9
+    ymax1 = max(ymax1_left, ymax1_right)
     ymax2 = math.ceil(ymax2 / 0.95)
-    axes1[0][0].set_ylim([0., ymax1])
-    axes1[0][1].set_ylim([0., ymax1])
+    axes1[0][0].set_ylim([0., ymax1_left])
+    axes1[0][1].set_ylim([0., ymax1_left])
     axes1[1][0].set_ylim([0., ymax2])
     axes1[1][1].set_ylim([0., ymax2])
+    axes1_0_right[0].set_ylim([0., ymax1_right])
+    axes1_0_right[1].set_ylim([0., ymax1_right])
     bar_loc0 = ymax1 * 0.95
     bar_loc1 = ymax2 * 0.95
     axes1[0][0].hlines([bar_loc0] * len(context.induction_start_times),
@@ -1397,8 +1404,14 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     axes1[1][1].hlines([bar_loc1] * len(context.induction_start_times),
                       xmin=context.induction_start_times / 1000.,
                       xmax=context.induction_stop_times / 1000., linewidth=2)
-    axes1[0][0].set_ylabel('Plasticity signal\namplitude')
+    axes1[0][0].set_ylabel('Firing rate (Hz)')
     axes1[1][0].set_ylabel('Synaptic weight')
+    axes1[0][0].set_yticks(np.arange(0., context.input_field_peak_rate + 1., 10.))
+    axes1[0][1].set_yticks(np.arange(0., context.input_field_peak_rate + 1., 10.))
+    axes1_0_right[0].set_ylabel('Plasticity signal amplitude', rotation=-90)
+    axes1_0_right[0].set_yticklabels(np.arange(0., 1., 0.2))
+    axes1_0_right[1].set_yticklabels(np.arange(0., 1., 0.2))
+    clean_twin_right_axes(axes1_0_right)
     clean_axes(np.array(axes1))
 
     axes2 = []
