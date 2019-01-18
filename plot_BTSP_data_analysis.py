@@ -6,6 +6,7 @@ import matplotlib.lines as mlines
 import matplotlib as mpl
 import matplotlib.gridspec as gridspec
 import click
+from scipy.ndimage.filters import gaussian_filter
 
 
 mpl.rcParams['svg.fonttype'] = 'none'
@@ -550,7 +551,6 @@ def main(data_file_path, model_file_path, output_dir, cell_id, export, debug, la
     clean_axes(axes)
     fig.show()
 
-    """
     fig8, axes8 = plt.figure(figsize=(11, 7)), []
     gs8 = gridspec.GridSpec(3, 4, wspace=0.55, hspace=0.5, left=0.075, right=0.975, top=0.95, bottom=0.075)
     axes8.append(fig8.add_subplot(gs8[0,0]))
@@ -607,9 +607,62 @@ def main(data_file_path, model_file_path, output_dir, cell_id, export, debug, la
     axes8[0].set_aspect('auto', adjustable='box')
     clean_axes(axes8)
     fig8.show()
-    """
 
     context.update(locals())
+
+    flat_min_t = []
+    flat_delta_ramp = []
+    flat_initial_ramp = []
+
+    induction_key = '2'
+    for cell_key in context.extended_delta_exp_ramp:
+        if induction_key in context.extended_delta_exp_ramp[cell_key]:
+            this_min_t = np.array(context.extended_min_delta_t[cell_key][induction_key])
+            this_delta_ramp = np.array(context.extended_delta_exp_ramp[cell_key][induction_key])
+            this_initial_ramp = np.array(context.extended_exp_ramp[cell_key][induction_key]['before'])
+            valid_indexes = np.where(~np.isnan(this_min_t))
+            indexes = np.where((this_min_t[valid_indexes] >= -5000) & (this_min_t[valid_indexes] <= 5000.))[0]
+            flat_min_t.extend(this_min_t[valid_indexes][indexes])
+            flat_delta_ramp.extend(this_delta_ramp[valid_indexes][indexes])
+            flat_initial_ramp.extend(this_initial_ramp[valid_indexes][indexes])
+    flat_min_t = np.divide(flat_min_t, 1000.)
+
+    points = np.array([flat_min_t, flat_initial_ramp]).transpose()
+    data = np.array(flat_delta_ramp)
+
+    tmax = 5.
+    interp_tmax = math.ceil(tmax * 1.2)
+    deltat = 0.05
+    min_t = np.arange(-interp_tmax, interp_tmax + deltat / 2., deltat)
+    ymax = max(np.max(flat_initial_ramp), -np.min(flat_initial_ramp))
+
+    interp_ymax = math.ceil(ymax * 1.2)
+    deltay = 0.1
+    initial_ramp = np.arange(-ymax, ymax + deltay / 2., deltay)
+
+    vmax = max(np.max(flat_delta_ramp), -np.min(flat_delta_ramp))
+
+    X, Y = np.meshgrid(min_t, initial_ramp)
+    nn_interp_f = scipy.interpolate.NearestNDInterpolator(points, data, rescale=True)
+    nn_interp_data = nn_interp_f(X, Y)
+
+    context.update(locals())
+
+    sigmax, sigmay = 10, 10
+    smoothed_nn_interp_data = gaussian_filter(nn_interp_data, [sigmax, sigmay], mode='constant')
+    fig, axes = plt.subplots()
+    axes.scatter(flat_min_t, flat_initial_ramp, c=flat_delta_ramp, cmap='RdBu_r', s=5., vmax=vmax,
+                 vmin=-vmax, zorder=1) #, alpha=0.5)
+    cax = axes.pcolor(X, Y, smoothed_nn_interp_data, cmap='RdBu_r', vmax=vmax, vmin=-vmax, zorder=0)
+    axes.set_ylabel('Initial ramp amplitude (mV)')
+    axes.set_xlabel('Time relative to plateau onset (s)')
+    axes.set_ylim(0., ymax)
+    axes.set_xlim(-tmax, tmax)
+    cbar = fig.colorbar(cax)
+    cbar.set_label('Change in ramp amplitude', rotation=270., labelpad=15.)
+    clean_axes(axes)
+
+    fig.show()
 
 
 if __name__ == '__main__':
