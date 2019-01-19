@@ -116,7 +116,7 @@ objective_names:
 - exp1_residual_score
 - exp2_residual_score
 - self_consistent_delta_residual_score
-optimization_title: bidirectional_BTSP
+optimization_title: bidirectional_BTSP_C
 param_gen: PopulationAnnealing
 param_names:
 - rMC_peak
