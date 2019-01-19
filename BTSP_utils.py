@@ -455,6 +455,8 @@ def get_local_peak_shift(local_context, ramp, induction_loc, tolerance=30.):
 
     peak_indexes = signal.argrelmax(interp_ramp, order=order, mode='wrap')[0]
     peak_locs = default_interp_x[peak_indexes]
+    if not np.any(peak_locs):
+        return None, None
     peak_shifts = []
 
     for peak_loc in peak_locs:
