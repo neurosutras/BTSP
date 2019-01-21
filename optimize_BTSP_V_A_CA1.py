@@ -1694,8 +1694,8 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
     context.update(locals())
     kwargs = get_unknown_click_arg_dict(cli.args)
     context.disp = verbose > 0
-    config_interactive(context, __file__, config_file_path=config_file_path, output_dir=output_dir, export=export,
-                       export_file_path=export_file_path, label=label, disp=context.disp, verbose=verbose, **kwargs)
+    config_optimize_interactive(__file__, config_file_path=config_file_path, output_dir=output_dir, export=export,
+                                export_file_path=export_file_path, label=label, disp=context.disp, verbose=verbose, **kwargs)
 
     x1_array = context.x0_array
     if 'params_path' in context.kwargs and os.path.isfile(context.kwargs['params_path']):

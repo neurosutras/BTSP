@@ -41,76 +41,11 @@ can be linear, exponential rise, or saturating).
 __author__ = 'milsteina'
 from BTSP_utils import *
 from collections import defaultdict
-from nested.parallel import *
 from nested.optimize_utils import *
 import click
 
 
 context = Context()
-
-
-def config_parallel_interface(config_file_path=None, output_dir=None, temp_output_path=None, export=False,
-                              export_file_path=None, label=None, disp=True, **kwargs):
-    """
-    nested.parallel is used for parallel map operations. This method imports optional parameters from a config_file and
-    initializes a Context object on each worker.
-    :param config_file_path: str (.yaml file path)
-    :param output_dir: str (dir path)
-    :param temp_output_path: str (.hdf5 file path)
-    :param export: bool
-    :param export_file_path: str (.hdf5 file path)
-    :param label: str
-    :param disp: bool
-    """
-    if config_file_path is not None:
-        context.config_file_path = config_file_path
-    if 'config_file_path' in context() and context.config_file_path is not None:
-        if not os.path.isfile(context.config_file_path):
-            raise Exception('nested.parallel: config_file_path specifying optional is invalid.')
-        else:
-            config_dict = read_from_yaml(context.config_file_path)
-    else:
-        config_dict = {}
-    context.update(config_dict)
-    context.kwargs = config_dict  # Extra arguments to be passed to imported sources
-
-    if label is not None:
-        context.label = label
-    if 'label' not in context() or context.label is None:
-        label = ''
-    else:
-        label = '_' + context.label
-
-    if output_dir is not None:
-        context.output_dir = output_dir
-    if 'output_dir' not in context():
-        context.output_dir = None
-    if context.output_dir is None:
-        output_dir_str = ''
-    else:
-        output_dir_str = context.output_dir + '/'
-
-    if temp_output_path is not None:
-        context.temp_output_path = temp_output_path
-    if 'temp_output_path' not in context() or context.temp_output_path is None:
-        context.temp_output_path = '%s%s_pid%i%s_temp_output.hdf5' % \
-                                   (output_dir_str, datetime.datetime.today().strftime('%Y%m%d_%H%M'), os.getpid(),
-                                    label)
-    context.export = export
-    if export_file_path is not None:
-        context.export_file_path = export_file_path
-    if 'export_file_path' not in context() or context.export_file_path is None:
-        context.export_file_path = '%s%s%s_exported_output.hdf5' % \
-                                   (output_dir_str, datetime.datetime.today().strftime('%Y%m%d_%H%M'), label)
-    context.disp = disp
-
-    config_worker()
-
-    try:
-        context.interface.start(disp=True)
-        context.interface.ensure_controller()
-    except Exception:
-        pass
 
 
 def config_worker():
@@ -1270,15 +1205,18 @@ def main(config_file_path, trial, output_dir, export, export_file_path, label, v
     context.update(locals())
     context.disp = verbose > 0
     if simulate:
+        from nested.parallel import ParallelContextInterface
         context.interface = ParallelContextInterface()
-        context.interface.apply(config_parallel_interface, config_file_path=config_file_path, output_dir=output_dir,
-                                export=export, export_file_path=export_file_path, label=label, disp=context.disp,
-                                verbose=verbose)
+        context.interface.apply(config_parallel_interface, __file__, config_file_path=config_file_path,
+                                output_dir=output_dir, export=export, export_file_path=export_file_path, label=label,
+                                disp=context.disp, verbose=verbose)
+        context.interface.start(disp=True)
+        context.interface.ensure_controller()
         plateau_start_times_population, plateau_stop_times_population, weights_population_full_history, \
             plateau_probability_history, weights_snapshots, ramp_snapshots = calculate_population_dynamics(export, plot)
     elif debug:
-        config_parallel_interface(config_file_path=config_file_path, output_dir=output_dir, export=export,
-                                  export_file_path=export_file_path, label=label, disp=context.disp, verbose=verbose)
+        config_parallel_interface(__file__, config_file_path=config_file_path, output_dir=output_dir, export=export,
+                                    export_file_path=export_file_path, label=label, disp=context.disp, verbose=verbose)
         if analyze:
             plot_plateau_modulation()
 
@@ -1288,10 +1226,7 @@ def main(config_file_path, trial, output_dir, export, export_file_path, label, v
     context.update(locals())
 
     if simulate and not interactive:
-        try:
-            context.interface.stop()
-        except Exception:
-            pass
+        context.interface.stop()
 
 
 if __name__ == '__main__':
