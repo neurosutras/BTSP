@@ -1681,10 +1681,11 @@ def filter_features_model_ramp(primitives, current_features, export=False):
     return features
 
 
-def get_objectives(features):
+def get_objectives(features, export=False):
     """
 
     :param features: dict
+    :param export: bool
     :return: tuple of dict
     """
     objectives = {}
@@ -1884,7 +1885,7 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
 
     if debug:
         features = get_features_interactive(x1_array, plot=plot)
-        features, objectives = get_objectives(features)
+        features, objectives = get_objectives(features, context.export)
         if export and os.path.isfile(context.temp_output_path):
             merge_exported_data([context.temp_output_path], context.export_file_path, True)
             os.remove(context.temp_output_path)
