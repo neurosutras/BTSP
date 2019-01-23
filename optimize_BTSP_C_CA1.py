@@ -38,8 +38,8 @@ are pooled across all cells and normalized to a peak value of 1. The transformat
 components: a rising phase and a decaying phase. Each phase has the flexibility to be any segment of a sigmoid (so
 can be linear, exponential rise, or saturating).
 
-BTSP_C vs. orig BTSP: one less parameter, removed rCM_min2 (forced to zero). Weights updated once per lap instead of
-once per time step.
+BTSP_C vs. orig BTSP: One less parameter, removed rCM_min2 (forced to zero). Weights updated once per lap instead of
+once per time step. Relaxed constraints on sigmoid slope compared to original version.
 """
 __author__ = 'milsteina'
 from BTSP_utils import *
