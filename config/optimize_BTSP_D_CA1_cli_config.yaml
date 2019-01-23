@@ -46,14 +46,6 @@ rel_bounds:
   - '>'
   - 1.0
   - global_signal_decay
-- - rMC_peak
-  - '>'
-  - 1.0
-  - rMC_th
-- - rCM_peak
-  - '>'
-  - 1.0
-  - rCM_th
 feature_names:
 - spont_delta_amp
 - spont_delta_width

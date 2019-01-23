@@ -880,9 +880,10 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     local_signals = np.divide(get_local_signal_population(local_signal_filter), local_signal_peak)
 
     signal_xrange = np.linspace(0., 1., 10000)
-    pot_rate = np.vectorize(scaled_single_sigmoid(context.rMC_th, context.rMC_peak, signal_xrange))
-    depot_rate = np.vectorize(scaled_double_sigmoid(context.rCM_th1, context.rCM_peak1, context.rCM_th2,
-                                                    context.rCM_peak2, signal_xrange))
+    pot_rate = np.vectorize(scaled_single_sigmoid(context.rMC_th, context.rMC_peak + context.rMC_th, signal_xrange))
+    depot_rate = np.vectorize(scaled_double_sigmoid(context.rCM_th1, context.rCM_th1 + context.rCM_peak1,
+                                                    context.rCM_th2, context.rCM_th2 - context.rCM_peak2,
+                                                    signal_xrange))
     if plot:
         fig, axes = plt.subplots(1)
         axes.plot(signal_xrange, pot_rate(signal_xrange), label='Potentiation rate')
