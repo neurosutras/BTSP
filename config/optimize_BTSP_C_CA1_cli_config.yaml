@@ -52,26 +52,10 @@ rel_bounds:
   - '>'
   - 1.0
   - global_signal_decay
-- - rMC_peak
-  - '>'
-  - 1.0
-  - rMC_th
-- - rCM_peak1
-  - '>'
-  - 1.0
-  - rCM_th1
-- - rCM_peak2
-  - '>'
-  - 1.0
-  - rCM_th1
 - - rCM_th2
   - '>'
   - 1.0
-  - rCM_peak1
-- - rCM_th2
-  - '>'
-  - 1.0
-  - rCM_peak2
+  - rCM_th1
 feature_names:
 - spont_delta_amp
 - spont_delta_width
