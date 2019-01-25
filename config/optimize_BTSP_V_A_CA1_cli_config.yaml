@@ -95,9 +95,9 @@ target_range:
   weights_smoothness: 0.01
 target_val:
 x0:
-  global_signal_decay: 4.251749E+02
-  local_signal_rise: 4.073256E+01
-  k_pot: 4.757886E+00
-  global_signal_rise: 6.948743E+01
-  k_depot: 1.068800E-01
-  local_signal_decay: 5.211542E+02
+  k_pot: 9.991864E+00
+  k_depot: 1.030430E-01
+  local_signal_rise: 1.995811E+02
+  local_signal_decay: 4.546595E+02
+  global_signal_rise: 1.199720E+02
+  global_signal_decay: 2.566589E+02

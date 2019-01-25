@@ -289,8 +289,6 @@ def scaled_double_sigmoid(th1, peak1, th2, peak2, x, y_start=0., y_peak=1., y_en
         raise ValueError('scaled_double_sigmoid: peak1 and th1: %.2E cannot be equal' % th1)
     if peak2 == th2:
         raise ValueError('scaled_double_sigmoid: peak2 and th2: %.2E cannot be equal' % th2)
-    if peak2 / (x[-1] - x[0]) > 0.95 and th2 / (x[-1] - x[0]) > 0.95:
-        return scaled_single_sigmoid(peak1, th1, x, [y_start, y_peak])
     slope1 = 2. / (peak1 - th1)
     slope2 = 2. / (peak2 - th2)
     y = lambda x: (1. / (1. + np.exp(-slope1 * (x - th1)))) * (1. / (1. + np.exp(-slope2 * (x - th2))))
@@ -302,6 +300,8 @@ def scaled_double_sigmoid(th1, peak1, th2, peak2, x, y_start=0., y_peak=1., y_en
     end_val = y(x[-1])
     amp1 = max_val - start_val
     amp2 = max_val - end_val
+    if amp1 == 0. or amp2 == 0.:
+        raise ValueError('scaled_double_sigmoid: parameters out of range for scaled double sigmoid')
     target_amp1 = y_peak - y_start
     target_amp2 = y_peak - y_end
 
@@ -331,8 +331,6 @@ def visualize_scaled_double_sigmoid(th1, peak1, th2, peak2, x, y_start=0., y_pea
         raise ValueError('scaled_double_sigmoid: peak1 and th1: %.2E cannot be equal' % th1)
     if peak2 == th2:
         raise ValueError('scaled_double_sigmoid: peak2 and th2: %.2E cannot be equal' % th2)
-    if peak2 / (x[-1] - x[0]) > 0.95 and th2 / (x[-1] - x[0]) > 0.95:
-        return scaled_single_sigmoid(peak1, th1, x, [y_start, y_peak])
     slope1 = 2. / (peak1 - th1)
     slope2 = 2. / (peak2 - th2)
     y1 = (1. / (1. + np.exp(-slope1 * (x - th1))))
@@ -350,6 +348,8 @@ def visualize_scaled_double_sigmoid(th1, peak1, th2, peak2, x, y_start=0., y_pea
     end_val = y(x[-1])
     amp1 = max_val - start_val
     amp2 = max_val - end_val
+    if amp1 == 0. or amp2 == 0.:
+        raise ValueError('scaled_double_sigmoid: parameters out of range for scaled double sigmoid')
     target_amp1 = y_peak - y_start
     target_amp2 = y_peak - y_end
 

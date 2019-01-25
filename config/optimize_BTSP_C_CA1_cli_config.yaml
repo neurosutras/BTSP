@@ -12,7 +12,7 @@ bounds:
   - 0.001
   - 1.
   rCM_th2: !!python/tuple
-  - 0.01
+  - 0.001
   - 1.
   rCM_peak2: !!python/tuple
   - 0.001

@@ -106,7 +106,6 @@ def init_context():
                                  (cell_id, 2) in context.data_keys]
     down_dt = 10.  # ms, to speed up optimization
     context.update(locals())
-    context.sm = StateMachine(dt=down_dt)
     context.cell_id = None
     context.induction = None
 
@@ -659,6 +658,8 @@ def get_model_ramp(delta_weights, input_x=None, ramp_x=None, allow_offset=False,
     :param delta_weights: array
     :param input_x: array (x resolution of inputs)
     :param ramp_x: array (x resolution of ramp)
+    :param allow_offset: bool (allow special case where baseline Vm before 1st induction is unknown)
+    :param impose_offset: float (impose Vm offset from 1st induction on 2nd induction)
     :param plot: bool
     :return: array
     """
@@ -893,7 +894,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
         clean_axes(axes)
         fig.tight_layout()
         fig.show()
-    weights = []
+
     peak_weight = context.peak_delta_weight + 1.
 
     allow_offset = False
@@ -941,6 +942,21 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     initial_weights = np.divide(np.add(initial_delta_weights, 1.), peak_weight)
     current_weights = np.array(initial_weights)
 
+    if plot:
+        fig, axes = plt.subplots()
+        fig.suptitle('Induction: %i' % context.induction)
+        axes.plot(context.down_t / 1000., global_signal)
+        axes.set_ylabel('Plasticity gating signal')
+        axes.set_xlabel('Time (s)')
+
+        fig2, axes2 = plt.subplots(1, 2, sharex=True)
+        fig2.suptitle('Induction: %i' % context.induction)
+        axes2[0].plot(context.binned_x, initial_ramp, c='k', label='Before')
+        axes2[0].set_ylabel('Ramp amplitude (mV)')
+        axes2[0].set_xlabel('Location (cm)')
+        axes2[1].set_ylabel('Change in synaptic weight')
+        axes2[1].set_xlabel('Location (cm)')
+
     for induction_lap in xrange(len(context.induction_start_times)):
         if induction_lap == 0:
             start_time = context.down_t[0]
@@ -962,14 +978,31 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
                                 context.rCM0 * this_depot_rate * current_weights[i]
             this_delta_weight = max(min(this_delta_weight, 1. - current_weights[i]), - current_weights[i])
             next_weights.append(current_weights[i] + this_delta_weight)
+        if plot:
+            axes2[1].plot(context.peak_locs,
+                          np.multiply(np.subtract(next_weights, current_weights), peak_weight),
+                          label='Induction lap: %i' % (induction_lap + 1))
         current_weights = np.array(next_weights)
         current_delta_weights = np.subtract(np.multiply(current_weights, peak_weight), 1.)
         delta_weights_snapshots.append(current_delta_weights)
         current_ramp, discard_ramp_offset = get_model_ramp(current_delta_weights, allow_offset=allow_offset,
                                                            impose_offset=initial_ramp_offset)
+        if plot:
+            axes2[0].plot(context.binned_x, current_ramp)
         ramp_snapshots.append(current_ramp)
 
+    if plot:
+        axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        clean_axes(axes)
+        clean_axes(axes2)
+        fig.tight_layout()
+        fig2.tight_layout()
+        fig.show()
+        fig2.show()
+
     delta_weights = np.subtract(current_delta_weights, initial_delta_weights)
+    initial_weights = np.multiply(initial_weights, peak_weight)
+    final_weights = np.add(delta_weights, 1.)
     target_ramp = context.exp_ramp['after']
 
     model_ramp, discard_delta_weights, model_ramp_offset, model_residual_score = \
@@ -1112,7 +1145,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
                 group.create_dataset('LSA_ramp', compression='gzip', data=LSA_ramp)
                 group.create_dataset('LSA_weights', compression='gzip', data=np.add(LSA_delta_weights, 1.))
             group.create_dataset('model_ramp', compression='gzip', data=model_ramp)
-            group.create_dataset('model_weights', compression='gzip', data=weights)
+            group.create_dataset('model_weights', compression='gzip', data=final_weights)
             group.create_dataset('initial_weights', compression='gzip', data=initial_weights)
             group.create_dataset('global_signal', compression='gzip', data=global_signal)
             group.create_dataset('down_t', compression='gzip', data=context.down_t)
@@ -1153,45 +1186,14 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             group.attrs['model_end_loc'] = end_loc['model']
             group.attrs['model_min_val'] = min_val['model']
             group.attrs['model_min_loc'] = min_loc['model']
+            group.create_group('ramp_snapshots')
+            for i, current_ramp in enumerate(ramp_snapshots):
+                group['ramp_snapshots'].create_dataset(str(i), data=current_ramp)
+            group.create_group('delta_weights_snapshots')
+            for i, this_delta_weights in enumerate(delta_weights_snapshots):
+                group['delta_weights_snapshots'].create_dataset(str(i), data=this_delta_weights)
+
     return {context.cell_id: {context.induction: result}}
-
-
-def append_local_peak_loc(model_file_path=None):
-    """
-
-    :param model_file_path:
-    """
-    if model_file_path is None:
-        raise IOError('append_local_peak_loc: no model file path provided')
-    elif not os.path.isfile(model_file_path):
-        raise IOError('append_local_peak_loc: invalid model file path: %s' % model_file_path)
-    with h5py.File(model_file_path, 'a') as f:
-        if 'exported_data' not in f:
-            raise KeyError('append_local_peak_loc: problem loading model results from file: %s' % model_file_path)
-        for cell_key in f['exported_data']:
-            for induction_key in f['exported_data'][cell_key]:
-                cell_id = int(cell_key)
-                induction = int(induction_key)
-                if 'model_ramp_features' not in f['exported_data'][cell_key][induction_key]:
-                    raise KeyError('append_local_peak_loc: problem loading model results for cell_id: %s, '
-                                   'induction: %s; from file: %s' % (cell_key, induction_key, model_file_path))
-                if (cell_id, induction) not in context.data_keys:
-                    raise KeyError('append_local_peak_loc: problem loading data for cell_id: %s, induction: %s' %
-                                   (cell_key, induction_key))
-                local_peak_loc, local_peak_shift = {}, {}
-                import_data(cell_id, induction)
-                group = f['exported_data'][cell_key][induction_key]['model_ramp_features']
-                model_ramp = group['model_ramp'][:]
-                target_ramp = group['target_ramp'][:]
-                induction_loc = group.attrs['mean_induction_start_loc']
-                local_peak_loc['target'], local_peak_shift['target'] = \
-                    get_local_peak_shift(context, target_ramp, induction_loc)
-                local_peak_loc['model'], local_peak_shift['model'] = \
-                    get_local_peak_shift(context, model_ramp, induction_loc)
-                group.attrs['target_local_peak_loc'] = local_peak_loc['target']
-                group.attrs['target_local_peak_shift'] = local_peak_shift['target']
-                group.attrs['model_local_peak_loc'] = local_peak_loc['model']
-                group.attrs['model_local_peak_shift'] = local_peak_shift['model']
 
 
 def plot_model_summary_figure(cell_id, model_file_path=None):
@@ -1229,6 +1231,12 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
         initial_weights = group['initial_weights'][:]
         initial_ramp = group['initial_model_ramp'][:]
         model_ramp = group['model_ramp'][:]
+        ramp_snapshots = []
+        for lap in xrange(len(group['ramp_snapshots'])):
+            ramp_snapshots.append(group['ramp_snapshots'][str(lap)][:])
+        delta_weights_snapshots = []
+        for lap in xrange(len(group['delta_weights_snapshots'])):
+            delta_weights_snapshots.append(group['delta_weights_snapshots'][str(lap)][:])
         final_weights = group['model_weights'][:]
 
     import_data(cell_id, 2)
@@ -1279,28 +1287,6 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
         relative_index = np.argmin(np.subtract(final_weights, initial_weights)[input_sample_indexes])
         this_example_index = input_sample_indexes[relative_index]
     example_input_dict['De-potentiating input example'] = this_example_index
-
-    # normalize total number of receptors
-    peak_weight = context.peak_delta_weight + 1.
-    initial_weights /= peak_weight
-
-    weight_dynamics_history = {}
-    local_signal_history = {}
-    for i in example_input_dict.itervalues():
-        initial_weight = initial_weights[i]
-        available = 1. - initial_weight
-        context.sm.update_states({'M': available, 'C': initial_weight})
-        local_signal = local_signals[i]
-        context.sm.update_rates(
-            {'M': {'C': context.rMC0 * np.multiply(pot_rate(local_signal), global_signal)},
-             'C': {'M': context.rCM0 * np.multiply(depot_rate(local_signal), global_signal)}})
-        context.sm.reset()
-        context.sm.run()
-        this_weight_dynamics = np.array(context.sm.states_history['C'][:-1]) * peak_weight
-        weight_dynamics_history[i] = this_weight_dynamics
-        local_signal_history[i] = np.array(local_signal)
-
-    initial_weights *= peak_weight
 
     import matplotlib as mpl
     mpl.rcParams['svg.fonttype'] = 'none'
@@ -1369,13 +1355,14 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
 
     clean_axes(axes)
 
+    colors = ['r', 'c']
+    """
     axes1 = [[fig.add_subplot(gs1[row, col]) for col in xrange(2)] for row in xrange(2)]
     axes1[0][0].get_shared_x_axes().join(axes1[0][0], axes1[0][1], axes1[1][0], axes1[1][1])
     axes1[0][0].get_shared_y_axes().join(axes1[0][0], axes1[0][1])
     axes1[1][0].get_shared_y_axes().join(axes1[1][0], axes1[1][1])
     ymax1 = np.max(global_signal)
     ymax2 = 0.
-    colors = ['r', 'c']
     axes1_0_right = [axes1[0][0].twinx(), axes1[0][1].twinx()]
     for i, (name, index) in enumerate(example_input_dict.iteritems()):
         this_rate_map = context.complete_rate_maps[index]
@@ -1435,7 +1422,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     axes1_0_right[1].set_yticklabels([i * 0.2 for i in range(5)])
     clean_twin_right_axes(axes1_0_right)
     clean_axes(np.array(axes1))
-
+    """
     axes2 = []
     ymax = 0.
     for row, weights in zip(range(1, 3), [initial_weights, final_weights]):
@@ -1457,13 +1444,11 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
         this_axis.set_xticks(np.arange(0., context.track_length, 45.))
         this_axis.set_xlabel('Position (cm)')
     axes2[0].legend(loc=(-0.1, 1.), frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-
     ymax = math.ceil(10. * ymax / 0.95) / 10.
     bar_loc = ymax * 0.95
     for this_axis in axes2:
         this_axis.set_ylim(0., ymax)
         this_axis.hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
-
     clean_axes(axes2)
     fig.show()
 
@@ -1483,129 +1468,22 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     fig.tight_layout()
     fig.show()
 
-    alt_depot_rate = np.vectorize(scaled_single_sigmoid(context.rCM_th1, context.rCM_peak1, signal_xrange))
-    fig, axes = plt.subplots()
-    cmap = cm.jet
-    for w in np.linspace(0., 1., 10):
-        net_delta_weight = pot_rate(signal_xrange) * pot_scale * (1. - w) - \
-                           alt_depot_rate(signal_xrange) * depot_scale * w
-        axes.plot(signal_xrange, net_delta_weight, c=cmap(w))
-    axes.set_title('Sigmoidal q_+, sigmoidal q_-')
-    sm = cm.ScalarMappable(cmap=cmap)
-    sm.set_array([])
-    cbar = fig.colorbar(sm)
-    cbar.set_label('Initial synaptic weight', rotation=270., labelpad=15.)
-    axes.set_xlabel('Normalized eligibility signal')
-    axes.set_ylabel('Net change in synaptic weight')
-    clean_axes(axes)
-    fig.tight_layout()
-    fig.show()
-
-    context.update(locals())
-
-
-def plot_weights_snapshots(cell_id, model_file_path=None):
-    """
-
-    :param cell_id: int
-    :param model_file_path: str (path)
-    :return: dict
-    """
-    if (cell_id, 2) not in context.data_keys:
-        raise KeyError('plot_weights_snapshots: cell_id: %i, induction: 2 not found' % cell_id)
-    if model_file_path is None:
-        raise IOError('plot_weights_snapshots: no model file path provided')
-    elif not os.path.isfile(model_file_path):
-        raise IOError('plot_weights_snapshots: invalid file path: %s' % model_file_path)
-    with h5py.File(model_file_path, 'r') as f:
-        if 'exported_data' not in f or str(cell_id) not in f['exported_data'] or \
-                '2' not in f['exported_data'][str(cell_id)] or \
-                'model_ramp_features' not in f['exported_data'][str(cell_id)]['2']:
-            raise KeyError('plot_weights_snapshots: problem loading model results for cell_id: %i, '
-                           'induction 2; from file: %s' % (cell_id, model_file_path))
-        group = f['exported_data'][str(cell_id)]['2']['model_ramp_features']
-        x = group['param_array'][:]
-        local_signal_peak = group.attrs['local_signal_peak']
-        global_signal_peak = group.attrs['global_signal_peak']
-        local_signal_filter_t = group['local_signal_filter_t'][:]
-        local_signal_filter = group['local_signal_filter'][:]
-        global_filter_t = group['global_filter_t'][:]
-        global_filter = group['global_filter'][:]
-        initial_weights = group['initial_weights'][:]
-
-    import_data(cell_id, 2)
-    update_source_contexts(x)
-
-    global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
-    local_signals = np.divide(get_local_signal_population(local_signal_filter), local_signal_peak)
-
-    signal_xrange = np.linspace(0., 1., 10000)
-    pot_rate = np.vectorize(scaled_single_sigmoid(context.rMC_th, context.rMC_peak, signal_xrange))
-    depot_rate = np.vectorize(scaled_double_sigmoid(context.rCM_th1, context.rCM_peak1, context.rCM_th2,
-                                                    context.rCM_peak2, signal_xrange))
-
-    peak_weight = context.peak_delta_weight + 1.
-    initial_weights /= peak_weight
-
-    import matplotlib as mpl
-    mpl.rcParams['svg.fonttype'] = 'none'
-    mpl.rcParams['font.size'] = 11.
-    mpl.rcParams['font.sans-serif'] = 'Arial'
-    mpl.rcParams['text.usetex'] = False
-    from matplotlib.pyplot import cm
-    from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-    weight_dynamics_history = []
-    local_signal_history = []
-    for i in xrange(len(context.peak_locs)):
-        # normalize total number of receptors
-        initial_weight = initial_weights[i]
-        available = 1. - initial_weight
-        context.sm.update_states({'M': available, 'C': initial_weight})
-        local_signal = local_signals[i]
-        context.sm.update_rates(
-            {'M': {'C': context.rMC0 * np.multiply(pot_rate(local_signal), global_signal)},
-             'C': {'M': context.rCM0 * np.multiply(depot_rate(local_signal), global_signal)}})
-        context.sm.reset()
-        context.sm.run()
-        this_weight_dynamics = np.array(context.sm.states_history['C'][:-1]) * peak_weight
-        weight_dynamics_history.append(this_weight_dynamics)
-        local_signal_history.append(np.array(local_signal))
-
-    weights_snapshots = []
-    for induction_time in context.induction_start_times:
-        index = np.where(context.down_t < induction_time)[0][-1]
-        this_snapshot = []
-        for this_weight_dynamics in weight_dynamics_history:
-            this_snapshot.append(this_weight_dynamics[index])
-        weights_snapshots.append(np.array(this_snapshot))
-    this_snapshot = []
-    for this_weight_dynamics in weight_dynamics_history:
-        this_snapshot.append(this_weight_dynamics[-1])
-    weights_snapshots.append(np.array(this_snapshot))
-
-    fig, axes = plt.subplots()
-    use_fraction = 0.75
-    crange = int(1. / use_fraction * len(weights_snapshots) - 2)
-    cvals = np.linspace(0., float((len(weights_snapshots) - 1)) / crange, len(weights_snapshots))
-    cmap = cm.inferno
-    cmap_colors = list(cmap(cvals))
-    for i, this_snapshot in enumerate(weights_snapshots):
-        axes.plot(context.peak_locs, this_snapshot, c=cmap_colors[i])
-    divider = make_axes_locatable(axes)
-    cax = divider.append_axes('right', size='2%', pad=0.1, aspect=30)
-    cbar = mpl.colorbar.ColorbarBase(cax, cmap=cmap, values=range(len(weights_snapshots)),
-                                     boundaries=range(len(weights_snapshots)),
-                                     orientation='vertical')
-    cbar.outline.set_linewidth(0)
-    cbar.ax.set_title('After\nPlateau #', fontsize=mpl.rcParams['font.size'])
-    cbar.set_ticks(range(len(weights_snapshots)))
-    cbar.set_ticklabels(['Before'] + range(1, len(weights_snapshots)))
-    axes.set_xlabel('Location (cm')
-    axes.set_ylabel('Synaptic\nweights')
-    clean_axes(axes)
-    fig.tight_layout()
-    fig.show()
+    fig2, axes2 = plt.subplots(1, 2, sharex=True)
+    fig2.suptitle('Induction: %i' % context.induction)
+    axes2[0].plot(context.binned_x, ramp_snapshots[0], c='k', label='Before')
+    axes2[0].set_ylabel('Ramp amplitude (mV)')
+    axes2[0].set_xlabel('Location (cm)')
+    axes2[1].set_ylabel('Change in synaptic weight')
+    axes2[1].set_xlabel('Location (cm)')
+    for i in xrange(1, len(ramp_snapshots)):
+        current_ramp = ramp_snapshots[i]
+        current_delta_weights = np.subtract(delta_weights_snapshots[i], delta_weights_snapshots[i - 1])
+        axes2[0].plot(context.binned_x, current_ramp)
+        axes2[1].plot(context.peak_locs, current_delta_weights, label='Induction lap: %i' % i)
+    axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+    clean_axes(axes2)
+    fig2.tight_layout()
+    fig2.show()
 
     context.update(locals())
 
@@ -1661,7 +1539,7 @@ def filter_features_model_ramp(primitives, current_features, export=False):
     features = {}
     groups = ['spont', 'exp1', 'exp2']
     grouped_feature_names = ['delta_amp', 'delta_width', 'delta_peak_shift', 'delta_asymmetry', 'delta_min_loc',
-                      'delta_min_val', 'residual_score']
+                             'delta_min_val', 'residual_score']
     feature_names = ['self_consistent_delta_residual_score']
     for this_result_dict in primitives:
         for cell_id in this_result_dict:
@@ -1759,47 +1637,6 @@ def get_features_interactive(x, plot=False):
     features.update(new_features)
 
     return features
-
-
-def check_lsa():
-    """
-
-    """
-    prev_cell_id = None
-    for cell_id, induction in context.data_keys:
-        import_data(cell_id, induction)
-        if induction == 1:
-            if 'before' in context.exp_ramp:
-                initial_ramp, initial_delta_weights, ramp_offset, discard_residual_score = \
-                    get_delta_weights_LSA(context.exp_ramp['after'], context.input_rate_maps,
-                                          context.LSA_weights['after'],
-                                          bounds=(context.min_delta_weight, context.peak_delta_weight),
-                                          allow_offset=False, verbose=context.verbose, plot=context.plot)
-            else:
-                initial_ramp, initial_delta_weights, ramp_offset, discard_residual_score = \
-                    get_delta_weights_LSA(context.exp_ramp['after'], context.input_rate_maps,
-                                          context.LSA_weights['after'],
-                                          bounds=(context.min_delta_weight, context.peak_delta_weight),
-                                          allow_offset=True, verbose=context.verbose, plot=context.plot)
-        else:
-            if prev_cell_id is None or prev_cell_id != cell_id:
-                initial_ramp, initial_delta_weights, ramp_offset, discard_residual_score = \
-                    get_delta_weights_LSA(context.exp_ramp['before'], context.input_rate_maps,
-                                          context.LSA_weights['before'],
-                                          bounds=(context.min_delta_weight, context.peak_delta_weight),
-                                          allow_offset=True, verbose=context.verbose, plot=context.plot)
-                print 'cell_id: %i, induction: before: %i, ramp_offset: %.3f' % (cell_id, induction, ramp_offset)
-            initial_ramp2, initial_delta_weights2, ramp_offset2, discard_residual_score = \
-                get_delta_weights_LSA(context.exp_ramp['after'], context.input_rate_maps,
-                                      context.LSA_weights['after'],
-                                      bounds=(context.min_delta_weight, context.peak_delta_weight),
-                                      allow_offset=False, impose_offset=ramp_offset, verbose=context.verbose,
-                                      plot=context.plot)
-            prev_allow_offset = False
-        print 'cell_id: %i, induction: %i, ramp_offset: %.3f' % (cell_id, induction, ramp_offset)
-        prev_cell_id = cell_id
-
-    context.update(locals())
 
 
 @click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True,))
