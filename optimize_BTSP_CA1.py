@@ -839,7 +839,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
 
     signal_xrange = np.linspace(0., 1., 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(context.rMC_th, context.rMC_peak, signal_xrange))
-    depot_rate = np.vectorize(scaled_double_sigmoid(context.rCM_th1, context.rCM_peak1, context.rCM_th2,
+    depot_rate = np.vectorize(scaled_double_sigmoid_orig(context.rCM_th1, context.rCM_peak1, context.rCM_th2,
                                                     context.rCM_peak2, signal_xrange, y_end=context.rCM_min2))
     if plot:
         fig, axes = plt.subplots(1)
@@ -1217,7 +1217,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
 
     signal_xrange = np.linspace(0., 1., 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(context.rMC_th, context.rMC_peak, signal_xrange))
-    depot_rate = np.vectorize(scaled_double_sigmoid(context.rCM_th1, context.rCM_peak1, context.rCM_th2,
+    depot_rate = np.vectorize(scaled_double_sigmoid_orig(context.rCM_th1, context.rCM_peak1, context.rCM_th2,
                                                     context.rCM_peak2, signal_xrange, y_end=context.rCM_min2))
 
     resolution = 10
@@ -1520,7 +1520,7 @@ def plot_weights_snapshots(cell_id, model_file_path=None):
 
     signal_xrange = np.linspace(0., 1., 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(context.rMC_th, context.rMC_peak, signal_xrange))
-    depot_rate = np.vectorize(scaled_double_sigmoid(context.rCM_th1, context.rCM_peak1, context.rCM_th2,
+    depot_rate = np.vectorize(scaled_double_sigmoid_orig(context.rCM_th1, context.rCM_peak1, context.rCM_th2,
                                                     context.rCM_peak2, signal_xrange, y_end=context.rCM_min2))
 
     peak_weight = context.peak_delta_weight + 1.

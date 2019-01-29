@@ -17,6 +17,9 @@ bounds:
   global_signal_decay: !!python/tuple
   - 50.
   - 3000.
+  peak_ramp_amp: !!python/tuple
+    - 5.
+    - 20.
 rel_bounds:
 - - local_signal_decay
   - '>'
@@ -87,6 +90,7 @@ param_names:
 - local_signal_decay
 - global_signal_rise
 - global_signal_decay
+- peak_ramp_amp
 target_range:
   ramp_offset: 0.01
   delta_min_val: 0.01
@@ -101,3 +105,4 @@ x0:
   local_signal_decay: 4.546595E+02
   global_signal_rise: 1.199720E+02
   global_signal_decay: 2.566589E+02
+  peak_ramp_amp: 10.

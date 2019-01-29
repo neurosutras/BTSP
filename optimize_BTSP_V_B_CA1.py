@@ -16,8 +16,10 @@ the sign of changes in synaptic weight.
 5) Changes in weight at each synapse are integrated over periods of nonzero overlap between eligibility and gating
 signals, and updated once per lap.
 
-Linear dependence on voltage:
-dW/dt ~ k_pot * (1. - V / V_max) - k_depot * V / V_max
+Nonlinear dependence on voltage:
+dW/dt ~ k_pot * f_pot(V / V_max) - k_depot * f_depot(V / V_max)
+f_pot: ascending sigmoid
+f_depot: descending sigmoid
 
 """
 __author__ = 'milsteina'
@@ -79,7 +81,7 @@ def init_context():
                                  ('1' not in f['data'][cell_id] or
                                   'before' not in f['data'][cell_id]['1']['raw']['exp_ramp'])]
     if context.verbose > 1:
-        print 'pid: %i; optimize_BTSP_V_A_CA1: processing the following data_keys: %s' % \
+        print 'pid: %i; optimize_BTSP_V_B_CA1: processing the following data_keys: %s' % \
               (os.getpid(), str(context.data_keys))
     self_consistent_cell_ids = [cell_id for (cell_id, induction) in context.data_keys if induction == 1 and
                                  (cell_id, 2) in context.data_keys]
@@ -103,7 +105,7 @@ def import_data(cell_id, induction):
     induction_key = str(induction)
     with h5py.File(context.data_file_path, 'r') as f:
         if cell_key not in f['data'] or induction_key not in f['data'][cell_key]:
-            raise KeyError('optimize_BTSP_V_A_CA1: no data found for cell_id: %s, induction: %s' %
+            raise KeyError('optimize_BTSP_V_B_CA1: no data found for cell_id: %s, induction: %s' %
                            (cell_key, induction_key))
         else:
             context.cell_id = cell_id
@@ -208,7 +210,7 @@ def import_data(cell_id, induction):
         context.down_rate_maps.append(this_down_rate_map)
     context.down_induction_gate = np.interp(context.down_t, context.complete_t, context.induction_gate)
     if context.verbose > 1:
-        print 'optimize_BTSP_V_A_CA1: process: %i loaded data for cell: %i, induction: %i' % \
+        print 'optimize_BTSP_V_B_CA1: process: %i loaded data for cell: %i, induction: %i' % \
               (os.getpid(), cell_id, induction)
 
 
@@ -551,8 +553,14 @@ def get_voltage_dependent_local_signal_population(local_filter, current_complete
     """
     local_signals = []
     normalized_ramp = current_complete_ramp / context.peak_ramp_amp
-    # BCM-like voltage dependence; linear
-    phi = np.vectorize(lambda x: context.k_pot * min(1., max(0., (1. - x))) - context.k_depot * max(0., min(1., x)))
+    # BCM-like voltage dependence; nonlinear
+    signal_xrange = np.linspace(0., 1., 10000)
+    pot_rate = scaled_single_sigmoid(context.r_pot_th, context.r_pot_th - context.r_pot_peak, signal_xrange,
+                                     ylim=[1.,0.])
+    depot_rate = scaled_single_sigmoid(context.r_depot_th, context.r_depot_th + context.r_depot_peak, signal_xrange)
+    phi = np.vectorize(lambda x: context.k_pot * pot_rate(min(1., max(0., x))) -
+                                 context.k_depot * depot_rate(max(0., min(1., x))))
+
     if plot:
         fig, axes = plt.subplots()
         ramp_range = np.linspace(np.min(normalized_ramp), np.max(normalized_ramp), 10000)
@@ -566,6 +574,7 @@ def get_voltage_dependent_local_signal_population(local_filter, current_complete
     for rate_map in context.down_rate_maps:
         local_signals.append(get_local_signal(np.multiply(rate_map, phi(normalized_ramp)), local_filter,
                                               context.down_dt))
+
     return local_signals
 
 
@@ -1127,6 +1136,12 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     update_source_contexts(x)
 
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
+    local_signals = np.divide(get_local_signal_population(local_signal_filter), local_signal_peak)
+
+    signal_xrange = np.linspace(0., 1., 10000)
+    pot_rate = np.vectorize(scaled_single_sigmoid(context.rMC_th, context.rMC_peak, signal_xrange))
+    depot_rate = np.vectorize(scaled_double_sigmoid_orig(context.rCM_th1, context.rCM_peak1, context.rCM_th2,
+                                                    context.rCM_peak2, signal_xrange, y_end=context.rCM_min2))
 
     resolution = 10
     input_sample_indexes = np.arange(0, len(context.peak_locs), resolution)
@@ -1498,7 +1513,7 @@ def get_features_interactive(x, plot=False):
 
 @click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True,))
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/optimize_BTSP_V_A_CA1_cli_config.yaml')
+              default='config/optimize_BTSP_V_B_CA1_cli_config.yaml')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
 @click.option("--export-file-path", type=str, default=None)
@@ -1520,7 +1535,7 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
     after optimization has completed, e.g.:
 
     ipython
-    run optimize_BTSP_V_A_CA1 --model-summary-figure --cell_id=1 --model-file-path=$PATH_TO_MODEL_FILE
+    run optimize_BTSP_V_B_CA1 --model-summary-figure --cell_id=1 --model-file-path=$PATH_TO_MODEL_FILE
 
     :param cli: contains unrecognized args as list of str
     :param config_file_path: str (path)
@@ -1553,13 +1568,13 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
                 x1_dict = param_source_dict['all']
                 x1_array = param_dict_to_array(x1_dict, context.param_names)
             else:
-                print 'optimize_BTSP_V_A: problem loading params for cell_id: %s from params_path: %s' % \
+                print 'optimize_BTSP_V_B: problem loading params for cell_id: %s from params_path: %s' % \
                       (kwargs['params_path'], context.kwargs['cell_id'])
         elif 'all' in param_source_dict:
             x1_dict = param_source_dict['all']
             x1_array = param_dict_to_array(x1_dict, context.param_names)
         else:
-            raise RuntimeError('optimize_BTSP_V_A: problem loading params from params_path: %s' %
+            raise RuntimeError('optimize_BTSP_V_B: problem loading params from params_path: %s' %
                                context.kwargs['params_path'])
 
     if debug:
