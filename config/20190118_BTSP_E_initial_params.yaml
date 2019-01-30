@@ -1,18 +1,18 @@
 1:
-  rMC_peak: 2.125194E-01
-  rMC_th: 2.925001E-01
-  rCM_th1: 1.121600E-02
-  rCM_peak1: 4.163327E-02
-  rCM_th2: 2.094774E-02
-  rCM_peak2: 1.894980E-02
-  rCM_min2: 1.169123E-02
-  rMC0: 1.811703E+00
-  rCM0: 2.835143E-01
-  local_signal_rise: 5.174176E+01
-  local_signal_decay: 8.911746E+02
-  global_signal_rise: 1.947800E+02
-  global_signal_decay: 2.349188E+02
-  peak_delta_weight: 2.641418E+00
+  rMC_peak: 2.161587E-01
+  rMC_th: 3.049451E-01
+  rCM_th1: 2.325560E-02
+  rCM_peak1: 3.021550E-01
+  rCM_th2: 3.168825E-02
+  rCM_peak2: 1.010529E-02
+  rCM_min2: 1.141798E-02
+  rMC0: 1.940812E+00
+  rCM0: 3.260998E-01
+  local_signal_rise: 2.154948E+01
+  local_signal_decay: 9.001786E+02
+  global_signal_rise: 4.431786E+01
+  global_signal_decay: 3.327118E+02
+  peak_delta_weight: 2.635780E+00
 4:
   global_signal_decay: 5.134553E+02
   local_signal_rise: 3.827617E+01

@@ -1459,7 +1459,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
         axes.plot(signal_xrange, net_delta_weight, c=cmap(w))
     axes.set_xlabel('Normalized eligibility signal')
     axes.set_ylabel('Net change in synaptic weight')
-    axes.set_title('Sigmoidal q_+, non-monotonic q_-')
+    axes.set_title('Sigmoidal q_+, sigmoidal q_-')
     sm = cm.ScalarMappable(cmap=cmap)
     sm.set_array([])
     cbar = fig.colorbar(sm)

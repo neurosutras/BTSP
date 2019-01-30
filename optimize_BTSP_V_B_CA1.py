@@ -831,14 +831,16 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
 
     allow_offset = False
     initial_delta_weights = context.LSA_weights['before']
-    # re-compute initial weights if they are out of the current weight bounds
+
+    target_ramp = context.exp_ramp['after']
+
     if context.induction == 1:
         if 'before' in context.exp_ramp:
             initial_ramp = context.LSA_ramp['before']
+            initial_ramp_offset = None
         else:
             initial_ramp, discard_ramp_offset = get_model_ramp(initial_delta_weights)
-            allow_offset = True
-        initial_ramp_offset = None
+            initial_ramp_offset = context.LSA_ramp_offset['after']
     else:
         initial_ramp = context.LSA_ramp['before']
         initial_ramp_offset = context.LSA_ramp_offset['before']
@@ -847,6 +849,10 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     delta_weights_snapshots = [current_delta_weights]
     current_ramp = initial_ramp
     ramp_snapshots = [current_ramp]
+
+    prev_residual_score = 0.
+    for i in xrange(len(target_ramp)):
+        prev_residual_score += ((current_ramp[i] - target_ramp[i]) / context.target_range['residuals']) ** 2.
 
     if plot:
         fig, axes = plt.subplots(2, sharex=True)
@@ -897,6 +903,27 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             axes2[0].plot(context.binned_x, current_ramp)
         ramp_snapshots.append(current_ramp)
 
+        current_residual_score = 0.
+        for i in xrange(len(target_ramp)):
+            current_residual_score += ((current_ramp[i] - target_ramp[i]) / context.target_range['residuals']) ** 2.
+
+        if current_residual_score > 1.1 * prev_residual_score:
+            if context.verbose > 0:
+                print 'optimize_BTSP_V_B_CA1: calculate_model_ramp: residual score not decreasing; induction: %i, ' \
+                      'lap: %i, current: %.1f, prev: %.1f' % \
+                      (context.induction, induction_lap + 1, current_residual_score, prev_residual_score)
+            if plot:
+                axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+                axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+                clean_axes(axes)
+                clean_axes(axes2)
+                fig.tight_layout()
+                fig2.tight_layout()
+                fig.show()
+                fig2.show()
+            return dict()
+        prev_residual_score = current_residual_score
+
     if plot:
         axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
         axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
@@ -907,10 +934,17 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
         fig.show()
         fig2.show()
 
-    target_ramp = context.exp_ramp['after']
+    if context.induction == 1:
+        initial_ramp_offset = None
+        if 'before' in context.exp_ramp:
+            allow_offset = False
+        else:
+            allow_offset = True
+
     model_ramp, discard_delta_weights, model_ramp_offset, model_residual_score = \
         get_residual_score(current_delta_weights, target_ramp, allow_offset=allow_offset,
                            impose_offset=initial_ramp_offset, full_output=True)
+
     if allow_offset and context.induction == 1:
         initial_ramp, discard_ramp_offset = subtract_baseline(initial_ramp, model_ramp_offset)
 
@@ -1413,6 +1447,11 @@ def filter_features_model_ramp(primitives, current_features, export=False):
                              'delta_min_val', 'residual_score']
     feature_names = ['self_consistent_delta_residual_score']
     for this_result_dict in primitives:
+        if not this_result_dict:
+            if context.verbose > 0:
+                print 'optimize_BTSP_V_B_CA1: filter_features_model_ramp: pid: %i; aborting - failed model' % \
+                      os.getpid()
+                return dict()
         for cell_id in this_result_dict:
             cell_id = int(cell_id)
             for induction in this_result_dict[cell_id]:

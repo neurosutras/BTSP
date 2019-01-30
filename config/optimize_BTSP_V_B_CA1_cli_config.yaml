@@ -1,10 +1,10 @@
 bounds:
   k_pot: !!python/tuple
   - 0.1
-  - 10.
+  - 15.
   k_depot: !!python/tuple
   - 0.1
-  - 10.
+  - 15.
   r_pot_peak: !!python/tuple
   - 0.001
   - 1.
@@ -115,14 +115,14 @@ target_range:
   weights_smoothness: 0.01
 target_val:
 x0:
-  k_pot: 6.107014E+00
-  k_depot: 3.127427E+00
-  r_pot_peak: 3.155315E-03
-  r_pot_th: 2.522871E-01
-  r_depot_peak: 9.959298E-02
-  r_depot_th: 1.480536E-01
-  delta_peak_ramp_amp: 0.
-  local_signal_rise: 2.506365E+01
-  local_signal_decay: 3.465653E+03
-  global_signal_rise: 3.792835E+01
-  global_signal_decay: 2.289039E+03
+  k_pot: 9.960185E+00
+  k_depot: 5.377837E+00
+  r_pot_peak: 5.642508E-03
+  r_pot_th: 1.945476E-01
+  r_depot_peak: 1.217725E-01
+  r_depot_th: 4.694389E-03
+  delta_peak_ramp_amp: 2.522885E-01
+  local_signal_rise: 1.606693E+02
+  local_signal_decay: 2.099815E+03
+  global_signal_rise: 8.896258E+01
+  global_signal_decay: 1.633249E+03

@@ -1,10 +1,10 @@
 bounds:
   k_pot: !!python/tuple
   - 0.1
-  - 10.
+  - 15.
   k_depot: !!python/tuple
   - 0.1
-  - 10.
+  - 15.
   local_signal_rise: !!python/tuple
   - 5.
   - 200.
