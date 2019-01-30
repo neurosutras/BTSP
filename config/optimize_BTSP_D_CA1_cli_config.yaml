@@ -13,10 +13,10 @@ bounds:
   - 1.
   rMC0: !!python/tuple
   - 0.01
-  - 2.
+  - 3.
   rCM0: !!python/tuple
   - 0.01
-  - 2.
+  - 3.
   local_signal_rise: !!python/tuple
   - 5.
   - 200.

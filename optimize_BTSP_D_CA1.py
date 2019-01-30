@@ -1002,7 +1002,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
 
     delta_weights = np.subtract(current_delta_weights, initial_delta_weights)
     initial_weights = np.multiply(initial_weights, peak_weight)
-    final_weights = np.add(delta_weights, 1.)
+    final_weights = np.add(current_delta_weights, 1.)
     target_ramp = context.exp_ramp['after']
 
     model_ramp, discard_delta_weights, model_ramp_offset, model_residual_score = \
@@ -1246,8 +1246,8 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     local_signals = np.divide(get_local_signal_population(local_signal_filter), local_signal_peak)
 
     signal_xrange = np.linspace(0., 1., 10000)
-    pot_rate = np.vectorize(scaled_single_sigmoid(context.rMC_th, context.rMC_peak, signal_xrange))
-    depot_rate = np.vectorize(scaled_single_sigmoid(context.rCM_th, context.rCM_peak, signal_xrange))
+    pot_rate = np.vectorize(scaled_single_sigmoid(context.rMC_th, context.rMC_th + context.rMC_peak, signal_xrange))
+    depot_rate = np.vectorize(scaled_single_sigmoid(context.rCM_th, context.rCM_th + context.rCM_peak, signal_xrange))
 
     resolution = 10
     input_sample_indexes = np.arange(0, len(context.peak_locs), resolution)

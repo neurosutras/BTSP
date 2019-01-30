@@ -17,9 +17,9 @@ bounds:
   r_depot_peak: !!python/tuple
   - 0.001
   - 1.
-  peak_ramp_amp: !!python/tuple
-  - 5.
-  - 20.
+  delta_peak_ramp_amp: !!python/tuple
+  - 0.
+  - 10.
   local_signal_rise: !!python/tuple
   - 5.
   - 200.
@@ -102,7 +102,7 @@ param_names:
 - r_pot_th
 - r_depot_peak
 - r_depot_th
-- peak_ramp_amp
+- delta_peak_ramp_amp
 - local_signal_rise
 - local_signal_decay
 - global_signal_rise
@@ -115,14 +115,14 @@ target_range:
   weights_smoothness: 0.01
 target_val:
 x0:
-  global_signal_decay: 4.251749E+02
-  local_signal_rise: 4.073256E+01
-  k_pot: 4.757886E+00
-  global_signal_rise: 6.948743E+01
-  k_depot: 1.068800E-01
-  local_signal_decay: 5.211542E+02
-  r_pot_peak: 1.
-  r_pot_th: 0.5
-  r_depot_peak: 1.
-  r_depot_th: 0.5
-  peak_ramp_amp: 10.
+  k_pot: 6.107014E+00
+  k_depot: 3.127427E+00
+  r_pot_peak: 3.155315E-03
+  r_pot_th: 2.522871E-01
+  r_depot_peak: 9.959298E-02
+  r_depot_th: 1.480536E-01
+  delta_peak_ramp_amp: 0.
+  local_signal_rise: 2.506365E+01
+  local_signal_decay: 3.465653E+03
+  global_signal_rise: 3.792835E+01
+  global_signal_decay: 2.289039E+03

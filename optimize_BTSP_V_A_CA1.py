@@ -162,18 +162,17 @@ def import_data(cell_id, induction):
             context.LSA_ramp['after'] = this_group['processed']['LSA_ramp']['after'][:]
             context.LSA_ramp_offset['after'] = this_group['processed']['LSA_ramp']['after'].attrs['ramp_offset']
             context.LSA_weights['after'] = this_group['processed']['LSA_weights']['after'][:]
-        """
         context.peak_ramp_amp = 0.
         for this_induction_key in f['data'][cell_key]:
-            if 'before' in f['data'][cell_key][this_induction_key]['processed']['LSA_ramp']:
+            if 'before' in f['data'][cell_key][this_induction_key]['processed']['exp_ramp']:
                 context.peak_ramp_amp = \
                     max(context.peak_ramp_amp,
-                        np.max(f['data'][cell_key][this_induction_key]['processed']['LSA_ramp']['before'][:]))
-            if 'after' in f['data'][cell_key][this_induction_key]['processed']['LSA_ramp']:
+                        np.max(f['data'][cell_key][this_induction_key]['processed']['exp_ramp']['before'][:]))
+            if 'after' in f['data'][cell_key][this_induction_key]['processed']['exp_ramp']:
                 context.peak_ramp_amp = \
                     max(context.peak_ramp_amp,
-                        np.max(f['data'][cell_key][this_induction_key]['processed']['LSA_ramp']['after'][:]))
-        """
+                        np.max(f['data'][cell_key][this_induction_key]['processed']['exp_ramp']['after'][:]))
+
     context.mean_induction_start_loc = np.mean(context.induction_locs)
     context.mean_induction_dur = np.mean(context.induction_durs)
     mean_induction_start_index = np.where(context.mean_position >= context.mean_induction_start_loc)[0][0]
@@ -449,7 +448,7 @@ def get_complete_ramp(current_ramp, input_x):
             this_lap_vm = np.interp(this_position, input_x, current_ramp)
             complete_ramp = np.append(complete_ramp, this_lap_vm)
     complete_ramp = np.multiply(complete_ramp, context.complete_run_vel_gate)
-    complete_ramp[np.where(context.induction_gate == 1.)[0]] = context.peak_ramp_amp
+    complete_ramp[np.where(context.induction_gate == 1.)[0]] = context.peak_ramp_amp + context.delta_peak_ramp_amp
     if len(complete_ramp) != len(context.complete_run_vel_gate):
         print 'get_complete_ramp: mismatched array length'
 
@@ -550,9 +549,10 @@ def get_voltage_dependent_local_signal_population(local_filter, current_complete
     :return: list of array
     """
     local_signals = []
-    normalized_ramp = current_complete_ramp / context.peak_ramp_amp
+    normalized_ramp = current_complete_ramp / (context.peak_ramp_amp + context.delta_peak_ramp_amp)
     # BCM-like voltage dependence; linear
     phi = np.vectorize(lambda x: context.k_pot * min(1., max(0., (1. - x))) - context.k_depot * max(0., min(1., x)))
+    this_phi = phi(normalized_ramp)
     if plot:
         fig, axes = plt.subplots()
         ramp_range = np.linspace(np.min(normalized_ramp), np.max(normalized_ramp), 10000)
@@ -564,8 +564,7 @@ def get_voltage_dependent_local_signal_population(local_filter, current_complete
         fig.tight_layout()
         fig.show()
     for rate_map in context.down_rate_maps:
-        local_signals.append(get_local_signal(np.multiply(rate_map, phi(normalized_ramp)), local_filter,
-                                              context.down_dt))
+        local_signals.append(get_local_signal(np.multiply(rate_map, this_phi), local_filter, context.down_dt))
     return local_signals
 
 
@@ -877,7 +876,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
         for i, this_local_signal in enumerate(local_signals):
             this_delta_weight = np.trapz(np.multiply(this_local_signal[indexes], global_signal[indexes]),
                                          dx=context.down_dt/1000.)
-            next_delta_weights.append(current_delta_weights[i] + this_delta_weight)
+            next_delta_weights.append(max(current_delta_weights[i] + this_delta_weight, -1.))
         if plot:
             axes[1].plot(context.down_t[indexes] / 1000., current_complete_ramp[indexes],
                          label='Lap: %i' % (induction_lap + 1))

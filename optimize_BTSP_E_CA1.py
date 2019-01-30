@@ -1008,7 +1008,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
 
     delta_weights = np.subtract(current_delta_weights, initial_delta_weights)
     initial_weights = np.multiply(initial_weights, peak_weight)
-    final_weights = np.add(delta_weights, 1.)
+    final_weights = np.add(current_delta_weights, 1.)
     target_ramp = context.exp_ramp['after']
 
     model_ramp, discard_delta_weights, model_ramp_offset, model_residual_score = \
