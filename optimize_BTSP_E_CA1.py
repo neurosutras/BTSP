@@ -920,10 +920,10 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
                           ' ramp_offset: %.3f' % (os.getpid(), context.cell_id, context.induction, initial_ramp_offset)
             else:
                 initial_ramp = context.LSA_ramp['before']
+            initial_ramp_offset = None
         else:
             initial_ramp, discard_ramp_offset = get_model_ramp(initial_delta_weights)
-            allow_offset = True
-        initial_ramp_offset = None
+            initial_ramp_offset = context.LSA_ramp_offset['after']
     else:
         if context.cell_id in context.allow_offset_cell_ids:
             allow_offset = True
@@ -947,6 +947,12 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     ramp_snapshots = [current_ramp]
     initial_weights = np.divide(np.add(initial_delta_weights, 1.), peak_weight)
     current_weights = np.array(initial_weights)
+
+    target_ramp = context.exp_ramp['after']
+
+    prev_residual_score = 0.
+    for i in xrange(len(target_ramp)):
+        prev_residual_score += ((current_ramp[i] - target_ramp[i]) / context.target_range['residuals']) ** 2.
 
     if plot:
         fig, axes = plt.subplots()
@@ -997,6 +1003,25 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             axes2[0].plot(context.binned_x, current_ramp)
         ramp_snapshots.append(current_ramp)
 
+        current_residual_score = 0.
+        for i in xrange(len(target_ramp)):
+            current_residual_score += ((current_ramp[i] - target_ramp[i]) / context.target_range['residuals']) ** 2.
+
+        if current_residual_score > 1.1 * prev_residual_score:
+            if context.verbose > 0:
+                print 'optimize_BTSP_V_E_CA1: calculate_model_ramp: aborting - residual score not decreasing; ' \
+                      'induction: %i, lap: %i' % (context.induction, induction_lap + 1)
+            if plot:
+                axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+                clean_axes(axes)
+                clean_axes(axes2)
+                fig.tight_layout()
+                fig2.tight_layout()
+                fig.show()
+                fig2.show()
+            return dict()
+        prev_residual_score = current_residual_score
+
     if plot:
         axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
         clean_axes(axes)
@@ -1009,7 +1034,13 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     delta_weights = np.subtract(current_delta_weights, initial_delta_weights)
     initial_weights = np.multiply(initial_weights, peak_weight)
     final_weights = np.add(current_delta_weights, 1.)
-    target_ramp = context.exp_ramp['after']
+
+    if context.induction == 1:
+        initial_ramp_offset = None
+        if 'before' in context.exp_ramp:
+            allow_offset = False
+        else:
+            allow_offset = True
 
     model_ramp, discard_delta_weights, model_ramp_offset, model_residual_score = \
         get_residual_score(current_delta_weights, target_ramp, allow_offset=allow_offset,

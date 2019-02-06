@@ -902,9 +902,8 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
 
         if current_residual_score > 1.1 * prev_residual_score:
             if context.verbose > 0:
-                print 'optimize_BTSP_V_A_CA1: calculate_model_ramp: residual score not decreasing; induction: %i, ' \
-                      'lap: %i, current: %.1f, prev: %.1f' % \
-                      (context.induction, induction_lap + 1, current_residual_score, prev_residual_score)
+                print 'optimize_BTSP_V_A_CA1: calculate_model_ramp: aborting - residual score not decreasing; ' \
+                      'induction: %i, lap: %i' % (context.induction, induction_lap + 1)
             if plot:
                 axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
                 axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)

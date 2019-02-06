@@ -832,8 +832,6 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     allow_offset = False
     initial_delta_weights = context.LSA_weights['before']
 
-    target_ramp = context.exp_ramp['after']
-
     if context.induction == 1:
         if 'before' in context.exp_ramp:
             initial_ramp = context.LSA_ramp['before']
@@ -849,6 +847,8 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     delta_weights_snapshots = [current_delta_weights]
     current_ramp = initial_ramp
     ramp_snapshots = [current_ramp]
+
+    target_ramp = context.exp_ramp['after']
 
     prev_residual_score = 0.
     for i in xrange(len(target_ramp)):
@@ -909,9 +909,8 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
 
         if current_residual_score > 1.1 * prev_residual_score:
             if context.verbose > 0:
-                print 'optimize_BTSP_V_B_CA1: calculate_model_ramp: residual score not decreasing; induction: %i, ' \
-                      'lap: %i, current: %.1f, prev: %.1f' % \
-                      (context.induction, induction_lap + 1, current_residual_score, prev_residual_score)
+                print 'optimize_BTSP_V_B_CA1: calculate_model_ramp: aborting - residual score not decreasing; ' \
+                      'induction: %i, lap: %i' % (context.induction, induction_lap + 1)
             if plot:
                 axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
                 axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
