@@ -564,7 +564,7 @@ def get_voltage_dependent_local_signal_population(local_filter, current_complete
         ramp_range = np.linspace(np.min(normalized_ramp), np.max(normalized_ramp), 10000)
         axes.plot(ramp_range, phi(ramp_range))
         axes.set_ylabel('Normalized rate')
-        axes.set_xlabel('Normalized ramp ampltude')
+        axes.set_xlabel('Normalized ramp amplitude')
         axes.set_title('Rate of change in synaptic weight')
         clean_axes(axes)
         fig.tight_layout()

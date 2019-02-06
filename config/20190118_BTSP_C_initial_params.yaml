@@ -1,10 +1,4 @@
 1:
-  rMC_peak: 1.349574E-01
-  rMC_th: 2.055363E-01
-  rCM_th1: 2.549731E-02
-  rCM_peak1: 3.677306E-02
-  rCM_th2: 2.934036E-02
-  rCM_peak2: 3.463874E-03
   rMC0: 9.424432E-01
   rCM0: 5.495925E-01
   local_signal_rise: 1.754482E+02

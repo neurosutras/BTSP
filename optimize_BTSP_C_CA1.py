@@ -38,8 +38,8 @@ are pooled across all cells and normalized to a peak value of 1. The transformat
 components: a rising phase and a decaying phase. Each phase has the flexibility to be any segment of a sigmoid (so
 can be linear, exponential rise, or saturating).
 
-BTSP_C vs. orig BTSP: One less parameter, removed rCM_min2 (forced to zero). Weights updated once per lap instead of
-once per time step. Relaxed constraints on sigmoid slope compared to original version.
+BTSP_C vs. orig BTSP: Potentiation and de-potentiation are linear. Weights updated once per lap instead of once per
+time step.
 """
 __author__ = 'milsteina'
 from BTSP_utils import *
@@ -881,18 +881,16 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     local_signals = np.divide(get_local_signal_population(local_signal_filter), local_signal_peak)
 
     signal_xrange = np.linspace(0., 1., 10000)
-    pot_rate = np.vectorize(scaled_single_sigmoid(context.rMC_th, context.rMC_peak + context.rMC_th, signal_xrange))
-    try:
-        depot_rate = np.vectorize(scaled_double_sigmoid(context.rCM_th1, context.rCM_th1 + context.rCM_peak1,
-                                                        context.rCM_th2, context.rCM_th2 - context.rCM_peak2,
-                                                        signal_xrange))
-    except:
-        print 'calculate_model_ramp: pid: %i: model failed; invalid parameters for depot_rate' % os.getpid()
-        return dict()
+    if context.rMC0 > context.rCM0:
+        pot_scale = 1.
+        depot_scale = context.rCM0 / context.rMC0
+    else:
+        pot_scale = context.rMC0 / context.rCM0
+        depot_scale = 1.
     if plot:
         fig, axes = plt.subplots(1)
-        axes.plot(signal_xrange, pot_rate(signal_xrange), label='Potentiation rate')
-        axes.plot(signal_xrange, depot_rate(signal_xrange), label='De-potentiation rate')
+        axes.plot(signal_xrange, pot_scale * signal_xrange, label='Potentiation rate')
+        axes.plot(signal_xrange, depot_scale * signal_xrange, label='De-potentiation rate')
         axes.set_xlabel('Normalized plasticity signal amplitude (a.u.)')
         axes.set_ylabel('Normalized rate')
         axes.set_title('Plasticity signal transformations')
@@ -920,10 +918,10 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
                           ' ramp_offset: %.3f' % (os.getpid(), context.cell_id, context.induction, initial_ramp_offset)
             else:
                 initial_ramp = context.LSA_ramp['before']
+            initial_ramp_offset = None
         else:
             initial_ramp, discard_ramp_offset = get_model_ramp(initial_delta_weights)
-            allow_offset = True
-        initial_ramp_offset = None
+            initial_ramp_offset = context.LSA_ramp_offset['after']
     else:
         if context.cell_id in context.allow_offset_cell_ids:
             allow_offset = True
@@ -947,6 +945,12 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     ramp_snapshots = [current_ramp]
     initial_weights = np.divide(np.add(initial_delta_weights, 1.), peak_weight)
     current_weights = np.array(initial_weights)
+
+    target_ramp = context.exp_ramp['after']
+
+    prev_residual_score = 0.
+    for i in xrange(len(target_ramp)):
+        prev_residual_score += ((current_ramp[i] - target_ramp[i]) / context.target_range['residuals']) ** 2.
 
     if plot:
         fig, axes = plt.subplots()
@@ -976,12 +980,10 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
 
         next_weights = []
         for i, this_local_signal in enumerate(local_signals):
-            this_pot_rate = np.trapz(np.multiply(pot_rate(this_local_signal[indexes]), global_signal[indexes]),
+            this_transition_rate = np.trapz(np.multiply(this_local_signal[indexes], global_signal[indexes]),
                                      dx=context.down_dt/1000.)
-            this_depot_rate = np.trapz(np.multiply(depot_rate(this_local_signal[indexes]), global_signal[indexes]),
-                                       dx=context.down_dt/1000.)
-            this_delta_weight = context.rMC0 * this_pot_rate * (1. - current_weights[i]) - \
-                                context.rCM0 * this_depot_rate * current_weights[i]
+            this_delta_weight = context.rMC0 * this_transition_rate * (1. - current_weights[i]) - \
+                                context.rCM0 * this_transition_rate * current_weights[i]
             this_delta_weight = max(min(this_delta_weight, 1. - current_weights[i]), - current_weights[i])
             next_weights.append(current_weights[i] + this_delta_weight)
         if plot:
@@ -997,6 +999,25 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             axes2[0].plot(context.binned_x, current_ramp)
         ramp_snapshots.append(current_ramp)
 
+        current_residual_score = 0.
+        for i in xrange(len(target_ramp)):
+            current_residual_score += ((current_ramp[i] - target_ramp[i]) / context.target_range['residuals']) ** 2.
+
+        if current_residual_score > 1.1 * prev_residual_score:
+            if context.verbose > 0:
+                print 'optimize_BTSP_C_CA1: calculate_model_ramp: aborting - residual score not decreasing; ' \
+                      'induction: %i, lap: %i' % (context.induction, induction_lap + 1)
+            if plot:
+                axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+                clean_axes(axes)
+                clean_axes(axes2)
+                fig.tight_layout()
+                fig2.tight_layout()
+                fig.show()
+                fig2.show()
+            return dict()
+        prev_residual_score = current_residual_score
+
     if plot:
         axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
         clean_axes(axes)
@@ -1009,7 +1030,13 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     delta_weights = np.subtract(current_delta_weights, initial_delta_weights)
     initial_weights = np.multiply(initial_weights, peak_weight)
     final_weights = np.add(current_delta_weights, 1.)
-    target_ramp = context.exp_ramp['after']
+
+    if context.induction == 1:
+        initial_ramp_offset = None
+        if 'before' in context.exp_ramp:
+            allow_offset = False
+        else:
+            allow_offset = True
 
     model_ramp, discard_delta_weights, model_ramp_offset, model_residual_score = \
         get_residual_score(current_delta_weights, target_ramp, allow_offset=allow_offset,
@@ -1155,8 +1182,6 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             group.create_dataset('initial_weights', compression='gzip', data=initial_weights)
             group.create_dataset('global_signal', compression='gzip', data=global_signal)
             group.create_dataset('down_t', compression='gzip', data=context.down_t)
-            group.create_dataset('pot_rate', compression='gzip', data=pot_rate(signal_xrange))
-            group.create_dataset('depot_rate', compression='gzip', data=depot_rate(signal_xrange))
             group.create_dataset('param_array', compression='gzip', data=context.x_array)
             group.create_dataset('local_signal_filter_t', compression='gzip', data=local_signal_filter_t)
             group.create_dataset('local_signal_filter', compression='gzip', data=local_signal_filter)
@@ -1252,10 +1277,8 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     local_signals = np.divide(get_local_signal_population(local_signal_filter), local_signal_peak)
 
     signal_xrange = np.linspace(0., 1., 10000)
-    pot_rate = np.vectorize(scaled_single_sigmoid(context.rMC_th, context.rMC_peak + context.rMC_th, signal_xrange))
-    depot_rate = np.vectorize(scaled_double_sigmoid(context.rCM_th1, context.rCM_th1 + context.rCM_peak1,
-                                                    context.rCM_th2, context.rCM_th2 - context.rCM_peak2,
-                                                    signal_xrange))
+    pot_rate = np.vectorize(scaled_single_sigmoid(context.rMC_th, context.rMC_th + context.rMC_peak, signal_xrange))
+    depot_rate = np.vectorize(scaled_single_sigmoid(context.rCM_th, context.rCM_th + context.rCM_peak, signal_xrange))
 
     resolution = 10
     input_sample_indexes = np.arange(0, len(context.peak_locs), resolution)
@@ -1352,8 +1375,8 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     else:
         pot_scale = context.rMC0 / context.rCM0
         depot_scale = 1.
-    this_axis.plot(signal_xrange, pot_rate(signal_xrange) * pot_scale, label='Potentiation', c='r')
-    this_axis.plot(signal_xrange, depot_rate(signal_xrange) * depot_scale, label='De-potentiation', c='c')
+    this_axis.plot(signal_xrange, signal_xrange * pot_scale, label='Potentiation', c='r')
+    this_axis.plot(signal_xrange, signal_xrange * depot_scale, label='De-potentiation', c='c')
     this_axis.set_xlabel('Normalized eligibility signal')
     this_axis.set_ylabel('Normalized rate')
     this_axis.set_ylim(0., this_axis.get_ylim()[1])
@@ -1463,11 +1486,11 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     fig, axes = plt.subplots()
     cmap = cm.jet
     for w in np.linspace(0., 1., 10):
-        net_delta_weight = pot_rate(signal_xrange) * pot_scale * (1. - w) - depot_rate(signal_xrange) * depot_scale * w
+        net_delta_weight = signal_xrange * pot_scale * (1. - w) - signal_xrange * depot_scale * w
         axes.plot(signal_xrange, net_delta_weight, c=cmap(w))
     axes.set_xlabel('Normalized eligibility signal')
     axes.set_ylabel('Net change in synaptic weight')
-    axes.set_title('Sigmoidal q_+, non-monotonic q_-')
+    axes.set_title('Sigmoidal q_+, sigmoidal q_-')
     sm = cm.ScalarMappable(cmap=cmap)
     sm.set_array([])
     cbar = fig.colorbar(sm)
@@ -1528,8 +1551,8 @@ def compute_features_model_ramp(x, cell_id=None, induction=None, local_signal_pe
     if context.disp:
         print 'Process: %i: computing model_ramp_features for cell_id: %i, induction: %i with x: %s' % \
               (os.getpid(), context.cell_id, context.induction, ', '.join('%.3E' % i for i in x))
-    result = calculate_model_ramp(local_signal_peak=local_signal_peak,
-                                  global_signal_peak=global_signal_peak, export=export, plot=plot)
+    result = calculate_model_ramp(local_signal_peak=local_signal_peak, global_signal_peak=global_signal_peak,
+                                  export=export, plot=plot)
     if context.disp:
         print 'Process: %i: computing model_ramp_features for cell_id: %i, induction: %i took %.1f s' % \
               (os.getpid(), context.cell_id, context.induction, time.time() - start_time)
@@ -1550,9 +1573,6 @@ def filter_features_model_ramp(primitives, current_features, export=False):
                              'delta_min_val', 'residual_score']
     feature_names = ['self_consistent_delta_residual_score']
     for this_result_dict in primitives:
-        if not this_result_dict:
-            print 'filter_features_model_ramp: pid: %i: model failed' % os.getpid()
-            return dict()
         for cell_id in this_result_dict:
             cell_id = int(cell_id)
             for induction in this_result_dict[cell_id]:
@@ -1616,7 +1636,12 @@ def get_objectives(features, export=False):
             objectives[objective_name] = 0.
         else:
             objectives[objective_name] = np.mean(objectives[objective_name])
-
+    """
+    print('raw features:')
+    pprint.pprint(features)
+    print('raw objectives:')
+    pprint.pprint(objectives)
+    """
     return features, objectives
 
 

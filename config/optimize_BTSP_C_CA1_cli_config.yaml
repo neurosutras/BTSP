@@ -1,22 +1,4 @@
 bounds:
-  rMC_peak: !!python/tuple
-  - 0.001
-  - 1.
-  rMC_th: !!python/tuple
-  - 0.001
-  - 1.
-  rCM_th1: !!python/tuple
-  - 0.001
-  - 1.
-  rCM_peak1: !!python/tuple
-  - 0.001
-  - 1.
-  rCM_th2: !!python/tuple
-  - 0.001
-  - 1.
-  rCM_peak2: !!python/tuple
-  - 0.001
-  - 1.
   rMC0: !!python/tuple
   - 0.01
   - 2.
@@ -52,10 +34,6 @@ rel_bounds:
   - '>'
   - 1.0
   - global_signal_decay
-- - rCM_th2
-  - '>'
-  - 1.0
-  - rCM_th1
 feature_names:
 - spont_delta_amp
 - spont_delta_width
@@ -103,12 +81,6 @@ objective_names:
 optimization_title: bidirectional_BTSP_C
 param_gen: PopulationAnnealing
 param_names:
-- rMC_peak
-- rMC_th
-- rCM_th1
-- rCM_peak1
-- rCM_th2
-- rCM_peak2
 - rMC0
 - rCM0
 - local_signal_rise
@@ -127,13 +99,7 @@ x0:
   global_signal_decay: 3.000893E+02
   local_signal_rise: 1.125681E+02
   rMC0: 7.407045E-01
-  rMC_th: 3.160245E-01
   peak_delta_weight: 3.681929E+00
   local_signal_decay: 1.739002E+03
-  rCM_th1: 7.109480E-02
-  rCM_th2: 8.612426E-01
-  rCM_peak1: 7.443065E-01
-  rCM_peak2: 4.395095E-01
   rCM0: 1.589147E-01
-  rMC_peak: 4.092345E-01
   global_signal_rise: 1.578144E+02
