@@ -1,5 +1,7 @@
 #!/bin/bash -l
 
+cd $HOME/BTSP
+
 for i in 11 28 29 30 31 8;
 do
     bash jobscripts/cori_optimize_BTSP_D_CA1_cli_debug.sh $i 7
