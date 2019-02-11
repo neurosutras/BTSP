@@ -1003,8 +1003,8 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
 
         if current_residual_score > 1.1 * prev_residual_score:
             if context.verbose > 0:
-                print 'optimize_BTSP_D_CA1: calculate_model_ramp: aborting - residual score not decreasing; ' \
-                      'induction: %i, lap: %i' % (context.induction, induction_lap + 1)
+                print 'optimize_BTSP_D_CA1: calculate_model_ramp: pid: %i; aborting - residual score not ' \
+                      'decreasing; induction: %i, lap: %i' % (os.getpid(), context.induction, induction_lap + 1)
             if plot:
                 axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
                 clean_axes(axes)
@@ -1573,6 +1573,10 @@ def filter_features_model_ramp(primitives, current_features, export=False):
                              'delta_min_val', 'residual_score']
     feature_names = ['self_consistent_delta_residual_score']
     for this_result_dict in primitives:
+        if not this_result_dict:
+            if context.verbose > 0:
+                print 'optimize_BTSP_E_CA1: filter_features_model_ramp: pid: %i; model failed' % os.getpid()
+            return dict()
         for cell_id in this_result_dict:
             cell_id = int(cell_id)
             for induction in this_result_dict[cell_id]:
@@ -1636,12 +1640,7 @@ def get_objectives(features, export=False):
             objectives[objective_name] = 0.
         else:
             objectives[objective_name] = np.mean(objectives[objective_name])
-    """
-    print('raw features:')
-    pprint.pprint(features)
-    print('raw objectives:')
-    pprint.pprint(objectives)
-    """
+
     return features, objectives
 
 

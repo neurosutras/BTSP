@@ -887,7 +887,9 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
                                                         context.rCM_th2, context.rCM_th2 - context.rCM_peak2,
                                                         signal_xrange, y_end=context.rCM_min2))
     except:
-        print 'calculate_model_ramp: pid: %i: model failed; invalid parameters for depot_rate' % os.getpid()
+        if context.verbose > 0:
+            print 'optimize_BTSP_E_CA1: calculate_model_ramp: pid: %i ; aborting - invalid parameters for ' \
+                  'depot_rate' % os.getpid()
         return dict()
     if plot:
         fig, axes = plt.subplots(1)
@@ -1009,8 +1011,8 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
 
         if current_residual_score > 1.1 * prev_residual_score:
             if context.verbose > 0:
-                print 'optimize_BTSP_V_E_CA1: calculate_model_ramp: aborting - residual score not decreasing; ' \
-                      'induction: %i, lap: %i' % (context.induction, induction_lap + 1)
+                print 'optimize_BTSP_E_CA1: calculate_model_ramp: pid: %i; aborting - residual score not ' \
+                      'decreasing; induction: %i, lap: %i' % (os.getpid(), context.induction, induction_lap + 1)
             if plot:
                 axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
                 clean_axes(axes)
@@ -1559,8 +1561,8 @@ def compute_features_model_ramp(x, cell_id=None, induction=None, local_signal_pe
     if context.disp:
         print 'Process: %i: computing model_ramp_features for cell_id: %i, induction: %i with x: %s' % \
               (os.getpid(), context.cell_id, context.induction, ', '.join('%.3E' % i for i in x))
-    result = calculate_model_ramp(local_signal_peak=local_signal_peak,
-                                  global_signal_peak=global_signal_peak, export=export, plot=plot)
+    result = calculate_model_ramp(local_signal_peak=local_signal_peak, global_signal_peak=global_signal_peak,
+                                  export=export, plot=plot)
     if context.disp:
         print 'Process: %i: computing model_ramp_features for cell_id: %i, induction: %i took %.1f s' % \
               (os.getpid(), context.cell_id, context.induction, time.time() - start_time)
@@ -1582,7 +1584,8 @@ def filter_features_model_ramp(primitives, current_features, export=False):
     feature_names = ['self_consistent_delta_residual_score']
     for this_result_dict in primitives:
         if not this_result_dict:
-            print 'filter_features_model_ramp: pid: %i: model failed' % os.getpid()
+            if context.verbose > 0:
+                print 'optimize_BTSP_E_CA1: filter_features_model_ramp: pid: %i; model failed' % os.getpid()
             return dict()
         for cell_id in this_result_dict:
             cell_id = int(cell_id)
