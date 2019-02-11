@@ -902,8 +902,8 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
 
         if current_residual_score > 1.1 * prev_residual_score:
             if context.verbose > 0:
-                print 'optimize_BTSP_V_A_CA1: calculate_model_ramp: aborting - residual score not decreasing; ' \
-                      'induction: %i, lap: %i' % (context.induction, induction_lap + 1)
+                print 'optimize_BTSP_V_A_CA1: calculate_model_ramp: pid: %i; aborting - residual score not ' \
+                      'decreasing; induction: %i, lap: %i' % (os.getpid(), context.induction, induction_lap + 1)
             if plot:
                 axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
                 axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
@@ -1409,8 +1409,8 @@ def compute_features_model_ramp(x, cell_id=None, induction=None, local_signal_pe
     if context.disp:
         print 'Process: %i: computing model_ramp_features for cell_id: %i, induction: %i with x: %s' % \
               (os.getpid(), context.cell_id, context.induction, ', '.join('%.3E' % i for i in x))
-    result = calculate_model_ramp(local_signal_peak=local_signal_peak,
-                                  global_signal_peak=global_signal_peak, export=export, plot=plot)
+    result = calculate_model_ramp(local_signal_peak=local_signal_peak, global_signal_peak=global_signal_peak,
+                                  export=export, plot=plot)
     if context.disp:
         print 'Process: %i: computing model_ramp_features for cell_id: %i, induction: %i took %.1f s' % \
               (os.getpid(), context.cell_id, context.induction, time.time() - start_time)
@@ -1433,9 +1433,8 @@ def filter_features_model_ramp(primitives, current_features, export=False):
     for this_result_dict in primitives:
         if not this_result_dict:
             if context.verbose > 0:
-                print 'optimize_BTSP_V_A_CA1: filter_features_model_ramp: pid: %i; aborting - failed model' % \
-                      os.getpid()
-                return dict()
+                print 'optimize_BTSP_V_A_CA1: filter_features_model_ramp: pid: %i; model failed' % os.getpid()
+            return dict()
         for cell_id in this_result_dict:
             cell_id = int(cell_id)
             for induction in this_result_dict[cell_id]:
@@ -1499,12 +1498,7 @@ def get_objectives(features, export=False):
             objectives[objective_name] = 0.
         else:
             objectives[objective_name] = np.mean(objectives[objective_name])
-    """
-    print('raw features:')
-    pprint.pprint(features)
-    print('raw objectives:')
-    pprint.pprint(objectives)
-    """
+
     return features, objectives
 
 

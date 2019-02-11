@@ -1575,7 +1575,7 @@ def filter_features_model_ramp(primitives, current_features, export=False):
     for this_result_dict in primitives:
         if not this_result_dict:
             if context.verbose > 0:
-                print 'optimize_BTSP_E_CA1: filter_features_model_ramp: pid: %i; model failed' % os.getpid()
+                print 'optimize_BTSP_D_CA1: filter_features_model_ramp: pid: %i; model failed' % os.getpid()
             return dict()
         for cell_id in this_result_dict:
             cell_id = int(cell_id)
