@@ -7,7 +7,7 @@ do
     bash jobscripts/cori_optimize_BTSP_V_A_CA1_cli.sh $i 7
 done
 
-for i in 1 15 18 4 5 7 9;
+for i in 15 18 4 5 7 9;  # 1
 do
     bash jobscripts/cori_optimize_BTSP_V_A_CA1_cli.sh $i 13
 done

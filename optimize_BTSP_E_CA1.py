@@ -1754,39 +1754,39 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
                                 export_file_path=export_file_path, label=label, disp=context.disp, verbose=verbose,
                                 **kwargs)
 
-    x1_array = context.x0_array
-    if 'params_path' in context.kwargs and os.path.isfile(context.kwargs['params_path']):
-        param_source_dict = read_from_yaml(context.kwargs['params_path'])
-        if 'cell_id' in context.kwargs:
-            if int(context.kwargs['cell_id']) in param_source_dict:
-                x1_dict = param_source_dict[int(context.kwargs['cell_id'])]
-                x1_array = param_dict_to_array(x1_dict, context.param_names)
+    if model_summary_figure:
+        plot_model_summary_figure(int(context.kwargs['cell_id']), model_file_path)
+    else:
+        x1_array = context.x0_array
+        if 'params_path' in context.kwargs and os.path.isfile(context.kwargs['params_path']):
+            param_source_dict = read_from_yaml(context.kwargs['params_path'])
+            if 'cell_id' in context.kwargs:
+                if int(context.kwargs['cell_id']) in param_source_dict:
+                    x1_dict = param_source_dict[int(context.kwargs['cell_id'])]
+                    x1_array = param_dict_to_array(x1_dict, context.param_names)
+                elif 'all' in param_source_dict:
+                    x1_dict = param_source_dict['all']
+                    x1_array = param_dict_to_array(x1_dict, context.param_names)
+                else:
+                    print 'optimize_BTSP_E: problem loading params for cell_id: %s from params_path: %s' % \
+                          (kwargs['params_path'], context.kwargs['cell_id'])
             elif 'all' in param_source_dict:
                 x1_dict = param_source_dict['all']
                 x1_array = param_dict_to_array(x1_dict, context.param_names)
             else:
-                print 'optimize_BTSP_E: problem loading params for cell_id: %s from params_path: %s' % \
-                      (kwargs['params_path'], context.kwargs['cell_id'])
-        elif 'all' in param_source_dict:
-            x1_dict = param_source_dict['all']
-            x1_array = param_dict_to_array(x1_dict, context.param_names)
-        else:
-            raise RuntimeError('optimize_BTSP_E: problem loading params from params_path: %s' %
-                               context.kwargs['params_path'])
+                raise RuntimeError('optimize_BTSP_E: problem loading params from params_path: %s' %
+                                   context.kwargs['params_path'])
 
-    if debug:
-        features = get_features_interactive(x1_array, plot=plot)
-        features, objectives = get_objectives(features, context.export)
-        if export and os.path.isfile(context.temp_output_path):
-            merge_exported_data([context.temp_output_path], context.export_file_path, True)
-            os.remove(context.temp_output_path)
-        print 'features:'
-        pprint.pprint({key: val for (key, val) in features.iteritems() if key in context.feature_names})
-        print 'objectives'
-        pprint.pprint({key: val for (key, val) in objectives.iteritems() if key in context.objective_names})
-
-    if model_summary_figure:
-        plot_model_summary_figure(int(context.kwargs['cell_id']), model_file_path)
+        if not debug:
+            features = get_features_interactive(x1_array, plot=plot)
+            features, objectives = get_objectives(features, context.export)
+            if export and os.path.isfile(context.temp_output_path):
+                merge_exported_data([context.temp_output_path], context.export_file_path, True)
+                os.remove(context.temp_output_path)
+            print 'features:'
+            pprint.pprint({key: val for (key, val) in features.iteritems() if key in context.feature_names})
+            print 'objectives'
+            pprint.pprint({key: val for (key, val) in objectives.iteritems() if key in context.objective_names})
 
     context.update(locals())
 

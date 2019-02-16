@@ -885,8 +885,14 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     depot_rate = np.vectorize(scaled_single_sigmoid(context.rCM_th, context.rCM_th + context.rCM_peak, signal_xrange))
     if plot:
         fig, axes = plt.subplots(1)
-        axes.plot(signal_xrange, pot_rate(signal_xrange), label='Potentiation rate')
-        axes.plot(signal_xrange, depot_rate(signal_xrange), label='De-potentiation rate')
+        if context.rMC0 > context.rCM0:
+            pot_scale = 1.
+            depot_scale = context.rCM0 / context.rMC0
+        else:
+            pot_scale = context.rMC0 / context.rCM0
+            depot_scale = 1.
+        axes.plot(signal_xrange, pot_rate(signal_xrange) * pot_scale, label='Potentiation rate')
+        axes.plot(signal_xrange, depot_rate(signal_xrange) * depot_scale, label='De-potentiation rate')
         axes.set_xlabel('Normalized plasticity signal amplitude (a.u.)')
         axes.set_ylabel('Normalized rate')
         axes.set_title('Plasticity signal transformations')
@@ -1261,6 +1267,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
         global_filter = group['global_filter'][:]
         initial_weights = group['initial_weights'][:]
         initial_ramp = group['initial_model_ramp'][:]
+        target_ramp = group['target_ramp'][:]
         model_ramp = group['model_ramp'][:]
         ramp_snapshots = []
         for lap in xrange(len(group['ramp_snapshots'])):
@@ -1516,6 +1523,28 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     fig2.tight_layout()
     fig2.show()
 
+    bar_loc = max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.) * 0.95
+    fig, axes = plt.subplots(2)
+    delta_weights = np.subtract(final_weights, initial_weights)
+    peak_weight = np.max(np.abs(delta_weights))
+    axes[1].plot(context.peak_locs, delta_weights)
+    axes[1].hlines(peak_weight * 1.05, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
+    axes[0].plot(context.binned_x, target_ramp, label='Experiment')
+    axes[0].plot(context.binned_x, model_ramp, label='Model')
+    axes[0].hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
+    axes[1].set_ylabel('Change in\nsynaptic weight')
+    axes[1].set_xlabel('Location (cm)')
+    axes[0].set_ylabel('Subthreshold\ndepolarization (mV)')
+    axes[0].set_xlabel('Location (cm)')
+    axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+    axes[0].set_ylim([min(-1., np.min(model_ramp) - 1., np.min(target_ramp) - 1.),
+                      max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.)])
+    axes[1].set_ylim([-peak_weight, peak_weight * 1.1])
+    clean_axes(axes)
+    fig.suptitle('Cell_id: %i, Induction: %i' % (cell_id, 2))
+    fig.tight_layout()
+    fig.show()
+
     context.update(locals())
 
 
@@ -1715,39 +1744,39 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
                                 export_file_path=export_file_path, label=label, disp=context.disp, verbose=verbose,
                                 **kwargs)
 
-    x1_array = context.x0_array
-    if 'params_path' in context.kwargs and os.path.isfile(context.kwargs['params_path']):
-        param_source_dict = read_from_yaml(context.kwargs['params_path'])
-        if 'cell_id' in context.kwargs:
-            if int(context.kwargs['cell_id']) in param_source_dict:
-                x1_dict = param_source_dict[int(context.kwargs['cell_id'])]
-                x1_array = param_dict_to_array(x1_dict, context.param_names)
+    if model_summary_figure:
+        plot_model_summary_figure(int(context.kwargs['cell_id']), model_file_path)
+    else:
+        x1_array = context.x0_array
+        if 'params_path' in context.kwargs and os.path.isfile(context.kwargs['params_path']):
+            param_source_dict = read_from_yaml(context.kwargs['params_path'])
+            if 'cell_id' in context.kwargs:
+                if int(context.kwargs['cell_id']) in param_source_dict:
+                    x1_dict = param_source_dict[int(context.kwargs['cell_id'])]
+                    x1_array = param_dict_to_array(x1_dict, context.param_names)
+                elif 'all' in param_source_dict:
+                    x1_dict = param_source_dict['all']
+                    x1_array = param_dict_to_array(x1_dict, context.param_names)
+                else:
+                    print 'optimize_BTSP_D: problem loading params for cell_id: %s from params_path: %s' % \
+                          (kwargs['params_path'], context.kwargs['cell_id'])
             elif 'all' in param_source_dict:
                 x1_dict = param_source_dict['all']
                 x1_array = param_dict_to_array(x1_dict, context.param_names)
             else:
-                print 'optimize_BTSP_D: problem loading params for cell_id: %s from params_path: %s' % \
-                      (kwargs['params_path'], context.kwargs['cell_id'])
-        elif 'all' in param_source_dict:
-            x1_dict = param_source_dict['all']
-            x1_array = param_dict_to_array(x1_dict, context.param_names)
-        else:
-            raise RuntimeError('optimize_BTSP_D: problem loading params from params_path: %s' %
-                               context.kwargs['params_path'])
+                raise RuntimeError('optimize_BTSP_D: problem loading params from params_path: %s' %
+                                   context.kwargs['params_path'])
 
-    if debug:
-        features = get_features_interactive(x1_array, plot=plot)
-        features, objectives = get_objectives(features, context.export)
-        if export and os.path.isfile(context.temp_output_path):
-            merge_exported_data([context.temp_output_path], context.export_file_path, True)
-            os.remove(context.temp_output_path)
-        print 'features:'
-        pprint.pprint({key: val for (key, val) in features.iteritems() if key in context.feature_names})
-        print 'objectives'
-        pprint.pprint({key: val for (key, val) in objectives.iteritems() if key in context.objective_names})
-
-    if model_summary_figure:
-        plot_model_summary_figure(int(context.kwargs['cell_id']), model_file_path)
+        if not debug:
+            features = get_features_interactive(x1_array, plot=plot)
+            features, objectives = get_objectives(features, context.export)
+            if export and os.path.isfile(context.temp_output_path):
+                merge_exported_data([context.temp_output_path], context.export_file_path, True)
+                os.remove(context.temp_output_path)
+            print 'features:'
+            pprint.pprint({key: val for (key, val) in features.iteritems() if key in context.feature_names})
+            print 'objectives'
+            pprint.pprint({key: val for (key, val) in objectives.iteritems() if key in context.objective_names})
 
     context.update(locals())
 
