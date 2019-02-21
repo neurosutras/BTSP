@@ -1,0 +1,147 @@
+bounds:
+  k_pot: !!python/tuple
+  - 0.1
+  - 15.
+  k_depot: !!python/tuple
+  - 0.1
+  - 15.
+  r_pot_peak: !!python/tuple
+  - 0.001
+  - 1.
+  r_pot_th: !!python/tuple
+  - 0.001
+  - 1.
+  r_depot_th1: !!python/tuple
+  - 0.001
+  - 1.
+  r_depot_peak1: !!python/tuple
+  - 0.001
+  - 1.
+  r_depot_th2: !!python/tuple
+  - 0.001
+  - 1.
+  r_depot_peak2: !!python/tuple
+  - 0.001
+  - 1.
+  r_depot_min2: !!python/tuple
+  - 0.01
+  - 1.
+  delta_peak_ramp_amp: !!python/tuple
+  - 0.
+  - 10.
+  local_signal_rise: !!python/tuple
+  - 5.
+  - 200.
+  local_signal_decay: !!python/tuple
+  - 50.
+  - 4000.
+  global_signal_rise: !!python/tuple
+  - 5.
+  - 200.
+  global_signal_decay: !!python/tuple
+  - 50.
+  - 3000.
+rel_bounds:
+- - local_signal_decay
+  - '>'
+  - 1.0
+  - local_signal_rise
+- - global_signal_decay
+  - '>'
+  - 1.0
+  - global_signal_rise
+- - local_signal_decay
+  - '>'
+  - 1.0
+  - global_signal_decay
+#- - k_pot
+#  - '>'
+#  - 1.0
+#  - k_depot
+- - r_depot_th2
+  - '>'
+  - 1.0
+  - r_depot_th1
+feature_names:
+- spont_delta_amp
+- spont_delta_width
+- spont_delta_peak_shift
+- spont_delta_asymmetry
+- spont_delta_min_loc
+- spont_delta_min_val
+- exp1_delta_amp
+- exp1_delta_width
+- exp1_delta_peak_shift
+- exp1_delta_asymmetry
+- exp1_delta_min_loc
+- exp1_delta_min_val
+- exp2_delta_amp
+- exp2_delta_width
+- exp2_delta_peak_shift
+- exp2_delta_asymmetry
+- exp2_delta_min_loc
+- exp2_delta_min_val
+update_context:
+- - optimize_BTSP_V_C_CA1
+  - update_model_params
+get_features_stages:
+- source: optimize_BTSP_V_C_CA1
+  get_args_static: get_args_static_signal_amplitudes
+  compute_features: compute_features_signal_amplitudes
+  filter_features: filter_features_signal_amplitudes
+- source: optimize_BTSP_V_C_CA1
+  get_args_dynamic: get_args_dynamic_model_ramp
+  compute_features: compute_features_model_ramp
+  filter_features: filter_features_model_ramp
+get_objectives:
+  optimize_BTSP_V_C_CA1: get_objectives
+kwargs:
+  data_file_name: 20180411_BTSP2_CA1_data.hdf5
+  verbose: 1
+  min_delta_weight: -0.2
+  data_keys:
+  # params_path: config/20180511_best_params.yaml
+objective_names:
+- spont_residual_score
+- exp1_residual_score
+- exp2_residual_score
+- self_consistent_delta_residual_score
+optimization_title: bidirectional_BTSP_V_C
+param_gen: PopulationAnnealing
+param_names:
+- k_pot
+- k_depot
+- r_pot_peak
+- r_pot_th
+- r_depot_peak1
+- r_depot_th1
+- r_depot_peak2
+- r_depot_th2
+- r_depot_min2
+- delta_peak_ramp_amp
+- local_signal_rise
+- local_signal_decay
+- global_signal_rise
+- global_signal_decay
+target_range:
+  ramp_offset: 0.01
+  delta_min_val: 0.01
+  delta_peak_val: 0.01
+  residuals: 0.1
+  weights_smoothness: 0.01
+target_val:
+x0:
+  k_pot: 1.494780E+01
+  k_depot: 4.183372E-01
+  r_pot_peak: 9.056280E-02
+  r_pot_th: 3.491252E-01
+  r_depot_peak1: 3.069892E-01
+  r_depot_th1: 8.710066E-01
+  r_depot_peak2: 3.069892E-01
+  r_depot_th2: 8.810066E-01
+  r_depot_min2: 0.01
+  delta_peak_ramp_amp: 8.702408E+00
+  local_signal_rise: 8.293589E+01
+  local_signal_decay: 4.482438E+02
+  global_signal_rise: 8.554945E+01
+  global_signal_decay: 2.216106E+02

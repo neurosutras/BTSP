@@ -1,6 +1,6 @@
 #!/bin/bash -l
-export JOB_NAME=optimize_BTSP_D_CA1_cell"$1"_"$DATE"
 export DATE=$(date +%Y%m%d_%H%M%S)
+export JOB_NAME=optimize_BTSP_D_CA1_cell"$1"_"$DATE"
 export cores=$(($2 * 32))
 sbatch <<EOT
 #!/bin/bash -l
