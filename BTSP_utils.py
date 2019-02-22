@@ -2,7 +2,6 @@
 
 """
 from nested.utils import *
-from scipy.optimize import minimize
 
 
 class StateMachine(object):
@@ -333,7 +332,7 @@ def scaled_double_sigmoid(th1, peak1, th2, peak2, x, y_start=0., y_peak=1., y_en
         raise ValueError('scaled_double_sigmoid: peak2 and th2: %.2E cannot be equal' % th2)
     slope1 = 2. / (peak1 - th1)
     slope2 = 2. / (peak2 - th2)
-    y = lambda x: (1. / (1. + np.exp(-slope1 * (x - th1)))) * (1. / (1. + np.exp(-slope2 * (x - th2))))
+    y = lambda xi: (1. / (1. + np.exp(-slope1 * (xi - th1)))) * (1. / (1. + np.exp(-slope2 * (xi - th2))))
     y_array = np.vectorize(y)
     peak_index = np.argmax(y_array(x))
     x_peak = x[peak_index]

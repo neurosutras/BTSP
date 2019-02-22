@@ -541,23 +541,18 @@ def get_local_signal_population(local_filter):
     return local_signals
 
 
-def get_voltage_dependent_local_signal_population(local_filter, current_complete_ramp, plot=False):
+def get_voltage_dependent_local_signal_population(local_filter, current_complete_ramp, phi, plot=False):
     """
 
     :param local_filter: array
     :param current_complete_ramp: array
+    :param phi: lambda
     :param plot: bool
     :return: list of array
     """
     local_signals = []
     normalized_ramp = current_complete_ramp / (context.peak_ramp_amp + context.delta_peak_ramp_amp)
-    # BCM-like voltage dependence; nonlinear
-    signal_xrange = np.linspace(0., 1., 10000)
-    pot_rate = scaled_single_sigmoid(context.r_pot_th, context.r_pot_th - context.r_pot_peak, signal_xrange,
-                                     ylim=[1.,0.])
-    depot_rate = scaled_single_sigmoid(context.r_depot_th, context.r_depot_th + context.r_depot_peak, signal_xrange)
-    phi = np.vectorize(lambda x: context.k_pot * pot_rate(min(1., max(0., x))) -
-                                 context.k_depot * depot_rate(max(0., min(1., x))))
+
     this_phi = phi(normalized_ramp)
     if plot:
         fig, axes = plt.subplots()
@@ -829,6 +824,14 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
                            context.global_signal_decay, context.down_dt, plot)
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
 
+    # BCM-like voltage dependence; nonlinear
+    signal_xrange = np.linspace(0., 1., 10000)
+    pot_rate = scaled_single_sigmoid(context.r_pot_th, context.r_pot_th - context.r_pot_peak, signal_xrange,
+                                     ylim=[1., 0.])
+    depot_rate = scaled_single_sigmoid(context.r_depot_th, context.r_depot_th + context.r_depot_peak, signal_xrange)
+    phi = np.vectorize(lambda x: context.k_pot * pot_rate(min(1., max(0., x))) -
+                                 context.k_depot * depot_rate(max(0., min(1., x))))
+
     allow_offset = False
     initial_delta_weights = context.LSA_weights['before']
 
@@ -874,7 +877,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
         current_complete_ramp = np.interp(context.down_t, context.complete_t,
                                           get_complete_ramp(current_ramp, context.binned_x))
         local_signals = np.divide(
-            get_voltage_dependent_local_signal_population(local_signal_filter, current_complete_ramp,
+            get_voltage_dependent_local_signal_population(local_signal_filter, current_complete_ramp, phi,
                                                           plot=plot and induction_lap == 0), local_signal_peak)
         if induction_lap == 0:
             start_time = context.down_t[0]
@@ -1260,7 +1263,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
 
     this_axis = fig.add_subplot(gs0[0, 3])
     axes.append(this_axis)
-    voltage_range = np.linspace(0., 1., 1000)
+    voltage_range = np.linspace(0., 1., 10000)
     pot_rate = scaled_single_sigmoid(context.r_pot_th, context.r_pot_th - context.r_pot_peak, signal_xrange,
                                      ylim=[1., 0.])
     depot_rate = scaled_single_sigmoid(context.r_depot_th, context.r_depot_th + context.r_depot_peak, signal_xrange)

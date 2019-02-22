@@ -1,5 +1,4 @@
 __author__ = 'milsteina'
-from BTSP_utils import *
 from nested.optimize_utils import *
 import matplotlib as mpl
 import matplotlib.gridspec as gridspec

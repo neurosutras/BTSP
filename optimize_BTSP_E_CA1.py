@@ -886,7 +886,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
         depot_rate = np.vectorize(scaled_double_sigmoid(context.rCM_th1, context.rCM_th1 + context.rCM_peak1,
                                                         context.rCM_th2, context.rCM_th2 - context.rCM_peak2,
                                                         signal_xrange, y_end=context.rCM_min2))
-    except:
+    except ValueError:
         if context.verbose > 0:
             print 'optimize_BTSP_E_CA1: calculate_model_ramp: pid: %i ; aborting - invalid parameters for ' \
                   'depot_rate' % os.getpid()

@@ -1,9 +1,9 @@
 __author__ = 'milsteina'
-from BTSP_utils import *
 from nested.optimize_utils import *
 import matplotlib as mpl
 import matplotlib.gridspec as gridspec
 from scipy.stats import pearsonr
+from collections import defaultdict
 import click
 
 
@@ -43,9 +43,9 @@ def main(model_file_path, output_dir, export, show_traces, label):
         raise IOError('Invalid model_file_path: %s' % model_file_path)
     if export and not os.path.isdir(output_dir):
         raise IOError('Invalid output_dir: %s' % output_dir)
-    ramp_amp, ramp_width, peak_shift, min_val = process_BTSP_model_results(model_file_path, show_traces, export,
-                                                                           output_dir, label)
-    plot_BTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, export, output_dir, label)
+    ramp_amp, ramp_width, peak_shift, min_val, ramp_mse = \
+        process_BTSP_model_results(model_file_path, show_traces, export, output_dir, label)
+    plot_BTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, ramp_mse, export, output_dir, label)
     context.update(locals())
 
 
@@ -57,9 +57,13 @@ def process_BTSP_model_results(file_path, show=False, export=False, output_dir=N
     :param export: bool
     :param output_dir: str (dir)
     :param label: str
-    :return: dict
+    :return: tuple of dict
     """
-    ramp_amp, ramp_width, local_peak_shift, min_val = {}, {}, {}, {}
+    ramp_amp = defaultdict(lambda: defaultdict(dict))
+    ramp_width = defaultdict(lambda: defaultdict(dict))
+    local_peak_shift = defaultdict(lambda: defaultdict(dict))
+    min_val = defaultdict(lambda: defaultdict(dict))
+    ramp_mse = defaultdict(dict)
     with h5py.File(file_path, 'r') as f:
         shared_context_key = 'shared_context'
         group = f[shared_context_key]
@@ -68,22 +72,18 @@ def process_BTSP_model_results(file_path, show=False, export=False, output_dir=N
         param_names = group['param_names'][:]
         exported_data_key = 'exported_data'
         for cell_key in f[exported_data_key]:
-            for parameter in ramp_amp, ramp_width, local_peak_shift, min_val:
-                if cell_key not in parameter:
-                    parameter[cell_key] = {}
             description = 'model_ramp_features'
             group = f[exported_data_key][cell_key].itervalues().next()[description]
             param_array = group['param_array'][:]
             param_dict = param_array_to_dict(param_array, param_names)
-            peak_weight = param_dict['peak_delta_weight'] + 1.
+            if 'peak_delta_weight' in param_dict:
+                peak_delta_weight = param_dict['peak_delta_weight']
+            else:
+                peak_delta_weight = 1.
 
             for induction_key in f[exported_data_key][cell_key]:
-                for parameter in ramp_amp, ramp_width, local_peak_shift, min_val:
-                    if induction_key not in parameter[cell_key]:
-                        parameter[cell_key][induction_key] = {}
                 description = 'model_ramp_features'
                 group = f[exported_data_key][cell_key][induction_key][description]
-
                 ramp_amp[cell_key][induction_key]['target'] = group.attrs['target_ramp_amp']
                 ramp_width[cell_key][induction_key]['target'] = group.attrs['target_ramp_width']
                 local_peak_shift[cell_key][induction_key]['target'] = group.attrs['target_local_peak_shift']
@@ -103,9 +103,13 @@ def process_BTSP_model_results(file_path, show=False, export=False, output_dir=N
                 model_weights = group['model_weights'][:]
                 initial_weights = group['initial_weights'][:]
                 delta_weights = np.subtract(model_weights, initial_weights)
+                peak_delta_weight = max([max(delta_weights), abs(min(delta_weights)), peak_delta_weight])
                 initial_model_ramp = group['initial_model_ramp'][:]
                 target_ramp = group['target_ramp'][:]
                 model_ramp = group['model_ramp'][:]
+
+                ramp_mse[cell_key][induction_key] = np.mean(np.square(np.subtract(target_ramp, model_ramp)))
+
                 ymin = min(ymin, np.min(model_ramp) - 1., np.min(target_ramp) - 1.)
                 ymax = max(ymax, np.max(model_ramp) + 1., np.max(target_ramp) + 1.)
                 if 'initial_exp_ramp' in group:
@@ -138,10 +142,11 @@ def process_BTSP_model_results(file_path, show=False, export=False, output_dir=N
                 mean_induction_stop_loc = group.attrs['mean_induction_stop_loc']
                 axes3[i][0].set_ylim([ymin, ymax * 1.05])
                 axes3[i][1].set_ylim([ymin, ymax * 1.05])
-                axes3[i][2].set_ylim([-peak_weight, peak_weight * 1.1])
+                axes3[i][2].set_ylim([-peak_delta_weight, peak_delta_weight * 1.1])
                 axes3[i][0].hlines(ymax, xmin=mean_induction_start_loc, xmax=mean_induction_stop_loc)
                 axes3[i][1].hlines(ymax, xmin=mean_induction_start_loc, xmax=mean_induction_stop_loc)
-                axes3[i][2].hlines(peak_weight * 1.05, xmin=mean_induction_start_loc, xmax=mean_induction_stop_loc)
+                axes3[i][2].hlines(peak_delta_weight * 1.05, xmin=mean_induction_start_loc,
+                                   xmax=mean_induction_stop_loc)
                 axes3[i][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
                 axes3[i][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
             clean_axes(axes3)
@@ -156,17 +161,18 @@ def process_BTSP_model_results(file_path, show=False, export=False, output_dir=N
     else:
         plt.close('all')
 
-    return ramp_amp, ramp_width, local_peak_shift, min_val
+    return ramp_amp, ramp_width, local_peak_shift, min_val, ramp_mse
 
 
-def plot_BTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, export=False, output_dir=None,
-                                         label=None):
+def plot_BTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, ramp_mse, export=False, output_dir=None,
+                                label=None):
     """
 
     :param ramp_amp: dict
     :param ramp_width: dict
     :param peak_shift: dict
     :param min_val: dict
+    :param ramp_mse: dict
     :param export: bool
     :param output_dir: str (dir)
     :param label: str
@@ -204,11 +210,84 @@ def plot_BTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, expor
         this_axis.plot(tick_loc, tick_loc, c='darkgrey', alpha=0.5, ls='--')
         this_axis.set_xlabel('Experiment')
         this_axis.set_ylabel('Model')
+    this_axis = fig.add_subplot(gs0[1, 0])
+    axes.append(this_axis)
+    vals = defaultdict(list)
+    for cell_key in ramp_mse:
+        for induction_key in ramp_mse[cell_key]:
+            vals[induction_key].append(ramp_mse[cell_key][induction_key])
+    max_val = 0.
+    for induction_key in vals:
+        vals[induction_key].sort()
+        max_val = max(max_val, np.max(vals[induction_key]))
+        n = len(vals[induction_key])
+        this_axis.plot(vals[induction_key], np.add(np.arange(n), 1.) / float(n), label='Induction: %s' % induction_key)
+    this_axis.set_ylim(0., 1.05)
+    this_axis.set_ylabel('Cum. fraction')
+    this_axis.set_xlim(0., math.ceil(max_val))
+    int_max_val = int(math.ceil(max_val))
+    int_delta_val = max(1, int_max_val / 6)
+    this_axis.set_xticks(np.arange(0, int_max_val+1, int_delta_val))
+    this_axis.set_xlabel('Mean squared error')
+    this_axis.set_title('Model ramp residual error', fontsize=mpl.rcParams['font.size'])
+    this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, handletextpad=0.5,
+                     fontsize=mpl.rcParams['font.size'])
     clean_axes(axes)
     if export:
         fig_path = '%s/%s_BTSP_model_fit_summary.svg' % (output_dir, label)
         fig.savefig(fig_path, format='svg')
     plt.show()
+
+
+def plot_compare_models_mse(model_file_path_dict=None):
+    """
+
+    :param model_file_path_dict: {label (str): file_path (str; path)}
+    """
+    all_mse = dict()
+    max_val = defaultdict(lambda: 0.)
+    if model_file_path_dict is None:
+        model_file_path_dict = {model: 'data/20190221_BTSP_%s_all_cells_merged_exported_data.hdf5' % model
+                                for model in ['V_A', 'V_B', 'D', 'E']}
+    for model, model_file_path in model_file_path_dict.iteritems():
+        ramp_amp, ramp_width, peak_shift, min_val, all_mse[model] = process_BTSP_model_results(model_file_path)
+    fig, axes = plt.subplots(1, 2)
+
+    for model in all_mse:
+        vals = defaultdict(list)
+        for cell_key in all_mse[model]:
+            for induction_key in all_mse[model][cell_key]:
+                vals[induction_key].append(all_mse[model][cell_key][induction_key])
+        for induction_key in vals:
+            if induction_key == '1':
+                col = 0
+            elif induction_key == '2':
+                col = 1
+            vals[induction_key].sort()
+            max_val[induction_key] = max(max_val[induction_key], np.max(vals[induction_key]))
+            n = len(vals[induction_key])
+            axes[col].plot(vals[induction_key], np.add(np.arange(n), 1.) / float(n), label='Model: %s' % model)
+
+    for induction_key in vals:
+        if induction_key == '1':
+            col = 0
+        elif induction_key == '2':
+            col = 1
+        axes[col].set_title('Induction %s' % induction_key, fontsize=mpl.rcParams['font.size'])
+        axes[col].set_xlim(0., math.ceil(max_val[induction_key]))
+        int_max_val = int(math.ceil(max_val[induction_key]))
+        int_delta_val = max(1, int_max_val / 6)
+        axes[col].set_xticks(np.arange(0, int_max_val + 1, int_delta_val))
+        axes[col].set_ylim(0., 1.05)
+        axes[col].set_ylabel('Cum. fraction')
+        axes[col].set_xlabel('Mean squared error')
+
+    axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, handletextpad=0.5,
+                   fontsize=mpl.rcParams['font.size'])
+    fig.suptitle('Model ramp residual error', fontsize=mpl.rcParams['font.size'])
+    clean_axes(axes)
+    fig.tight_layout(rect=[0., 0., 1., 0.95])
+    fig.show()
 
 
 if __name__ == '__main__':
