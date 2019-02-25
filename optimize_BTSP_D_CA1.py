@@ -66,7 +66,6 @@ def init_context():
         raise IOError('init_context: invalid data_file_path: %s' % context.data_file_path)
     with h5py.File(context.data_file_path, 'r') as f:
         dt = f['defaults'].attrs['dt']  # ms
-        input_field_width = f['defaults'].attrs['input_field_width']  # cm
         input_field_peak_rate = f['defaults'].attrs['input_field_peak_rate']  # Hz
         num_inputs = f['defaults'].attrs['num_inputs']
         track_length = f['defaults'].attrs['track_length']  # cm
@@ -82,8 +81,14 @@ def init_context():
         default_interp_t = f['defaults']['default_interp_t'][:]
         default_interp_x = f['defaults']['default_interp_x'][:]
         extended_x = f['defaults']['extended_x'][:]
-        input_rate_maps = f['defaults']['input_rate_maps'][:]
-        peak_locs = f['defaults']['peak_locs'][:]
+        if 'input_field_width' not in context():
+            input_field_width = f['defaults'].attrs['input_field_width']  # cm
+            input_rate_maps = f['defaults']['input_rate_maps'][:]
+            peak_locs = f['defaults']['peak_locs'][:]
+        else:
+            input_rate_maps, peak_locs = \
+                generate_spatial_rate_maps(binned_x, num_inputs, input_field_peak_rate, context.input_field_width,
+                                           track_length)
         if 'data_keys' not in context() or context.data_keys is None:
             if 'cell_id' not in context() or context.cell_id == 'all' or context.cell_id is None:
                     context.data_keys = \

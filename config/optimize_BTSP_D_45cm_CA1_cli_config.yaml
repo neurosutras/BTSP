@@ -83,7 +83,7 @@ kwargs:
   data_file_name: 20180411_BTSP2_CA1_data.hdf5
   verbose: 1
   min_delta_weight: -0.2
-  input_field_width: 90.  # cm
+  input_field_width: 45.  # cm
   data_keys:
   params_path: config/20190118_BTSP_D_initial_params.yaml
 objective_names:
