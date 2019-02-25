@@ -2,6 +2,7 @@
 
 """
 from nested.utils import *
+from scipy.optimize import minimize
 
 
 class StateMachine(object):
