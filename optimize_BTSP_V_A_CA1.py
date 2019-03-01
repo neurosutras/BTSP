@@ -1256,9 +1256,9 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     voltage_range = np.linspace(0., 1., 10000)
     phi = context.k_pot * (1. - voltage_range) - context.k_depot * voltage_range
     this_axis.plot(voltage_range, phi/np.max(phi), c='k')
+    this_axis.plot(voltage_range, np.zeros_like(voltage_range), linestyle='--', c='grey')
     this_axis.set_xlabel('Normalized voltage')
     this_axis.set_ylabel('Normalized rate')
-    # this_axis.set_ylim(0., this_axis.get_ylim()[1])
     this_axis.set_xlim(0., 1.)
     this_axis.set_title('Rate of change in synaptic weight', fontsize=mpl.rcParams['font.size'])
 
@@ -1359,6 +1359,17 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
         this_axis.set_ylim(0., ymax)
         this_axis.hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
     clean_axes(axes2)
+    fig.show()
+
+    fig, this_axis = plt.subplots()
+    this_axis.plot(voltage_range, phi / np.max(phi), c='k')
+    this_axis.plot(voltage_range, np.zeros_like(voltage_range), linestyle='--', c='grey')
+    this_axis.set_xlabel('Normalized voltage')
+    this_axis.set_ylabel('Net change in synaptic weight')
+    this_axis.set_xlim(0., 1.)
+    this_axis.set_title('Linear q$_{+}$, linear q$_{-}$')
+    clean_axes(this_axis)
+    fig.tight_layout()
     fig.show()
 
     fig2, axes2 = plt.subplots(1, 2, sharex=True)

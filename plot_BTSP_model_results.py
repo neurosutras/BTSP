@@ -20,7 +20,7 @@ context = Context()
 
 @click.command()
 @click.option("--model-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='data/20180511_BTSP_all_cells_PopulationAnnealing_optimization_merged_exported_output.hdf5')
+              default='data/20190221_BTSP_D_all_cells_merged_exported_data.hdf5')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
 @click.option("--show-traces", is_flag=True)

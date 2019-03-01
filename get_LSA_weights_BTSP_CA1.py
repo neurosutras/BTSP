@@ -54,7 +54,7 @@ def main(cli, min_delta_weight, data_dir, plot, verbose, export, data_file_path,
     prev_allow_offset = False
     if get_scale_factor:
         target_ramp, force_delta_weights, model_ramp, delta_weights, ramp_scaling_factor = \
-            get_weights_LSA_scaling_factor(context.input_rate_maps, plot=context.plot, verbose=context.verbose)
+            get_weights_LSA_scaling_factor(context, context.input_rate_maps, plot=context.plot, verbose=context.verbose)
         context.update(locals())
         print 'get_LSA_weights_BTSP_CA1: standard scale factor: %.3E' % ramp_scaling_factor
     else:
@@ -348,11 +348,15 @@ def get_residual_score(delta_weights, target_ramp, input_matrix, ramp_x, input_x
                                                                                               {}, {}, {}
     ramp_amp['target'], ramp_width['target'], peak_shift['target'], ratio['target'], start_loc['target'], \
     peak_loc['target'], end_loc['target'], min_val['target'], min_loc['target'] = \
-        calculate_ramp_features(context, target_ramp, context.mean_induction_start_loc)
+        calculate_ramp_features(ramp=target_ramp, induction_loc=context.mean_induction_start_loc,
+                                binned_x=context.binned_x, interp_x=context.default_interp_x,
+                                track_length=context.track_length)
 
     ramp_amp['model'], ramp_width['model'], peak_shift['model'], ratio['model'], start_loc['model'], \
     peak_loc['model'], end_loc['model'], min_val['model'], min_loc['model'] = \
-        calculate_ramp_features(context, model_ramp, context.mean_induction_start_loc)
+        calculate_ramp_features(ramp=model_ramp, induction_loc=context.mean_induction_start_loc,
+                                binned_x=context.binned_x, interp_x=context.default_interp_x,
+                                track_length=context.track_length)
 
     if disp:
         print 'exp: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f, ' \
@@ -470,116 +474,6 @@ def get_delta_weights_LSA(target_ramp, input_rate_maps, initial_delta_weights=No
         plt.close()
 
     return model_ramp, delta_weights, ramp_offset
-
-
-def get_weights_LSA_scaling_factor(input_rate_maps, bounds=None, beta=2., ramp_x=None, input_x=None, plot=False,
-                                   verbose=1):
-    """
-    Reality check for the least square approximation method to estimate weights. Used to calibrate ramp_scaling_factor.
-    Forces weights to a truncated cosine with field_width = 1.2 * input_field_width and ramp_peak = 6 mV.
-    :param input_rate_maps: array
-    :param bounds: tuple of float
-    :param beta: float; regularization parameter
-    :param ramp_x: array (spatial resolution of ramp)
-    :param input_x: array (spatial resolution of input_matrix)
-    :param plot: bool
-    :param verbose: int
-    :return: tuple of array
-    """
-    if ramp_x is None:
-        ramp_x = context.binned_x
-    if input_x is None:
-        input_x = context.binned_x
-    modulated_field_center = context.track_length * 0.5
-    context.mean_induction_start_loc = modulated_field_center + 10.
-    context.mean_induction_stop_loc = context.mean_induction_start_loc + 5.
-    peak_delta_weight = 1.5
-    tuning_amp = peak_delta_weight / 2.
-    tuning_offset = tuning_amp
-    force_delta_weights = tuning_amp * np.cos(2. * np.pi / (context.input_field_width * 1.2) *
-                                              (context.peak_locs - modulated_field_center)) + tuning_offset
-    left = np.where(context.peak_locs >= modulated_field_center - context.input_field_width * 1.2 / 2.)[0][0]
-    right = np.where(context.peak_locs > modulated_field_center + context.input_field_width * 1.2 / 2.)[0][0]
-    force_delta_weights[:left] = 0.
-    force_delta_weights[right:] = 0.
-    exp_ramp = force_delta_weights.dot(input_rate_maps)
-    ramp_scaling_factor = 6. / np.max(exp_ramp)
-    input_matrix = np.multiply(input_rate_maps, context.ramp_scaling_factor)
-    exp_ramp = force_delta_weights.dot(input_matrix)
-    if len(exp_ramp) != len(ramp_x):
-        target_ramp = np.interp(ramp_x, input_x, exp_ramp)
-    else:
-        target_ramp = np.array(exp_ramp)
-        ramp_amp, ramp_width, peak_shift, ratio, start_loc, peak_loc, end_loc, min_val, min_loc = \
-            {}, {}, {}, {}, {}, {}, {}, {}, {}
-    ramp_amp['target'], ramp_width['target'], peak_shift['target'], ratio['target'], start_loc['target'], \
-    peak_loc['target'], end_loc['target'], min_val['target'], min_loc['target'] = \
-        calculate_ramp_features(context, target_ramp, context.mean_induction_start_loc)
-
-    [U, s, Vh] = np.linalg.svd(input_matrix)
-    V = Vh.T
-    D = np.zeros_like(input_matrix)
-    D[np.where(np.eye(*D.shape))] = s / (s ** 2. + beta ** 2.)
-    input_matrix_inv = V.dot(D.conj().T).dot(U.conj().T)
-    delta_weights = exp_ramp.dot(input_matrix_inv)
-    SVD_delta_weights = np.array(delta_weights)
-    if bounds is None:
-        bounds = [context.min_delta_weight, 3.]
-    result = minimize(get_residual_score, delta_weights,
-                               args=(target_ramp, input_matrix, ramp_x, input_x, bounds), method='L-BFGS-B',
-                               bounds=[bounds] * len(delta_weights), options={'disp': verbose > 1, 'maxiter': 100})
-    delta_weights = result.x
-    model_ramp = delta_weights.dot(input_matrix)
-    if len(model_ramp) != len(ramp_x):
-        model_ramp = np.interp(ramp_x, input_x, model_ramp)
-    ramp_amp['model'], ramp_width['model'], peak_shift['model'], ratio['model'], start_loc['model'], \
-    peak_loc['model'], end_loc['model'], min_val['model'], min_loc['model'] = \
-        calculate_ramp_features(context, model_ramp, context.mean_induction_start_loc)
-    # peak_val, ramp_width, peak_shift, ratio, start_loc, peak_loc, end_loc, min_val, min_loc
-    if verbose > 0:
-        print 'exp: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f, ' \
-              'end_loc: %.1f' % (ramp_amp['target'], ramp_width['target'], peak_shift['target'], ratio['target'],
-                                 start_loc['target'], peak_loc['target'], end_loc['target'])
-        print 'model: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f' \
-              ', end_loc: %.1f' % (ramp_amp['model'], ramp_width['model'], peak_shift['model'], ratio['model'],
-                                   start_loc['model'], peak_loc['model'], end_loc['model'])
-    sys.stdout.flush()
-
-    if plot:
-        x_start = context.mean_induction_start_loc
-        x_end = context.mean_induction_stop_loc
-        ylim = max(np.max(target_ramp), np.max(model_ramp))
-        ymin = min(np.min(target_ramp), np.min(model_ramp))
-        fig, axes = plt.subplots(1)
-        axes.plot(ramp_x, target_ramp, label='Experiment', color='k')
-        axes.plot(ramp_x, model_ramp, label='Model (LSA)', color='c')
-        axes.hlines(ylim + 0.2, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
-        axes.set_xlabel('Location (cm)')
-        axes.set_ylabel('Ramp amplitude (mV)')
-        axes.set_xlim([0., context.track_length])
-        axes.set_ylim([math.floor(ymin), max(math.ceil(ylim), ylim + 0.4)])
-        axes.legend(loc='best', frameon=False, framealpha=0.5)
-        axes.set_title('Vm ramp')
-        clean_axes(axes)
-        fig.tight_layout()
-        ylim = np.max(delta_weights) + 1.
-        ymin = np.min(delta_weights) + 1.
-        fig1, axes1 = plt.subplots(1)
-        axes1.plot(context.peak_locs, force_delta_weights + 1., label='Target', c='k')
-        axes1.plot(context.peak_locs, SVD_delta_weights + 1., c='r', label='Model (SVD)')
-        axes1.plot(context.peak_locs, delta_weights + 1., c='c', label='Model (LSA)')
-        axes1.hlines(ylim + 0.2, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
-        axes1.set_xlabel('Location (cm)')
-        axes1.set_ylabel('Candidate synaptic weights (a.u.)')
-        axes1.set_xlim([0., context.track_length])
-        axes1.set_ylim([math.floor(ymin), max(math.ceil(ylim), ylim + 0.4)])
-        axes1.legend(loc='best', frameon=False, framealpha=0.5)
-        clean_axes(axes1)
-        fig1.tight_layout()
-        plt.show()
-        plt.close()
-
-    return target_ramp, force_delta_weights, model_ramp, delta_weights, ramp_scaling_factor
 
 
 if __name__ == '__main__':
