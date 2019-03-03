@@ -1,5 +1,5 @@
 __author__ = 'Aaron D. Milstein'
-from BTSP_utils import *
+from BTSP_utils_alt import *
 import click
 
 
@@ -26,6 +26,8 @@ context = Context()
 
 @click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True,))
 @click.option("--min-delta-weight", type=float, default=-0.2)
+@click.option("--target-field-width", type=float, default=90.)
+@click.option("--input-field-width", type=float, default=90.)
 @click.option("--data-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True),
               default='data')
 @click.option("--plot", type=int, default=1)
@@ -33,18 +35,18 @@ context = Context()
 @click.option("--export", is_flag=True)
 @click.option("--data-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
               default='data/20180411_BTSP2_CA1_data.hdf5')
-@click.option("--get-scale-factor", is_flag=True)
 @click.pass_context
-def main(cli, min_delta_weight, data_dir, plot, verbose, export, data_file_path, get_scale_factor):
+def main(cli, min_delta_weight, target_field_width, input_field_width, data_dir, plot, verbose, export, data_file_path):
     """
     :param cli: contains unrecognized args as list of str
     :param min_delta_weight: float
+    :param target_field_width: float
+    :param input_field_width: float
     :param data_dir: str
     :param plot: bool
     :param verbose: int
     :param export: bool
     :param data_file_path: str (path)
-    :param get_scale_factor: bool
     """
     context.update(locals())
     kwargs = get_unknown_click_arg_dict(cli.args)
@@ -52,98 +54,123 @@ def main(cli, min_delta_weight, data_dir, plot, verbose, export, data_file_path,
     init_context()
     prev_cell_id = None
     prev_allow_offset = False
-    if get_scale_factor:
-        target_ramp, force_delta_weights, model_ramp, delta_weights, ramp_scaling_factor = \
-            get_weights_LSA_scaling_factor(context, context.input_rate_maps, plot=context.plot, verbose=context.verbose)
-        context.update(locals())
-        print 'get_LSA_weights_BTSP_CA1: standard scale factor: %.3E' % ramp_scaling_factor
-    else:
-        for cell_id, induction in context.data_keys:
-            import_data(cell_id, induction)
-            LSA_ramp, delta_weights, ramp_offset = {}, {}, {}
-            if induction == 1:
-                if 'before' in context.exp_ramp:
-                    LSA_ramp['before'], delta_weights['before'], ramp_offset['before'] = \
-                        get_delta_weights_LSA(context.exp_ramp['before'], context.input_rate_maps,
-                                              bounds=(context.min_delta_weight, 3.), beta=2., plot=plot > 1,
-                                              verbose=verbose)
-                    if verbose > 0:
-                        print 'Process: %i; cell: %i: before induction: %i; ramp_offset: %.3f' % \
-                              (os.getpid(), context.cell_id, context.induction, ramp_offset['before'])
-                    prev_allow_offset = False
-                else:
-                    delta_weights['before'] = np.zeros_like(context.peak_locs)
-                    ramp_offset['before'] = 0.
-                    prev_allow_offset = True
-                LSA_ramp['after'], delta_weights['after'], ramp_offset['after'] = \
-                    get_delta_weights_LSA(context.exp_ramp['after'], context.input_rate_maps,
-                                          bounds=(context.min_delta_weight, 3.), beta=2., allow_offset=prev_allow_offset,
-                                          plot=plot > 1, verbose=verbose)
-                if verbose > 0:
-                    print 'Process: %i; cell: %i: after induction: %i; ramp_offset: %.3f' % \
-                          (os.getpid(), context.cell_id, context.induction, ramp_offset['after'])
-            else:
-                if prev_cell_id is None or prev_cell_id != cell_id:
-                    LSA_ramp['before'], delta_weights['before'], ramp_offset['before'] = \
-                        get_delta_weights_LSA(context.exp_ramp['before'], context.input_rate_maps,
-                                              bounds=(context.min_delta_weight, 3.), beta=2., plot=plot > 1,
-                                              allow_offset=True, verbose=verbose)
-                else:
-                    LSA_ramp['before'], delta_weights['before'], ramp_offset['before'] = \
-                        get_delta_weights_LSA(context.exp_ramp['before'], context.input_rate_maps,
-                                              bounds=(context.min_delta_weight, 3.), beta=2., plot=plot > 1,
-                                              allow_offset=prev_allow_offset, verbose=verbose)
+
+    for cell_id, induction in context.data_keys:
+        import_data(cell_id, induction)
+        LSA_ramp, delta_weights, ramp_offset = {}, {}, {}
+        if induction == 1:
+            if 'before' in context.exp_ramp:
+                LSA_ramp['before'], delta_weights['before'], ramp_offset['before'], discard_residual_score = \
+                    get_delta_weights_LSA(context.exp_ramp['before'], ramp_x=context.binned_x, input_x=context.binned_x,
+                                          interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
+                                          peak_locs=context.peak_locs, ramp_scaling_factor=context.ramp_scaling_factor,
+                                          induction_start_loc=context.mean_induction_start_loc,
+                                          induction_stop_loc=context.mean_induction_stop_loc,
+                                          track_length=context.track_length, target_range=context.target_range,
+                                          bounds=(context.min_delta_weight, 3.), beta=2., plot=plot > 1,
+                                          label='Cell: %i; Induction: %i' % (cell_id, induction),
+                                          verbose=verbose)
                 if verbose > 0:
                     print 'Process: %i; cell: %i: before induction: %i; ramp_offset: %.3f' % \
                           (os.getpid(), context.cell_id, context.induction, ramp_offset['before'])
-                LSA_ramp['after'], delta_weights['after'], ramp_offset['after'] = \
-                    get_delta_weights_LSA(context.exp_ramp['after'], context.input_rate_maps,
-                                          bounds=(context.min_delta_weight, 3.), beta=2., allow_offset=False,
-                                          impose_offset=ramp_offset['before'], plot=plot > 1, verbose=verbose)
-                if verbose > 0:
-                    print 'Process: %i; cell: %i: after induction: %i; ramp_offset: %.3f' % \
-                          (os.getpid(), context.cell_id, context.induction, ramp_offset['after'])
                 prev_allow_offset = False
-            prev_cell_id = cell_id
+            else:
+                delta_weights['before'] = np.zeros_like(context.peak_locs)
+                ramp_offset['before'] = 0.
+                prev_allow_offset = True
+            LSA_ramp['after'], delta_weights['after'], ramp_offset['after'], discard_residual_score = \
+                get_delta_weights_LSA(context.exp_ramp['after'], ramp_x=context.binned_x, input_x=context.binned_x,
+                                      interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
+                                      peak_locs=context.peak_locs, ramp_scaling_factor=context.ramp_scaling_factor,
+                                      induction_start_loc=context.mean_induction_start_loc,
+                                      induction_stop_loc=context.mean_induction_stop_loc,
+                                      track_length=context.track_length, target_range=context.target_range,
+                                      bounds=(context.min_delta_weight, 3.), beta=2., allow_offset=prev_allow_offset,
+                                      plot=plot > 1, label='Cell: %i; Induction: %i' % (cell_id, induction),
+                                      verbose=verbose)
 
-            if plot > 0:
-                fig, axes = plt.subplots(1, 2)
-                x_start = context.mean_induction_start_loc
-                x_end = context.mean_induction_stop_loc
-                max_ramp = max(np.max(LSA_ramp['after']), np.max(context.exp_ramp['after']),
-                               np.max(context.exp_ramp_raw['after']))
-                max_weights = np.max(delta_weights['after'])
-                axes[0].plot(context.binned_x, LSA_ramp['after'])
-                axes[1].plot(context.peak_locs, delta_weights['after'] + 1., label='After induction')
-                if 'before' in context.exp_ramp:
-                    axes[0].plot(context.binned_x, LSA_ramp['before'])
-                    axes[1].plot(context.peak_locs, delta_weights['before'] + 1., label='Before induction')
-                    max_weights = max(max_weights, np.max(delta_weights['before']))
-                max_weights += 1
-                axes[0].plot(context.binned_x, context.exp_ramp['after'])
-                axes[0].plot(context.binned_x, context.exp_ramp_raw['after'])
-                if 'before' in context.exp_ramp:
-                    axes[0].plot(context.binned_x, context.exp_ramp['before'])
-                    axes[0].plot(context.binned_x, context.exp_ramp_raw['before'])
-                    max_ramp = max(max_ramp, np.max(LSA_ramp['before']), np.max(context.exp_ramp['before']),
-                                   np.max(context.exp_ramp_raw['before']))
-                axes[0].hlines(max_ramp * 1.1, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
-                axes[1].hlines(max_weights * 1.1, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
-                axes[0].set_ylim(-1., max_ramp * 1.2)
-                axes[1].set_ylim(0.5, max_weights * 1.2)
-                axes[0].set_xlabel('Position (cm)')
-                axes[1].set_xlabel('Position (cm)')
-                axes[0].set_ylabel('Ramp amplitude (mV)')
-                axes[1].set_ylabel('Candidate synaptic weights (a.u.)')
-                axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-                fig.suptitle('Cell: %i, Induction: %i' % (context.cell_id, context.induction))
-                clean_axes(axes)
-                fig.tight_layout()
-                plt.show()
-                plt.close()
-            context.update(locals())
-            if export:
-                export_data()
+            if verbose > 0:
+                print 'Process: %i; cell: %i: after induction: %i; ramp_offset: %.3f' % \
+                      (os.getpid(), context.cell_id, context.induction, ramp_offset['after'])
+        else:
+            if prev_cell_id is None or prev_cell_id != cell_id:
+                LSA_ramp['before'], delta_weights['before'], ramp_offset['before'], discard_residual_score = \
+                    get_delta_weights_LSA(context.exp_ramp['before'], ramp_x=context.binned_x, input_x=context.binned_x,
+                                          interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
+                                          peak_locs=context.peak_locs, ramp_scaling_factor=context.ramp_scaling_factor,
+                                          induction_start_loc=context.mean_induction_start_loc,
+                                          induction_stop_loc=context.mean_induction_stop_loc,
+                                          track_length=context.track_length, target_range=context.target_range,
+                                          bounds=(context.min_delta_weight, 3.), beta=2.,
+                                          allow_offset=True, plot=plot > 1,
+                                          label='Cell: %i; Induction: %i' % (cell_id, induction), verbose=verbose)
+            else:
+                LSA_ramp['before'], delta_weights['before'], ramp_offset['before'], discard_residual_score = \
+                    get_delta_weights_LSA(context.exp_ramp['before'], ramp_x=context.binned_x, input_x=context.binned_x,
+                                          interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
+                                          peak_locs=context.peak_locs, ramp_scaling_factor=context.ramp_scaling_factor,
+                                          induction_start_loc=context.mean_induction_start_loc,
+                                          induction_stop_loc=context.mean_induction_stop_loc,
+                                          track_length=context.track_length, target_range=context.target_range,
+                                          bounds=(context.min_delta_weight, 3.), beta=2.,
+                                          allow_offset=prev_allow_offset, plot=plot > 1,
+                                          label='Cell: %i; Induction: %i' % (cell_id, induction), verbose=verbose)
+            if verbose > 0:
+                print 'Process: %i; cell: %i: before induction: %i; ramp_offset: %.3f' % \
+                      (os.getpid(), context.cell_id, context.induction, ramp_offset['before'])
+            LSA_ramp['after'], delta_weights['after'], ramp_offset['after'], discard_residual_score = \
+                get_delta_weights_LSA(context.exp_ramp['after'], ramp_x=context.binned_x, input_x=context.binned_x,
+                                      interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
+                                      peak_locs=context.peak_locs, ramp_scaling_factor=context.ramp_scaling_factor,
+                                      induction_start_loc=context.mean_induction_start_loc,
+                                      induction_stop_loc=context.mean_induction_stop_loc,
+                                      track_length=context.track_length, target_range=context.target_range,
+                                      bounds=(context.min_delta_weight, 3.), beta=2.,
+                                      allow_offset=False, impose_offset=ramp_offset['before'], plot=plot > 1,
+                                      label='Cell: %i; Induction: %i' % (cell_id, induction), verbose=verbose)
+            if verbose > 0:
+                print 'Process: %i; cell: %i: after induction: %i; ramp_offset: %.3f' % \
+                      (os.getpid(), context.cell_id, context.induction, ramp_offset['after'])
+            prev_allow_offset = False
+        prev_cell_id = cell_id
+
+        if plot > 0:
+            fig, axes = plt.subplots(1, 2)
+            x_start = context.mean_induction_start_loc
+            x_end = context.mean_induction_stop_loc
+            max_ramp = max(np.max(LSA_ramp['after']), np.max(context.exp_ramp['after']),
+                           np.max(context.exp_ramp_raw['after']))
+            max_weights = np.max(delta_weights['after'])
+            axes[0].plot(context.binned_x, LSA_ramp['after'])
+            axes[1].plot(context.peak_locs, delta_weights['after'] + 1., label='After induction')
+            if 'before' in context.exp_ramp:
+                axes[0].plot(context.binned_x, LSA_ramp['before'])
+                axes[1].plot(context.peak_locs, delta_weights['before'] + 1., label='Before induction')
+                max_weights = max(max_weights, np.max(delta_weights['before']))
+            max_weights += 1
+            axes[0].plot(context.binned_x, context.exp_ramp['after'])
+            axes[0].plot(context.binned_x, context.exp_ramp_raw['after'])
+            if 'before' in context.exp_ramp:
+                axes[0].plot(context.binned_x, context.exp_ramp['before'])
+                axes[0].plot(context.binned_x, context.exp_ramp_raw['before'])
+                max_ramp = max(max_ramp, np.max(LSA_ramp['before']), np.max(context.exp_ramp['before']),
+                               np.max(context.exp_ramp_raw['before']))
+            axes[0].hlines(max_ramp * 1.1, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
+            axes[1].hlines(max_weights * 1.1, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
+            axes[0].set_ylim(-1., max_ramp * 1.2)
+            axes[1].set_ylim(0.5, max_weights * 1.2)
+            axes[0].set_xlabel('Position (cm)')
+            axes[1].set_xlabel('Position (cm)')
+            axes[0].set_ylabel('Ramp amplitude (mV)')
+            axes[1].set_ylabel('Candidate synaptic weights (a.u.)')
+            axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+            axes[0].set_title('Cell: %i, Induction: %i' % (context.cell_id, context.induction))
+            clean_axes(axes)
+            fig.tight_layout()
+            fig.show()
+        context.update(locals())
+        if export:
+            export_data()
 
 
 def init_context():
@@ -152,9 +179,10 @@ def init_context():
     """
     if context.data_file_path is None or not os.path.isfile(context.data_file_path):
         raise IOError('init_context: invalid data_file_path: %s' % context.data_file_path)
+    context.target_range = {'ramp_offset': 0.01, 'delta_min_val': 0.01, 'delta_peak_val': 0.01, 'residuals': 0.1,
+                            'weights_smoothness': 0.01}
     with h5py.File(context.data_file_path, 'r') as f:
         dt = f['defaults'].attrs['dt']  # ms
-        input_field_width = f['defaults'].attrs['input_field_width']  # cm
         input_field_peak_rate = f['defaults'].attrs['input_field_peak_rate']  # Hz
         num_inputs = f['defaults'].attrs['num_inputs']
         track_length = f['defaults'].attrs['track_length']  # cm
@@ -163,15 +191,26 @@ def init_context():
         default_run_vel = f['defaults'].attrs['default_run_vel']  # cm/s
         generic_position_dt = f['defaults'].attrs['generic_position_dt']  # ms
         default_interp_dx = f['defaults'].attrs['default_interp_dx']  # cm
-        ramp_scaling_factor = f['defaults'].attrs['ramp_scaling_factor']
         binned_x = f['defaults']['binned_x'][:]
         generic_x = f['defaults']['generic_x'][:]
         generic_t = f['defaults']['generic_t'][:]
         default_interp_t = f['defaults']['default_interp_t'][:]
         default_interp_x = f['defaults']['default_interp_x'][:]
         extended_x = f['defaults']['extended_x'][:]
-        input_rate_maps = f['defaults']['input_rate_maps'][:]
-        peak_locs = f['defaults']['peak_locs'][:]
+        context.input_field_width = float(context.input_field_width)
+        input_rate_maps, peak_locs = \
+            generate_spatial_rate_maps(binned_x, num_inputs, input_field_peak_rate, context.input_field_width,
+                                       track_length)
+        ramp_scaling_factor = \
+            get_weights_LSA_scaling_factor(ramp_x=binned_x, input_x=binned_x, interp_x=default_interp_x,
+                                           input_rate_maps=input_rate_maps, peak_locs=peak_locs,
+                                           target_field_width=context.target_field_width, track_length=track_length,
+                                           target_range=context.target_range,
+                                           bounds=(context.min_delta_weight, 3.), plot=context.plot > 0,
+                                           verbose=context.verbose)[3]
+        if context.verbose > 1:
+            print 'optimize_BTSP_D_CA1: ramp_scaling_factor recomputed for %.1f cm field width: %.4E' % \
+                  (context.input_field_width, ramp_scaling_factor)
         if 'data_keys' not in context() or context.data_keys is None:
             if 'cell_id' not in context() or context.cell_id == 'all' or context.cell_id is None:
                     context.data_keys = \
@@ -184,11 +223,17 @@ def init_context():
                                  for cell_id in [cell_id for cell_id in context.data_keys if str(cell_id) in f['data']]
                                  for induction in f['data'][str(cell_id)]]
         spont_cell_id_list = [int(cell_id) for cell_id in f['data'] if f['data'][cell_id].attrs['spont']]
+        allow_offset_cell_ids = [int(cell_id) for cell_id in f['data'] if '2' in f['data'][cell_id] and
+                                 ('1' not in f['data'][cell_id] or
+                                  'before' not in f['data'][cell_id]['1']['raw']['exp_ramp'])]
+    if context.verbose > 1:
+        print 'pid: %i; get_LSA_weights_BTSP_CA1: processing the following data_keys: %s' % \
+              (os.getpid(), str(context.data_keys))
+    self_consistent_cell_ids = [cell_id for (cell_id, induction) in context.data_keys if induction == 1 and
+                                 (cell_id, 2) in context.data_keys]
     context.update(locals())
     context.cell_id = None
     context.induction = None
-    context.target_range = {'ramp_offset': 0.01, 'delta_min_val': 0.01, 'delta_peak_val': 0.01, 'residuals': 0.1,
-                            'weights_smoothness': 0.01}
 
 
 def import_data(cell_id, induction):
@@ -306,174 +351,6 @@ def export_data(export_file_path=None):
                                                  data=context.delta_weights['after'])
     if context.verbose > 0:
         print 'Exported data for cell: %i, induction: %i to %s' % (context.cell_id, context.induction, export_file_path)
-
-
-def get_residual_score(delta_weights, target_ramp, input_matrix, ramp_x, input_x, bounds=None, allow_offset=False,
-                       impose_offset=None, disp=False, full_output=False):
-    """
-
-    :param delta_weights: array
-    :param target_ramp: array
-    :param input_matrix: array
-    :param ramp_x: array
-    :param input_x: array
-    :param bounds: array
-    :param allow_offset: bool (allow special case where baseline Vm before 1st induction is unknown)
-    :param impose_offset: float (impose Vm offset from 1st induction on 2nd induction)
-    :param disp: bool
-    :param full_output: bool
-    :return: float
-    """
-    if bounds is not None:
-        min_weight, max_weight = bounds
-        if np.min(delta_weights) < min_weight or np.max(delta_weights) > max_weight:
-            if full_output:
-                raise Exception('get_residual_score: input out of bounds; cannot return full_output')
-            return 1e9
-    model_ramp = delta_weights.dot(input_matrix)
-    if len(model_ramp) != len(ramp_x):
-        model_ramp = np.interp(ramp_x, input_x, model_ramp)
-
-    Err = 0.
-    if impose_offset is not None:
-        ramp_offset = impose_offset
-        model_ramp -= impose_offset
-    elif allow_offset:
-        model_ramp, ramp_offset = subtract_baseline(model_ramp)
-        Err += (ramp_offset / context.target_range['ramp_offset']) ** 2.
-    else:
-        ramp_offset = 0.
-
-    ramp_amp, ramp_width, peak_shift, ratio, start_loc, peak_loc, end_loc, min_val, min_loc = {}, {}, {}, {}, {}, {}, \
-                                                                                              {}, {}, {}
-    ramp_amp['target'], ramp_width['target'], peak_shift['target'], ratio['target'], start_loc['target'], \
-    peak_loc['target'], end_loc['target'], min_val['target'], min_loc['target'] = \
-        calculate_ramp_features(ramp=target_ramp, induction_loc=context.mean_induction_start_loc,
-                                binned_x=context.binned_x, interp_x=context.default_interp_x,
-                                track_length=context.track_length)
-
-    ramp_amp['model'], ramp_width['model'], peak_shift['model'], ratio['model'], start_loc['model'], \
-    peak_loc['model'], end_loc['model'], min_val['model'], min_loc['model'] = \
-        calculate_ramp_features(ramp=model_ramp, induction_loc=context.mean_induction_start_loc,
-                                binned_x=context.binned_x, interp_x=context.default_interp_x,
-                                track_length=context.track_length)
-
-    if disp:
-        print 'exp: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f, ' \
-              'end_loc: %.1f, min_val: %.1f, min_loc: %.1f' % \
-              (ramp_amp['target'], ramp_width['target'], peak_shift['target'], ratio['target'], start_loc['target'],
-               peak_loc['target'], end_loc['target'], min_val['target'], min_loc['target'])
-        print 'model: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f' \
-              ', end_loc: %.1f, min_val: %.1f, min_loc: %.1f' % \
-              (ramp_amp['model'], ramp_width['model'], peak_shift['model'], ratio['model'], start_loc['model'],
-               peak_loc['model'], end_loc['model'], min_val['model'], min_loc['model'])
-    sys.stdout.flush()
-
-    start_index, peak_index, end_index, min_index = \
-        get_indexes_from_ramp_bounds_with_wrap(ramp_x, start_loc['target'], peak_loc['target'], end_loc['target'],
-                                               min_loc['target'])
-
-    model_val_at_target_min_loc = model_ramp[min_index]
-    Err += ((model_val_at_target_min_loc - min_val['target']) / context.target_range['delta_min_val']) ** 2.
-    model_val_at_target_peak_loc = model_ramp[peak_index]
-    Err += ((model_val_at_target_peak_loc - ramp_amp['target']) / context.target_range['delta_peak_val']) ** 2.
-
-    for i in xrange(len(target_ramp)):
-        Err += ((target_ramp[i] - model_ramp[i]) / context.target_range['residuals']) ** 2.
-    for delta in np.diff(np.insert(delta_weights, 0, delta_weights[-1])):
-        Err += (delta / context.target_range['weights_smoothness']) ** 2.
-
-    if full_output:
-        return model_ramp, delta_weights, ramp_offset
-    else:
-        return Err
-
-
-def get_delta_weights_LSA(target_ramp, input_rate_maps, initial_delta_weights=None, bounds=None, beta=2., ramp_x=None,
-                          input_x=None, allow_offset=False, impose_offset=None, plot=False, verbose=1):
-    """
-    Uses least square approximation to estimate a set of weights to match any arbitrary place field ramp, agnostic
-    about underlying kernel, induction velocity, etc.
-    :param target_ramp: dict of array
-    :param input_rate_maps: array; x=default_interp_x
-    :param initial_delta_weights: array
-    :param bounds: tuple of float
-    :param beta: float; regularization parameter
-    :param ramp_x: array (spatial resolution of ramp)
-    :param input_x: array (spatial resolution of input_rate_maps)
-    :param allow_offset: bool (allow special case where baseline Vm before 1st induction is unknown)
-    :param impose_offset: float (impose Vm offset from 1st induction on 2nd induction)
-    :param plot: bool
-    :param verbose: int
-    :return: tuple of array
-    """
-    if ramp_x is None:
-        ramp_x = context.binned_x
-    if input_x is None:
-        input_x = context.binned_x
-    if len(target_ramp) != len(input_x):
-        exp_ramp = np.interp(input_x, ramp_x, target_ramp)
-    else:
-        exp_ramp = np.array(target_ramp)
-
-    input_matrix = np.multiply(input_rate_maps, context.ramp_scaling_factor)
-    if initial_delta_weights is None:
-        [U, s, Vh] = np.linalg.svd(input_matrix)
-        V = Vh.T
-        D = np.zeros_like(input_matrix)
-        D[np.where(np.eye(*D.shape))] = s / (s ** 2. + beta ** 2.)
-        input_matrix_inv = V.dot(D.conj().T).dot(U.conj().T)
-        initial_delta_weights = exp_ramp.dot(input_matrix_inv)
-    initial_ramp = initial_delta_weights.dot(input_matrix)
-    if bounds is None:
-        bounds = (0., 3.)
-    result = minimize(get_residual_score, initial_delta_weights,
-                      args=(target_ramp, input_matrix, ramp_x, input_x, bounds, allow_offset, impose_offset),
-                      method='L-BFGS-B', bounds=[bounds] * len(initial_delta_weights),
-                      options={'disp': verbose > 1, 'maxiter': 100})
-
-    if verbose > 1:
-        print 'get_delta_weights_LSA: process: %i; cell: %i; induction: %i:' % \
-              (os.getpid(), context.cell_id, context.induction)
-    model_ramp, delta_weights, ramp_offset = \
-        get_residual_score(result.x, target_ramp, input_matrix, ramp_x, input_x, bounds, allow_offset,
-                                    impose_offset, disp=True, full_output=True)
-
-    if plot:
-        x_start = context.mean_induction_start_loc
-        x_end = context.mean_induction_stop_loc
-        ylim = max(np.max(target_ramp), np.max(model_ramp))
-        ymin = min(np.min(target_ramp), np.min(model_ramp))
-        fig, axes = plt.subplots(1)
-        axes.plot(ramp_x, target_ramp, label='Experiment', color='k')
-        axes.plot(ramp_x, initial_ramp, label='Model (Initial)', color='r')
-        axes.plot(ramp_x, model_ramp, label='Model (LSA)', color='c')
-        axes.hlines(ylim + 0.2, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
-        axes.set_xlabel('Location (cm)')
-        axes.set_ylabel('Ramp amplitude (mV)')
-        axes.set_xlim([0., context.track_length])
-        axes.set_ylim([math.floor(ymin), max(math.ceil(ylim), ylim + 0.4)])
-        axes.legend(loc='best', frameon=False, framealpha=0.5)
-        axes.set_title('Vm ramp')
-        clean_axes(axes)
-        fig.tight_layout()
-        ylim = np.max(delta_weights) + 1.
-        ymin = np.min(delta_weights) + 1.
-        fig1, axes1 = plt.subplots(1)
-        axes1.plot(context.peak_locs, initial_delta_weights + 1., c='r', label='Model (Initial)')
-        axes1.plot(context.peak_locs, delta_weights + 1., c='c', label='Model (LSA)')
-        axes1.hlines(ylim + 0.2, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
-        axes1.set_xlabel('Location (cm)')
-        axes1.set_ylabel('Candidate synaptic weights (a.u.)')
-        axes1.set_xlim([0., context.track_length])
-        axes1.set_ylim([math.floor(ymin), max(math.ceil(ylim), ylim + 0.4)])
-        axes1.legend(loc='best', frameon=False, framealpha=0.5)
-        clean_axes(axes1)
-        fig1.tight_layout()
-        plt.show()
-        plt.close()
-
-    return model_ramp, delta_weights, ramp_offset
 
 
 if __name__ == '__main__':

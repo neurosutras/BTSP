@@ -42,7 +42,7 @@ BTSP_D vs. orig BTSP: De-potentiation is restricted to a single sigmoid. Weights
 per time step. Relaxed constraints on sigmoid slope compared to original version.
 """
 __author__ = 'milsteina'
-from BTSP_utils import *
+from BTSP_utils_alt import *
 from nested.optimize_utils import *
 import click
 
@@ -80,16 +80,28 @@ def init_context():
         default_interp_t = f['defaults']['default_interp_t'][:]
         default_interp_x = f['defaults']['default_interp_x'][:]
         extended_x = f['defaults']['extended_x'][:]
-        if 'input_field_width' not in context():
+        if 'input_field_width' not in context():  # or context.input_field_width == f['defaults'].attrs['input_field_width']:
             input_field_width = f['defaults'].attrs['input_field_width']  # cm
             input_rate_maps = f['defaults']['input_rate_maps'][:]
             peak_locs = f['defaults']['peak_locs'][:]
             ramp_scaling_factor = f['defaults'].attrs['ramp_scaling_factor']
             re_compute_LSA = False
         else:
+            context.input_field_width = float(context.input_field_width)
             input_rate_maps, peak_locs = \
                 generate_spatial_rate_maps(binned_x, num_inputs, input_field_peak_rate, context.input_field_width,
                                            track_length)
+            ramp_scaling_factor = \
+                get_weights_LSA_scaling_factor(ramp_x=binned_x, input_x=binned_x, interp_x=default_interp_x,
+                                               input_rate_maps=input_rate_maps, peak_locs=peak_locs,
+                                               target_field_width=90., track_length=track_length,
+                                               target_range=context.target_range,
+                                               bounds=(context.min_delta_weight, 3.), plot=context.plot,
+                                               verbose=context.verbose)[3]
+            if context.verbose > 1:
+                print 'optimize_BTSP_D_CA1: ramp_scaling_factor recomputed for %.1f cm field width: %.4E' % \
+                      (context.input_field_width, ramp_scaling_factor)
+            re_compute_LSA = True
         if 'data_keys' not in context() or context.data_keys is None:
             if 'cell_id' not in context() or context.cell_id == 'all' or context.cell_id is None:
                     context.data_keys = \
@@ -660,140 +672,6 @@ def filter_features_signal_amplitudes(primitives, current_features, export=False
     return signal_amplitude_features
 
 
-def get_model_ramp(delta_weights, input_x=None, ramp_x=None, allow_offset=False, impose_offset=None, plot=False):
-    """
-
-    :param delta_weights: array
-    :param input_x: array (x resolution of inputs)
-    :param ramp_x: array (x resolution of ramp)
-    :param allow_offset: bool (allow special case where baseline Vm before 1st induction is unknown)
-    :param impose_offset: float (impose Vm offset from 1st induction on 2nd induction)
-    :param plot: bool
-    :return: array
-    """
-    if input_x is None:
-        input_x = context.binned_x
-    if ramp_x is None:
-        ramp_x = context.binned_x
-    model_ramp = np.multiply(delta_weights.dot(context.input_rate_maps), context.ramp_scaling_factor)
-    if len(model_ramp) != len(ramp_x):
-        model_ramp = np.interp(ramp_x, input_x, model_ramp)
-
-    if impose_offset is not None:
-        ramp_offset = impose_offset
-        model_ramp -= impose_offset
-    elif allow_offset:
-        model_ramp, ramp_offset = subtract_baseline(model_ramp)
-    else:
-        ramp_offset = 0.
-
-    if plot:
-        fig, axes = plt.subplots(1)
-        max_ramp = max(np.max(model_ramp), np.max(context.exp_ramp['after']))
-        axes.hlines(max_ramp * 1.2,
-                       xmin=context.mean_induction_start_loc,
-                       xmax=context.mean_induction_stop_loc, linewidth=2)
-        axes.plot(context.binned_x, context.exp_ramp['after'], label='Experiment')
-        axes.plot(context.binned_x, model_ramp, label='Model')
-        axes.set_ylim(-0.5, max_ramp * 1.4)
-        axes.set_xlabel('Location (cm)')
-        axes.set_ylabel('Ramp amplitude (mV)')
-        axes.set_title('Cell_id: %i, Induction: %i' % (context.cell_id, context.induction))
-        clean_axes(axes)
-        fig.tight_layout()
-        plt.show()
-        plt.close()
-
-    return model_ramp, ramp_offset
-
-
-def get_delta_weights_LSA(target_ramp, input_rate_maps, initial_delta_weights=None, bounds=None, beta=2., ramp_x=None,
-                          input_x=None, allow_offset=False, impose_offset=None, plot=False, verbose=1):
-    """
-    Uses least square approximation to estimate a set of weights to match any arbitrary place field ramp, agnostic
-    about underlying kernel, induction velocity, etc.
-    :param target_ramp: dict of array
-    :param input_rate_maps: array; x=default_interp_x
-    :param initial_delta_weights: array
-    :param bounds: tuple of float
-    :param beta: float; regularization parameter
-    :param ramp_x: array (spatial resolution of ramp)
-    :param input_x: array (spatial resolution of input_rate_maps)
-    :param allow_offset: bool (allow special case where baseline Vm before 1st induction is unknown)
-    :param impose_offset: float (impose Vm offset from 1st induction on 2nd induction)
-    :param plot: bool
-    :param verbose: int
-    :return: tuple of array
-    """
-    if ramp_x is None:
-        ramp_x = context.binned_x
-    if input_x is None:
-        input_x = context.binned_x
-    if len(target_ramp) != len(input_x):
-        exp_ramp = np.interp(input_x, ramp_x, target_ramp)
-    else:
-        exp_ramp = np.array(target_ramp)
-
-    input_matrix = np.multiply(input_rate_maps, context.ramp_scaling_factor)
-    if initial_delta_weights is None:
-        [U, s, Vh] = np.linalg.svd(input_matrix)
-        V = Vh.T
-        D = np.zeros_like(input_matrix)
-        D[np.where(np.eye(*D.shape))] = s / (s ** 2. + beta ** 2.)
-        input_matrix_inv = V.dot(D.conj().T).dot(U.conj().T)
-        initial_delta_weights = exp_ramp.dot(input_matrix_inv)
-    initial_ramp = initial_delta_weights.dot(input_matrix)
-    if bounds is None:
-        bounds = (0., 3.)
-    result = minimize(get_residual_score, initial_delta_weights,
-                      args=(target_ramp, input_x, ramp_x, bounds, allow_offset, impose_offset),
-                      method='L-BFGS-B', bounds=[bounds] * len(initial_delta_weights),
-                      options={'disp': verbose > 1, 'maxiter': 100})
-
-    if verbose > 1:
-        print 'get_delta_weights_LSA: process: %i; cell: %i; induction: %i:' % \
-              (os.getpid(), context.cell_id, context.induction)
-    model_ramp, delta_weights, ramp_offset, residual_score = \
-        get_residual_score(result.x, target_ramp, input_x, ramp_x, bounds, allow_offset, impose_offset,
-                           disp=verbose > 1, full_output=True)
-
-    if plot:
-        x_start = context.mean_induction_start_loc
-        x_end = context.mean_induction_stop_loc
-        ylim = max(np.max(target_ramp), np.max(model_ramp))
-        ymin = min(np.min(target_ramp), np.min(model_ramp))
-        fig, axes = plt.subplots(1)
-        axes.plot(ramp_x, target_ramp, label='Experiment', color='k')
-        axes.plot(ramp_x, initial_ramp, label='Model (Initial)', color='r')
-        axes.plot(ramp_x, model_ramp, label='Model (LSA)', color='c')
-        axes.hlines(ylim + 0.2, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
-        axes.set_xlabel('Location (cm)')
-        axes.set_ylabel('Ramp amplitude (mV)')
-        axes.set_xlim([0., context.track_length])
-        axes.set_ylim([math.floor(ymin), max(math.ceil(ylim), ylim + 0.4)])
-        axes.legend(loc='best', frameon=False, framealpha=0.5)
-        axes.set_title('Vm ramp')
-        clean_axes(axes)
-        fig.tight_layout()
-        ylim = np.max(delta_weights) + 1.
-        ymin = np.min(delta_weights) + 1.
-        fig1, axes1 = plt.subplots(1)
-        axes1.plot(context.peak_locs, initial_delta_weights + 1., c='r', label='Model (Initial)')
-        axes1.plot(context.peak_locs, delta_weights + 1., c='c', label='Model (LSA)')
-        axes1.hlines(ylim + 0.2, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
-        axes1.set_xlabel('Location (cm)')
-        axes1.set_ylabel('Candidate synaptic weights (a.u.)')
-        axes1.set_xlim([0., context.track_length])
-        axes1.set_ylim([math.floor(ymin), max(math.ceil(ylim), ylim + 0.4)])
-        axes1.legend(loc='best', frameon=False, framealpha=0.5)
-        clean_axes(axes1)
-        fig1.tight_layout()
-        plt.show()
-        plt.close()
-
-    return model_ramp, delta_weights, ramp_offset, residual_score
-
-
 def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export=False, plot=False):
     """
 
@@ -841,10 +719,14 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             if not np.all((context.min_delta_weight <= initial_delta_weights) &
                           (initial_delta_weights <= context.peak_delta_weight)):
                 initial_ramp, initial_delta_weights, initial_ramp_offset, discard_residual_score = \
-                    get_delta_weights_LSA(context.exp_ramp['before'], context.input_rate_maps,
-                                          initial_delta_weights=initial_delta_weights,
+                    get_delta_weights_LSA(context.exp_ramp['before'], ramp_x=context.binned_x, input_x=context.binned_x,
+                                          interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
+                                          peak_locs=context.peak_locs, ramp_scaling_factor=context.ramp_scaling_factor,
+                                          induction_start_loc=context.mean_induction_start_loc,
+                                          induction_stop_loc=context.mean_induction_stop_loc,
+                                          track_length=context.track_length, target_range=context.target_range,
                                           bounds=(context.min_delta_weight, context.peak_delta_weight),
-                                          verbose=context.verbose)
+                                          initial_delta_weights=initial_delta_weights, verbose=context.verbose)
                 if context.verbose > 1:
                     print 'Process: %i; re-computed initial weights: cell_id: %i, before induction: %i,' \
                           ' ramp_offset: %.3f' % (os.getpid(), context.cell_id, context.induction, initial_ramp_offset)
@@ -852,7 +734,9 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
                 initial_ramp = context.LSA_ramp['before']
             initial_ramp_offset = None
         else:
-            initial_ramp, discard_ramp_offset = get_model_ramp(initial_delta_weights)
+            initial_ramp, discard_ramp_offset = \
+                get_model_ramp(initial_delta_weights, ramp_x=context.binned_x, input_x=context.binned_x,
+                           input_rate_maps=context.input_rate_maps, ramp_scaling_factor=context.ramp_scaling_factor)
             initial_ramp_offset = context.LSA_ramp_offset['after']
     else:
         if context.cell_id in context.allow_offset_cell_ids:
@@ -860,10 +744,15 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
         if not np.all((context.min_delta_weight <= initial_delta_weights) &
                       (initial_delta_weights <= context.peak_delta_weight)):
             initial_ramp, initial_delta_weights, initial_ramp_offset, discard_residual_score = \
-                get_delta_weights_LSA(context.exp_ramp['before'], context.input_rate_maps,
-                                      initial_delta_weights=initial_delta_weights,
+                get_delta_weights_LSA(context.exp_ramp['before'], ramp_x=context.binned_x, input_x=context.binned_x,
+                                      interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
+                                      peak_locs=context.peak_locs, ramp_scaling_factor=context.ramp_scaling_factor,
+                                      induction_start_loc=context.mean_induction_start_loc,
+                                      induction_stop_loc=context.mean_induction_stop_loc,
+                                      track_length=context.track_length, target_range=context.target_range,
                                       bounds=(context.min_delta_weight, context.peak_delta_weight),
-                                      allow_offset=allow_offset, verbose=context.verbose)
+                                      initial_delta_weights=initial_delta_weights, allow_offset=allow_offset,
+                                      verbose=context.verbose)
             if context.verbose > 1:
                 print 'Process: %i; re-computed initial weights: cell_id: %i, before induction: %i, ' \
                       'ramp_offset: %.3f' % (os.getpid(), context.cell_id, context.induction, initial_ramp_offset)
@@ -927,8 +816,11 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
         current_weights = np.array(next_weights)
         current_delta_weights = np.subtract(np.multiply(current_weights, peak_weight), 1.)
         delta_weights_snapshots.append(current_delta_weights)
-        current_ramp, discard_ramp_offset = get_model_ramp(current_delta_weights, allow_offset=allow_offset,
-                                                           impose_offset=initial_ramp_offset)
+        current_ramp, discard_ramp_offset = \
+            get_model_ramp(current_delta_weights, ramp_x=context.binned_x, input_x=context.binned_x,
+                           input_rate_maps=context.input_rate_maps, ramp_scaling_factor=context.ramp_scaling_factor,
+                           allow_offset=allow_offset, impose_offset=initial_ramp_offset)
+
         if plot:
             axes2[0].plot(context.binned_x, current_ramp)
         ramp_snapshots.append(current_ramp)
@@ -973,8 +865,13 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             allow_offset = True
 
     model_ramp, discard_delta_weights, model_ramp_offset, model_residual_score = \
-        get_residual_score(current_delta_weights, target_ramp, allow_offset=allow_offset,
+        get_residual_score(current_delta_weights, target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
+                           interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
+                           ramp_scaling_factor=context.ramp_scaling_factor,
+                           induction_loc=context.mean_induction_start_loc, track_length=context.track_length,
+                           target_range=context.target_range, allow_offset=allow_offset,
                            impose_offset=initial_ramp_offset, full_output=True)
+
     if allow_offset and context.induction == 1:
         initial_ramp, discard_ramp_offset = subtract_baseline(initial_ramp, model_ramp_offset)
     
@@ -986,18 +883,27 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
         if not np.all((context.min_delta_weight <= LSA_delta_weights) &
                       (LSA_delta_weights <= context.peak_delta_weight)):
             LSA_ramp, LSA_delta_weights, LSA_ramp_offset, LSA_residual_score = \
-                get_delta_weights_LSA(context.exp_ramp['after'], context.input_rate_maps,
-                                      initial_delta_weights=LSA_delta_weights,
+                get_delta_weights_LSA(context.exp_ramp['after'], ramp_x=context.binned_x, input_x=context.binned_x,
+                                      interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
+                                      peak_locs=context.peak_locs, ramp_scaling_factor=context.ramp_scaling_factor,
+                                      induction_start_loc=context.mean_induction_start_loc,
+                                      induction_stop_loc=context.mean_induction_stop_loc,
+                                      track_length=context.track_length, target_range=context.target_range,
                                       bounds=(context.min_delta_weight, context.peak_delta_weight),
-                                      allow_offset=allow_offset, impose_offset=initial_ramp_offset,
-                                      verbose=context.verbose)
+                                      initial_delta_weights=LSA_delta_weights, allow_offset=allow_offset,
+                                      impose_offset=initial_ramp_offset, verbose=context.verbose)
             if context.verbose > 1:
                 print 'Process: %i; re-computed LSA weights: cell_id: %i, after induction: %i, ramp_offset: %.3f' % \
                       (os.getpid(), context.cell_id, context.induction, LSA_ramp_offset)
         else:
             LSA_ramp, LSA_delta_weights, LSA_ramp_offset, LSA_residual_score = \
-                get_residual_score(LSA_delta_weights, target_ramp, allow_offset=allow_offset,
+                get_residual_score(LSA_delta_weights, target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
+                                   interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
+                                   ramp_scaling_factor=context.ramp_scaling_factor,
+                                   induction_loc=context.mean_induction_start_loc, track_length=context.track_length,
+                                   target_range=context.target_range, allow_offset=allow_offset,
                                    impose_offset=initial_ramp_offset, full_output=True)
+
         result['self_consistent_delta_residual_score'] = max(0., model_residual_score - LSA_residual_score)
     else:
         LSA_ramp = None
@@ -1100,6 +1006,8 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
                 group.create_dataset('binned_x', compression='gzip', data=context.binned_x)
                 group.create_dataset('signal_xrange', compression='gzip', data=signal_xrange)
                 group.create_dataset('param_names', compression='gzip', data=context.param_names)
+                group.attrs['input_field_width'] = context.input_field_width
+                group.attrs['ramp_scaling_factor'] = context.ramp_scaling_factor
             exported_data_key = 'exported_data'
             if exported_data_key not in f:
                 f.create_group(exported_data_key)
