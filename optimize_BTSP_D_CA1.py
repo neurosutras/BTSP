@@ -1114,6 +1114,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
         global_filter_t = group['global_filter_t'][:]
         global_filter = group['global_filter'][:]
         initial_weights = group['initial_weights'][:]
+        initial_exp_ramp = group['initial_exp_ramp'][:]
         initial_ramp = group['initial_model_ramp'][:]
         target_ramp = group['target_ramp'][:]
         model_ramp = group['model_ramp'][:]
@@ -1176,7 +1177,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
 
     import matplotlib as mpl
     mpl.rcParams['svg.fonttype'] = 'none'
-    mpl.rcParams['font.size'] = 11.
+    mpl.rcParams['font.size'] = 12.
     mpl.rcParams['font.sans-serif'] = 'Arial'
     mpl.rcParams['text.usetex'] = False
     mpl.rcParams['axes.titlepad'] = 2.
@@ -1239,7 +1240,6 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     this_axis.set_xlim(0., 1.)
     this_axis.set_title('State transition rates', fontsize=mpl.rcParams['font.size'])
     this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-
     clean_axes(axes)
 
     colors = ['r', 'c']
@@ -1339,22 +1339,6 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     clean_axes(axes2)
     fig.show()
 
-    fig, axes = plt.subplots()
-    cmap = cm.jet
-    for w in np.linspace(0., 1., 10):
-        net_delta_weight = pot_rate(signal_xrange) * pot_scale * (1. - w) - depot_rate(signal_xrange) * depot_scale * w
-        axes.plot(signal_xrange, net_delta_weight, c=cmap(w))
-    axes.set_xlabel('Normalized eligibility signal')
-    axes.set_ylabel('Net change in synaptic weight')
-    axes.set_title('Sigmoidal q$_{+}$, sigmoidal q$_{-}$')
-    sm = cm.ScalarMappable(cmap=cmap)
-    sm.set_array([])
-    cbar = fig.colorbar(sm)
-    cbar.set_label('Initial synaptic weight', rotation=270., labelpad=15.)
-    clean_axes(axes)
-    fig.tight_layout()
-    fig.show()
-
     fig2, axes2 = plt.subplots(1, 2, sharex=True)
     fig2.suptitle('Induction: %i' % context.induction)
     axes2[0].plot(context.binned_x, ramp_snapshots[0], c='k', label='Before')
@@ -1372,26 +1356,80 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     fig2.tight_layout()
     fig2.show()
 
+
+    # New figures
+
+    fig, axes = plt.subplots(2, 3, figsize=(12., 6.5))
+    xmax = max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.
+    xmax = math.ceil(xmax)
+    axes[0][0].plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='darkgray',
+                   label='Synaptic\neligibility signal')
+    axes[0][0].plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
+                   label='Dendritic\ngating signal')
+    axes[0][0].set_xlabel('Time (s)')
+    axes[0][0].set_ylabel('Normalized amplitude')
+    axes[0][0].set_xlim(-0.5, xmax)
+    axes[0][0].set_title('Plasticity signal kinetics', fontsize=mpl.rcParams['font.size'], pad=10.)
+    axes[0][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
+    axes[0][0].set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
+
+    axes[0][1].set_xlabel('Normalized voltage')
+    axes[0][1].set_ylabel('Normalized rate')
+    axes[0][1].set_title('Sigmoidal q$_{+}$, sigmoidal q$_{-}$', fontsize=mpl.rcParams['font.size'], pad=10.)
+    axes[0][1].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='q$_{+}$ (Potentiation)')
+    axes[0][1].plot(signal_xrange, depot_rate(signal_xrange), c='r', label='q$_{-}$ (De-potentiation)')
+    axes[0][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
+
+    cmap = cm.jet
+    for w in np.linspace(0., 1., 10):
+        net_delta_weight = pot_rate(signal_xrange) * pot_scale * (1. - w) - depot_rate(signal_xrange) * depot_scale * w
+        axes[0][2].plot(signal_xrange, net_delta_weight, c=cmap(w))
+    axes[0][2].axhline(y=0., linestyle='--', c='grey')
+    axes[0][2].set_xlabel('Normalized eligibility signal')
+    axes[0][2].set_ylabel('Normalized rate')
+    axes[0][2].set_title('Net rate of change in synaptic weight', fontsize=mpl.rcParams['font.size'], pad=10.)
+    sm = cm.ScalarMappable(cmap=cmap)
+    sm.set_array([])
+    cbar = fig.colorbar(sm, ax=axes[0][2])
+    cbar.set_label('Initial synaptic weight\n(normalized)', rotation=270., labelpad=25.)
+
     bar_loc = max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.) * 0.95
-    fig, axes = plt.subplots(2)
     delta_weights = np.subtract(final_weights, initial_weights)
     peak_weight = np.max(np.abs(delta_weights))
-    axes[1].plot(context.peak_locs, delta_weights)
-    axes[1].hlines(peak_weight * 1.05, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
-    axes[0].plot(context.binned_x, target_ramp, label='Experiment')
-    axes[0].plot(context.binned_x, model_ramp, label='Model')
-    axes[0].hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
-    axes[1].set_ylabel('Change in\nsynaptic weight')
-    axes[1].set_xlabel('Location (cm)')
-    axes[0].set_ylabel('Subthreshold\ndepolarization (mV)')
-    axes[0].set_xlabel('Location (cm)')
-    axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-    axes[0].set_ylim([min(-1., np.min(model_ramp) - 1., np.min(target_ramp) - 1.),
+    axes[1][2].plot(context.peak_locs, delta_weights, c='k')
+    axes[1][2].axhline(y=0., linestyle='--', c='grey')
+    axes[1][2].hlines(peak_weight * 1.05, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
+    axes[1][1].plot(context.binned_x, initial_ramp, label='Before', c='k')
+    axes[1][1].plot(context.binned_x, model_ramp, label='After', c='c')
+    axes[1][1].hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
+    axes[1][2].set_ylabel('Change in\nsynaptic weight')
+    axes[1][2].set_xlabel('Location (cm)')
+    axes[1][1].set_ylabel('Ramp amplitude (mV)')
+    axes[1][1].set_xlabel('Location (cm)')
+    axes[1][1].set_xticks(np.arange(0., context.track_length, 45.))
+    axes[1][2].set_xticks(np.arange(0., context.track_length, 45.))
+    axes[1][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+    axes[1][1].set_ylim([min(-1., np.min(model_ramp) - 1., np.min(target_ramp) - 1.),
                       max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.)])
-    axes[1].set_ylim([-peak_weight, peak_weight * 1.1])
+    axes[1][2].set_ylim([-peak_weight, peak_weight * 1.1])
+    axes[1][1].set_title('Bistable synapse model', fontsize=mpl.rcParams['font.size'], pad=10.)
+
+    axes[1][0].plot(context.binned_x, initial_exp_ramp, label='Before', c='k')
+    axes[1][0].plot(context.binned_x, target_ramp, label='After', c='c')
+    axes[1][0].hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
+    axes[1][0].set_ylabel('Ramp amplitude (mV)')
+    axes[1][0].set_xlabel('Location (cm)')
+    axes[1][0].set_xticks(np.arange(0., context.track_length, 45.))
+    axes[1][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+    axes[1][0].set_ylim([min(-1., np.min(model_ramp) - 1., np.min(target_ramp) - 1.),
+                         max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.)])
+    axes[1][0].set_title('Experimental data', fontsize=mpl.rcParams['font.size'], pad=10.)
+
     clean_axes(axes)
-    fig.suptitle('Cell_id: %i, Induction: %i' % (cell_id, 2))
+    fig.suptitle('Bistable synapse model; cell: %i, induction: %i' % (cell_id, 2),
+                 fontsize=mpl.rcParams['font.size'], x=0.02, ha='left')
     fig.tight_layout()
+    plt.subplots_adjust(hspace=0.5, wspace=0.65, top=0.9)
     fig.show()
 
     context.update(locals())
