@@ -26,27 +26,30 @@ context = Context()
 
 @click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True,))
 @click.option("--min-delta-weight", type=float, default=-0.2)
-@click.option("--target-field-width", type=float, default=90.)
+@click.option("--target-weights-width", type=float, default=108.)
 @click.option("--input-field-width", type=float, default=90.)
 @click.option("--data-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True),
               default='data')
+@click.option("--data-file-name", type=click.Path(exists=True, file_okay=True, dir_okay=False),
+              default='data/20180411_BTSP2_CA1_data.hdf5')
+@click.option("--export-file-name", type=str, default=None)
 @click.option("--plot", type=int, default=1)
 @click.option("--verbose", type=int, default=1)
 @click.option("--export", is_flag=True)
-@click.option("--data-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='data/20180411_BTSP2_CA1_data.hdf5')
 @click.pass_context
-def main(cli, min_delta_weight, target_field_width, input_field_width, data_dir, plot, verbose, export, data_file_path):
+def main(cli, min_delta_weight, target_weights_width, input_field_width, data_dir, data_file_name, export_file_name,
+         plot, verbose, export):
     """
     :param cli: contains unrecognized args as list of str
     :param min_delta_weight: float
-    :param target_field_width: float
+    :param target_weights_width: float
     :param input_field_width: float
-    :param data_dir: str
+    :param data_dir: str (path)
+    :param data_file_name: str (path)
+    :param export_file_name: str (path)
     :param plot: bool
     :param verbose: int
     :param export: bool
-    :param data_file_path: str (path)
     """
     context.update(locals())
     kwargs = get_unknown_click_arg_dict(cli.args)

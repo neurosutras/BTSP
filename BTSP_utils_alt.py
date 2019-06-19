@@ -698,39 +698,45 @@ def get_adjusted_delta_weights_and_ramp_scaling_factor(delta_weights, input_rate
     return adjusted_delta_weights, ramp_scaling_factor
 
 
-def get_weights_LSA_scaling_factor(ramp_x, input_x, interp_x, input_rate_maps, peak_locs, target_field_width,
-                                   track_length, target_range, bounds, beta=2., plot=False, verbose=1):
+def get_initial_target_ramp_and_scaling_factor(ramp_x, input_x, interp_x, num_inputs, input_field_peak_rate,
+                                               input_field_width, track_length, target_weights_width=108.,
+                                               target_peak_delta_weight=1.5, target_peak_ramp_amp=6., plot=False,
+                                               verbose=1):
     """
-    Reality check for the least square approximation method to estimate weights. Used to calibrate ramp_scaling_factor.
-    Forces weights to a truncated cosine with field_width = 1.2 * input_field_width and ramp_peak = 6 mV.
+
     :param ramp_x: array (spatial resolution of ramp)
     :param input_x: array (spatial resolution of input_rate_maps)
     :param interp_x: array (spatial resolution for computing fine features)
-    :param input_rate_maps: array
-    :param peak_locs: array
-    :param target_field_width: float
+    :param num_inputs: int
+    :param input_field_peak_rate: float
+    :param input_field_width: float
     :param track_length: float
-    :param target_range: dict
-    :param bounds: tuple of float
-    :param beta: float; regularization parameter
+    :param target_weights_width: float  (legacy target ramp width is 108 cm (90 * 1.2), to produce a firing field of width 90)
+    :param target_peak_delta_weight: float
+    :param target_peak_ramp_amp: float (mV)
     :param plot: bool
-    :param verbose: int
-    :return: tuple of array
+    :param verbose: bool
+    :return: tuple (array, float)
     """
+    input_rate_maps, peak_locs = \
+        generate_spatial_rate_maps(input_x, num_inputs, input_field_peak_rate, input_field_width, track_length)
     modulated_field_center = track_length * 0.5
     induction_start_loc = modulated_field_center + 10.
     induction_stop_loc = induction_start_loc + 5.
-    peak_delta_weight = 1.5
-    peak_ramp_amp = 6.  # mV
-    ramp_tuning_amp = peak_ramp_amp / 2.
-    ramp_tuning_offset = ramp_tuning_amp
-    target_ramp = ramp_tuning_amp * \
-                  np.cos(2. * np.pi / (target_field_width * 1.2) * (ramp_x - modulated_field_center)) + \
-                  ramp_tuning_offset
-    left = np.where(ramp_x >= modulated_field_center - target_field_width * 1.2 / 2.)[0][0]
-    right = np.where(ramp_x > modulated_field_center + target_field_width * 1.2 / 2.)[0][0]
-    target_ramp[:left] = 0.
-    target_ramp[right:] = 0.
+    tuning_amp = target_peak_delta_weight / 2.
+    tuning_offset = tuning_amp
+    force_delta_weights = tuning_amp * np.cos(2. * np.pi / target_weights_width * (peak_locs - modulated_field_center)) + \
+                          tuning_offset
+    left = np.where(peak_locs >= modulated_field_center - target_weights_width / 2.)[0][0]
+    right = np.where(peak_locs > modulated_field_center + target_weights_width / 2.)[0][0]
+    force_delta_weights[:left] = 0.
+    force_delta_weights[right:] = 0.
+    target_ramp = force_delta_weights.dot(input_rate_maps)
+    ramp_scaling_factor = target_peak_ramp_amp / np.max(target_ramp)
+    input_matrix = np.multiply(input_rate_maps, ramp_scaling_factor)
+    target_ramp = force_delta_weights.dot(input_matrix)
+    if len(target_ramp) != len(ramp_x):
+        target_ramp = np.interp(ramp_x, input_x, target_ramp)
 
     ramp_amp, ramp_width, peak_shift, ratio, start_loc, peak_loc, end_loc, min_val, min_loc = \
         {}, {}, {}, {}, {}, {}, {}, {}, {}
@@ -738,19 +744,77 @@ def get_weights_LSA_scaling_factor(ramp_x, input_x, interp_x, input_rate_maps, p
     peak_loc['target'], end_loc['target'], min_val['target'], min_loc['target'] = \
         calculate_ramp_features(ramp=target_ramp, induction_loc=induction_start_loc, binned_x=ramp_x,
                                 interp_x=interp_x, track_length=track_length)
+    if verbose > 1:
+        print 'target: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, ' \
+              'peak_loc: %.1f, end_loc: %.1f' % (ramp_amp['target'], ramp_width['target'], peak_shift['target'],
+                                                 ratio['target'], start_loc['target'], peak_loc['target'],
+                                                 end_loc['target'])
+    if plot:
+        x_start = induction_start_loc
+        x_end = induction_stop_loc
+        ylim = np.max(target_ramp)
+        ymin = np.min(target_ramp)
+        fig, axes = plt.subplots(1, 2)
+        axes[0].plot(ramp_x, target_ramp, color='k')
+        axes[0].hlines(ylim + 0.2, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
+        axes[0].set_xlabel('Location (cm)')
+        axes[0].set_ylabel('Ramp amplitude (mV)')
+        axes[0].set_xlim([0., track_length])
+        axes[0].set_ylim([math.floor(ymin), max(math.ceil(ylim), ylim + 0.4)])
+        axes[0].legend(loc='best', frameon=False, framealpha=0.5)
 
-    delta_weights_tuning_amp = peak_delta_weight / 2.
-    delta_weights_tuning_offset = peak_delta_weight
-    force_delta_weights = delta_weights_tuning_amp * \
-                          np.cos(2. * np.pi / (target_field_width * 1.2) * (peak_locs - modulated_field_center)) + \
-                          delta_weights_tuning_offset
-    left = np.where(peak_locs >= modulated_field_center - target_field_width * 1.2 / 2.)[0][0]
-    right = np.where(peak_locs > modulated_field_center + target_field_width * 1.2 / 2.)[0][0]
-    force_delta_weights[:left] = 0.
-    force_delta_weights[right:] = 0.
+        ylim = np.max(force_delta_weights) + 1.
+        ymin = np.min(force_delta_weights) + 1.
+        axes[1].plot(peak_locs, force_delta_weights + 1., c='r')
+        axes[1].hlines(ylim + 0.2, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
+        axes[1].set_xlabel('Location (cm)')
+        axes[1].set_ylabel('Candidate synaptic weights (a.u.)')
+        axes[1].set_xlim([0., track_length])
+        axes[1].set_ylim([math.floor(ymin), max(math.ceil(ylim), ylim + 0.4)])
+        clean_axes(axes)
+        fig.tight_layout()
+        fig.show()
 
-    initial_ramp = force_delta_weights.dot(np.array(input_rate_maps))
-    initial_ramp_scaling_factor = peak_ramp_amp / np.max(initial_ramp)
+    return target_ramp, ramp_scaling_factor
+
+
+def get_weights_LSA_scaling_factor(ramp_x, input_x, interp_x, input_rate_maps, peak_locs, target_ramp, track_length,
+                                   target_range, bounds, beta=2., initial_ramp_scaling_factor=0.002956,
+                                   target_peak_delta_weight=1.5, plot=False, verbose=1):
+    """
+    Reality check for the least square approximation method to estimate weights. Used to calibrate ramp_scaling_factor.
+    Given a set of input_rate_maps and a target_ramp, computes and a set of weights with the target_peak_delta_weight.
+    Returns the weights and a new ramp_scaling_factor.
+    :param ramp_x: array (spatial resolution of ramp)
+    :param input_x: array (spatial resolution of input_rate_maps)
+    :param interp_x: array (spatial resolution for computing fine features)
+    :param input_rate_maps: array
+    :param peak_locs: array
+    :param target_ramp: array
+    :param track_length: float
+    :param target_range: dict
+    :param bounds: tuple of float
+    :param beta: float; regularization parameter
+    :param initial_ramp_scaling_factor: float
+    :param target_peak_delta_weight: float
+    :param target_peak_ramp_amp: float (mV)
+    :param plot: bool
+    :param verbose: int
+    :return: tuple of array
+    """
+    target_peak_ramp_amp = np.max(target_ramp)
+    if len(target_ramp) != len(ramp_x):
+        target_ramp = np.interp(ramp_x, input_x, target_ramp)
+    modulated_field_center = ramp_x[np.argmax(target_ramp)]
+    induction_start_loc = modulated_field_center + 10.
+    induction_stop_loc = induction_start_loc + 5.
+
+    ramp_amp, ramp_width, peak_shift, ratio, start_loc, peak_loc, end_loc, min_val, min_loc = \
+        {}, {}, {}, {}, {}, {}, {}, {}, {}
+    ramp_amp['target'], ramp_width['target'], peak_shift['target'], ratio['target'], start_loc['target'], \
+    peak_loc['target'], end_loc['target'], min_val['target'], min_loc['target'] = \
+        calculate_ramp_features(ramp=target_ramp, induction_loc=induction_start_loc, binned_x=ramp_x,
+                                interp_x=interp_x, track_length=track_length)
 
     if len(target_ramp) != len(input_x):
         interp_target_ramp = np.interp(input_x, ramp_x, target_ramp)
@@ -765,8 +829,8 @@ def get_weights_LSA_scaling_factor(ramp_x, input_x, interp_x, input_rate_maps, p
     delta_weights = interp_target_ramp.dot(input_matrix_inv)
 
     SVD_delta_weights, SVD_ramp_scaling_factor = \
-        get_adjusted_delta_weights_and_ramp_scaling_factor(delta_weights, input_rate_maps, peak_delta_weight,
-                                                           peak_ramp_amp)
+        get_adjusted_delta_weights_and_ramp_scaling_factor(delta_weights, input_rate_maps, target_peak_delta_weight,
+                                                           target_peak_ramp_amp)
     input_matrix = np.multiply(input_rate_maps, SVD_ramp_scaling_factor)
     SVD_model_ramp = SVD_delta_weights.dot(input_matrix)
 
@@ -777,8 +841,8 @@ def get_weights_LSA_scaling_factor(ramp_x, input_x, interp_x, input_rate_maps, p
 
     LSA_delta_weights = result.x
     delta_weights, ramp_scaling_factor = \
-        get_adjusted_delta_weights_and_ramp_scaling_factor(LSA_delta_weights, input_rate_maps, peak_delta_weight,
-                                                           peak_ramp_amp)
+        get_adjusted_delta_weights_and_ramp_scaling_factor(LSA_delta_weights, input_rate_maps, target_peak_delta_weight,
+                                                           target_peak_ramp_amp)
 
     input_matrix = np.multiply(input_rate_maps, ramp_scaling_factor)
     model_ramp = delta_weights.dot(input_matrix)
@@ -798,6 +862,7 @@ def get_weights_LSA_scaling_factor(ramp_x, input_x, interp_x, input_rate_maps, p
         print 'model: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f' \
               ', end_loc: %.1f' % (ramp_amp['model'], ramp_width['model'], peak_shift['model'], ratio['model'],
                                    start_loc['model'], peak_loc['model'], end_loc['model'])
+        print 'ramp_scaling_factor: %.6f' % ramp_scaling_factor
 
     sys.stdout.flush()
 

@@ -1373,7 +1373,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     axes[0][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
     axes[0][0].set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
 
-    axes[0][1].set_xlabel('Normalized voltage')
+    axes[0][1].set_xlabel('Normalized eligibility signal')
     axes[0][1].set_ylabel('Normalized rate')
     axes[0][1].set_title('Sigmoidal q$_{+}$, sigmoidal q$_{-}$', fontsize=mpl.rcParams['font.size'], pad=10.)
     axes[0][1].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='q$_{+}$ (Potentiation)')
