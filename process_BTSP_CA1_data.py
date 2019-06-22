@@ -2,7 +2,6 @@ __author__ = 'Aaron D. Milstein'
 from BTSP_utils import *
 import click
 import pandas as pd
-# from plot_results import *
 
 
 """
@@ -382,17 +381,14 @@ def export_data(export_file_path=None):
             f['defaults'].attrs['generic_position_dt'] = context.generic_position_dt  # ms
             f['defaults'].attrs['default_interp_dx'] = context.default_interp_dx  # cm
             f['defaults'].attrs['ramp_scaling_factor'] = context.ramp_scaling_factor
-            f['defaults'].create_dataset('binned_x', compression='gzip', compression_opts=9, data=context.binned_x)
-            f['defaults'].create_dataset('generic_x', compression='gzip', compression_opts=9, data=context.generic_x)
-            f['defaults'].create_dataset('generic_t', compression='gzip', compression_opts=9, data=context.generic_t)
-            f['defaults'].create_dataset('default_interp_t', compression='gzip', compression_opts=9,
-                                         data=context.default_interp_t)
-            f['defaults'].create_dataset('default_interp_x', compression='gzip', compression_opts=9,
-                                         data=context.default_interp_x)
-            f['defaults'].create_dataset('extended_x', compression='gzip', compression_opts=9, data=context.extended_x)
-            f['defaults'].create_dataset('input_rate_maps', compression='gzip', compression_opts=9,
-                                         data=context.spatial_rate_maps)
-            f['defaults'].create_dataset('peak_locs', compression='gzip', compression_opts=9, data=context.peak_locs)
+            f['defaults'].create_dataset('binned_x', compression='gzip', data=context.binned_x)
+            f['defaults'].create_dataset('generic_x', compression='gzip', data=context.generic_x)
+            f['defaults'].create_dataset('generic_t', compression='gzip', data=context.generic_t)
+            f['defaults'].create_dataset('default_interp_t', compression='gzip', data=context.default_interp_t)
+            f['defaults'].create_dataset('default_interp_x', compression='gzip', data=context.default_interp_x)
+            f['defaults'].create_dataset('extended_x', compression='gzip', data=context.extended_x)
+            f['defaults'].create_dataset('input_rate_maps', compression='gzip', data=context.spatial_rate_maps)
+            f['defaults'].create_dataset('peak_locs', compression='gzip', data=context.peak_locs)
         if 'data' not in f:
             f.create_group('data')
         cell_key = str(context.cell_id)
@@ -415,19 +411,17 @@ def export_data(export_file_path=None):
             this_group['raw']['t'].create_group(category)
             for i in xrange(len(context.raw_position[category])):
                 lap_key = str(i)
-                this_group['raw']['position'][category].create_dataset(lap_key, compression='gzip', compression_opts=9, 
+                this_group['raw']['position'][category].create_dataset(lap_key, compression='gzip',
                                                                        data=context.raw_position[category][i])
-                this_group['raw']['t'][category].create_dataset(lap_key, compression='gzip', compression_opts=9, 
+                this_group['raw']['t'][category].create_dataset(lap_key, compression='gzip',
                                                                 data=context.raw_t[category][i])
         for i in xrange(len(context.raw_current)):
             lap_key = str(i)
-            this_group['raw']['current'].create_dataset(lap_key, compression='gzip', compression_opts=9, 
-                                                        data=context.raw_current[i])
+            this_group['raw']['current'].create_dataset(lap_key, compression='gzip', data=context.raw_current[i])
         this_group['raw'].create_group('exp_ramp')
-        this_group['raw']['exp_ramp'].create_dataset('after', compression='gzip', compression_opts=9, 
-                                                     data=context.exp_ramp_raw['after'])
+        this_group['raw']['exp_ramp'].create_dataset('after', compression='gzip', data=context.exp_ramp_raw['after'])
         if 'before' in context.ramp_laps:
-            this_group['raw']['exp_ramp'].create_dataset('before', compression='gzip', compression_opts=9,
+            this_group['raw']['exp_ramp'].create_dataset('before', compression='gzip',
                                                          data=context.exp_ramp_raw['before'])
         this_group.create_group('processed')
         this_group['processed'].create_group('position')
@@ -438,40 +432,31 @@ def export_data(export_file_path=None):
             this_group['processed']['t'].create_group(category)
             for i in xrange(len(context.position[category])):
                 lap_key = str(i)
-                this_group['processed']['position'][category].create_dataset(lap_key, compression='gzip', 
-                                                                             compression_opts=9, 
-                                                                             data=context.position[category][i])
-                this_group['processed']['t'][category].create_dataset(lap_key, compression='gzip', compression_opts=9, 
+                this_group['processed']['position'][category].create_dataset(
+                    lap_key, compression='gzip', data=context.position[category][i])
+                this_group['processed']['t'][category].create_dataset(lap_key, compression='gzip',
                                                                       data=context.t[category][i])
-        this_group['processed'].create_dataset('mean_position', compression='gzip', compression_opts=9,
-                                               data=context.mean_position)
-        this_group['processed'].create_dataset('mean_t', compression='gzip', compression_opts=9, data=context.mean_t)
+        this_group['processed'].create_dataset('mean_position', compression='gzip', data=context.mean_position)
+        this_group['processed'].create_dataset('mean_t', compression='gzip', data=context.mean_t)
         for i in xrange(len(context.current)):
             lap_key = str(i)
-            this_group['processed']['current'].create_dataset(lap_key, compression='gzip', compression_opts=9, 
-                                                              data=context.current[i])
+            this_group['processed']['current'].create_dataset(lap_key, compression='gzip', data=context.current[i])
         this_group['processed'].create_group('exp_ramp')
-        this_group['processed']['exp_ramp'].create_dataset('after', compression='gzip', compression_opts=9,
-                                                           data=context.exp_ramp['after'])
+        this_group['processed']['exp_ramp'].create_dataset('after', compression='gzip', data=context.exp_ramp['after'])
         this_group['processed'].create_group('exp_ramp_vs_t')
-        this_group['processed']['exp_ramp_vs_t'].create_dataset('after', compression='gzip', compression_opts=9,
-                                                           data=context.exp_ramp_vs_t['after'])
+        this_group['processed']['exp_ramp_vs_t'].create_dataset('after', compression='gzip',
+                                                                data=context.exp_ramp_vs_t['after'])
         if 'before' in context.ramp_laps:
-            this_group['processed']['exp_ramp'].create_dataset('before', compression='gzip', compression_opts=9,
+            this_group['processed']['exp_ramp'].create_dataset('before', compression='gzip',
                                                                data=context.exp_ramp['before'])
-            this_group['processed']['exp_ramp_vs_t'].create_dataset('before', compression='gzip', compression_opts=9,
+            this_group['processed']['exp_ramp_vs_t'].create_dataset('before', compression='gzip',
                                                                     data=context.exp_ramp_vs_t['before'])
         this_group.create_group('complete')
-        this_group['complete'].create_dataset('run_vel', compression='gzip', compression_opts=9,
-                                              data=context.complete_run_vel)
-        this_group['complete'].create_dataset('run_vel_gate', compression='gzip', compression_opts=9,
-                                              data=context.complete_run_vel_gate)
-        this_group['complete'].create_dataset('position', compression='gzip', compression_opts=9,
-                                              data=context.complete_position)
-        this_group['complete'].create_dataset('t', compression='gzip', compression_opts=9,
-                                              data=context.complete_t)
-        this_group['complete'].create_dataset('induction_gate', compression='gzip', compression_opts=9,
-                                              data=context.induction_gate)
+        this_group['complete'].create_dataset('run_vel', compression='gzip', data=context.complete_run_vel)
+        this_group['complete'].create_dataset('run_vel_gate', compression='gzip', data=context.complete_run_vel_gate)
+        this_group['complete'].create_dataset('position', compression='gzip', data=context.complete_position)
+        this_group['complete'].create_dataset('t', compression='gzip', data=context.complete_t)
+        this_group['complete'].create_dataset('induction_gate', compression='gzip', data=context.induction_gate)
     print 'Exported data for cell: %i, induction: %i to %s' % (context.cell_id, context.induction,
                                                                context.export_file_path)
 

@@ -80,11 +80,10 @@ get_features_stages:
 get_objectives:
   optimize_BTSP_D_CA1: get_objectives
 kwargs:
-  data_file_name: 20180411_BTSP2_CA1_data.hdf5
+  data_file_name: 20190621_BTSP_CA1_data_calibrated_input.hdf5
+  input_field_width: 45.  # cm
   verbose: 1
   min_delta_weight: -0.2
-  input_field_width: 45.  # cm
-  data_keys:
   params_path: config/20190118_BTSP_D_initial_params.yaml
 objective_names:
 - spont_residual_score
@@ -110,7 +109,7 @@ target_range:
   delta_min_val: 0.01
   delta_peak_val: 0.01
   residuals: 0.1
-  weights_smoothness: 0.01
+  weights_smoothness: 0.005
 target_val:
 x0:
   global_signal_decay: 3.000893E+02

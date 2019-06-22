@@ -5,7 +5,6 @@ for ((cell_id=1;cell_id<=31;cell_id++))
 do
     export cell_id
     for induction in 1 2
-    # for induction in 2
     do
         export induction
         python get_LSA_weights_BTSP_CA1.py --cell-id=$cell_id --induction=$induction --plot=1 --export \
