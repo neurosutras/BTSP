@@ -1,4 +1,5 @@
 __author__ = 'milsteina'
+from BTSP_utils import *
 from nested.optimize_utils import *
 import matplotlib as mpl
 import matplotlib.gridspec as gridspec
@@ -38,12 +39,11 @@ context.param_labels = {'local_signal_rise': 'signal$_{eligibility}$ tau$_{rise}
                         }
 
 
-
 @click.command()
 @click.option("--param-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/20190225_BTSP_D_best_params.yaml')
+              default='config/20190225_biBTSP_D_best_params.yaml')
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/optimize_BTSP_CA1_cli_config.yaml')
+              default='config/optimize_biBTSP_D_90cm_cli_config.yaml')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--pcadim", type=int, default=4)
 @click.option("--export", is_flag=True)
@@ -95,7 +95,7 @@ def plot_BTSP_model_param_cdfs(param_file_path, config_file_path, export=False, 
     ordered_param_keys = read_from_yaml(config_file_path)['param_names']
 
     for cell in cell_keys:
-        for param, val in params_by_cell[cell].iteritems():
+        for param, val in viewitems(params_by_cell[cell]):
             if param == 'peak_delta_weight':
                 val += 1.
             params[param].append(val)
@@ -103,8 +103,8 @@ def plot_BTSP_model_param_cdfs(param_file_path, config_file_path, export=False, 
     fig, axes = plt.figure(figsize=(10, 9)), []
     gs0 = gridspec.GridSpec(4, 4, wspace=0.65, hspace=0.7, left=0.1, right=0.95, top=0.95, bottom=0.075)
     axes = []
-    for row in xrange(4):
-        for col in xrange(4):
+    for row in range(4):
+        for col in range(4):
             this_axis = fig.add_subplot(gs0[row, col])
             axes.append(this_axis)
     for i, param_name in enumerate(ordered_param_keys):
@@ -159,7 +159,7 @@ def plot_BTSP_model_param_PCA(param_file_path, pcadim=None, export=False, output
                     'rCM_peak2': u'rate$_{de\u2011pot}$ xpeak$_{2}$',
                     'rCM_min2': u'rate$_{de\u2011pot}$ ymin$_{2}$'}
     data = []
-    for cell, param_dict in params_by_cell.iteritems():
+    for cell, param_dict in viewitems(params_by_cell):
         if cell not in ['all']:
             data.append(param_dict_to_array(param_dict, ordered_param_keys))
     data = np.array(data)
@@ -168,8 +168,8 @@ def plot_BTSP_model_param_PCA(param_file_path, pcadim=None, export=False, output
 
     pca = PCA(whiten=False)  # , n_components=dim)
     fit = pca.fit(scaled_data)
-    print 'Explained variance ratios: '
-    print pca.explained_variance_ratio_
+    print('Explained variance ratios: ')
+    print(pca.explained_variance_ratio_)
     # print pca.components_
     trans_data = fit.transform(scaled_data)
     plot_data = trans_data
@@ -208,9 +208,9 @@ def plot_BTSP_model_param_PCA(param_file_path, pcadim=None, export=False, output
         axes.set_xlabel('PC1')
     else:
         fig, axes = plt.subplots(plotdim, plotdim, figsize=(10, 10))
-        for row in xrange(plotdim):
+        for row in range(plotdim):
             axes[row][0].set_ylabel('PC%i' % (row + 2))
-            for col in xrange(plotdim):
+            for col in range(plotdim):
                 if row == plotdim - 1:
                     axes[row][col].set_xlabel('PC%i' % (col + 1))
                 if row >= col:

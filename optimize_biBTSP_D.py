@@ -50,6 +50,9 @@ import click
 context = Context()
 
 
+BTSP_model_name = 'D'
+
+
 def config_worker():
     """
 
@@ -63,7 +66,8 @@ def init_context():
 
     """
     if context.data_file_path is None or not os.path.isfile(context.data_file_path):
-        raise IOError('optimize_BTSP_D_CA1: init_context: invalid data_file_path: %s' % context.data_file_path)
+        raise IOError('optimize_biBTSP_%s: init_context: invalid data_file_path: %s' %
+                      (BTSP_model_name, context.data_file_path))
 
     with h5py.File(context.data_file_path, 'r') as f:
         dt = f['defaults'].attrs['dt']  # ms
@@ -83,21 +87,22 @@ def init_context():
         extended_x = f['defaults']['extended_x'][:]
         # import these from a 'calibrated_input' group instead
         if 'input_field_width' not in context() or context.input_field_width is None:
-            raise RuntimeError('optimize_BTSP_D_CA1: init context: missing required parameter: input_field_width')
+            raise RuntimeError('optimize_biBTSP_%s: init context: missing required parameter: input_field_width' %
+                               BTSP_model_name)
         input_field_width_key = str(int(context.input_field_width))
         if 'calibrated_input' not in f or input_field_width_key not in f['calibrated_input']:
-            raise RuntimeError('optimize_BTSP_D_CA1: init context: data for input_field_width: %.1f not found in the '
+            raise RuntimeError('optimize_biBTSP_%s: init context: data for input_field_width: %.1f not found in the '
                                'provided data_file_path: %s' %
-                               (float(context.input_field_width), context.data_file_path))
+                               (BTSP_model_name, float(context.input_field_width), context.data_file_path))
         input_field_width = f['calibrated_input'][input_field_width_key].attrs['input_field_width']  # cm
         input_rate_maps, peak_locs = \
             generate_spatial_rate_maps(binned_x, num_inputs, input_field_peak_rate, input_field_width, track_length)
         ramp_scaling_factor = f['calibrated_input'][input_field_width_key].attrs['ramp_scaling_factor']
 
+        all_data_keys = [(int(cell_id), int(induction)) for cell_id in f['data'] for induction in f['data'][cell_id]]
         if 'data_keys' not in context() or context.data_keys is None:
             if 'cell_id' not in context() or context.cell_id == 'all' or context.cell_id is None:
-                context.data_keys = \
-                    [(int(cell_id), int(induction)) for cell_id in f['data'] for induction in f['data'][cell_id]]
+                context.data_keys = all_data_keys
             else:
                 context.data_keys = \
                     [(int(context.cell_id), int(induction)) for induction in f['data'][str(context.cell_id)]]
@@ -110,8 +115,8 @@ def init_context():
                                  ('1' not in f['data'][cell_id] or
                                   'before' not in f['data'][cell_id]['1']['raw']['exp_ramp'])]
     if context.verbose > 1:
-        print('optimize_BTSP_D_CA1: pid: %i; processing the following data_keys: %s' % \
-              (os.getpid(), str(context.data_keys)))
+        print('optimize_biBTSP_%s: pid: %i; processing the following data_keys: %s' %
+              (BTSP_model_name, os.getpid(), str(context.data_keys)))
     self_consistent_cell_ids = [cell_id for (cell_id, induction) in context.data_keys if induction == 1 and
                                 (cell_id, 2) in context.data_keys]
     down_dt = 10.  # ms, to speed up optimization
@@ -145,8 +150,8 @@ def import_data(cell_id, induction):
 
     with h5py.File(context.data_file_path, 'r') as f:
         if cell_key not in f['data'] or induction_key not in f['data'][cell_key]:
-            raise KeyError('optimize_BTSP_D_CA1: no data found for cell_id: %s, induction: %s' %
-                           (cell_key, induction_key))
+            raise KeyError('optimize_biBTSP_%s: no data found for cell_id: %s, induction: %s' %
+                           (BTSP_model_name, cell_key, induction_key))
         data_group = f['data'][cell_key][induction_key]
         induction_context.induction_locs = data_group.attrs['induction_locs']
         induction_context.induction_durs = data_group.attrs['induction_durs']
@@ -252,8 +257,8 @@ def import_data(cell_id, induction):
     context.data_cache[cell_id][induction] = induction_context
     context.update(induction_context())
     if context.verbose > 1:
-        print('optimize_BTSP_D_CA1: process: %i loaded data for cell: %i, induction: %i' %
-              (os.getpid(), cell_id, induction))
+        print('optimize_biBTSP_%s: process: %i loaded data for cell: %i, induction: %i' %
+              (BTSP_model_name, os.getpid(), cell_id, induction))
 
 
 def update_model_params(x, local_context):
@@ -552,12 +557,7 @@ def get_args_static_signal_amplitudes():
     (static) for each set of parameters.
     :return: list of list
     """
-    with h5py.File(context.data_file_path, 'r') as f:
-        data_keys = []
-        for cell_key in f['data']:
-            for induction_key in f['data'][cell_key]:
-                data_keys.append((int(cell_key), int(induction_key)))
-    return list(zip(*data_keys))
+    return list(zip(*context.all_data_keys))
 
 
 def compute_features_signal_amplitudes(x, cell_id=None, induction=None, export=False, plot=False):
@@ -575,30 +575,20 @@ def compute_features_signal_amplitudes(x, cell_id=None, induction=None, export=F
     if context.verbose > 1:
         print('Process: %i: computing signal_amplitude features for cell_id: %i, induction: %i with x: %s' % \
               (os.getpid(), context.cell_id, context.induction, ', '.join('%.3E' % i for i in x)))
+        sys.stdout.flush()
     start_time = time.time()
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
         get_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
                            context.global_signal_decay, context.down_dt, plot)
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
     local_signals = get_local_signal_population(local_signal_filter)
-    local_signal_peaks = [np.max(local_signal) for local_signal in local_signals]
-    if plot:
-        fig, axes = plt.subplots(1)
-        hist, edges = np.histogram(local_signal_peaks, density=True)
-        bin_width = edges[1] - edges[0]
-        axes.plot(edges[:-1] + bin_width / 2., hist * bin_width, c='r', label='Local plasticity signals')
-        axes.set_xlabel('Peak local plasticity signal amplitudes (a.u.)')
-        axes.set_ylabel('Probability')
-        axes.set_title('Local signal amplitude distribution')
-        axes.legend(loc='best', frameon=False, framealpha=0.5)
-        clean_axes(axes)
-        fig.tight_layout()
-        fig.show()
-    result = {'local_signal_peaks': local_signal_peaks,
+
+    result = {'local_signal_peak': np.max(local_signals),
               'global_signal_peak': np.max(global_signal)}
     if context.verbose > 1:
         print('Process: %i: computing signal_amplitude features for cell_id: %i, induction: %i took %.1f s' % \
               (os.getpid(), context.cell_id, context.induction, time.time() - start_time))
+        sys.stdout.flush()
     return {cell_id: {induction: result}}
 
 
@@ -611,57 +601,41 @@ def filter_features_signal_amplitudes(primitives, current_features, export=False
     :param plot: bool
     :return: dict
     """
-    all_inputs_local_signal_peaks = np.array([], dtype='float32')
-    each_cell_local_signal_peak = []
-    each_cell_global_signal_peak = []
+    local_signal_peaks = []
+    global_signal_peaks = []
     for this_dict in primitives:
         for cell_id in this_dict:
             for induction_id in this_dict[cell_id]:
-                each_cell_global_signal_peak.append(this_dict[cell_id][induction_id]['global_signal_peak'])
-                each_cell_local_signal_peak.append(
-                    np.max(this_dict[cell_id][induction_id]['local_signal_peaks']))
-                all_inputs_local_signal_peaks = np.append(all_inputs_local_signal_peaks,
-                                                          this_dict[cell_id][induction_id]['local_signal_peaks'])
+                global_signal_peaks.append(this_dict[cell_id][induction_id]['global_signal_peak'])
+                local_signal_peaks.append(this_dict[cell_id][induction_id]['local_signal_peak'])
     if plot:
         fig, axes = plt.subplots(1)
-        hist, edges = np.histogram(all_inputs_local_signal_peaks, bins=10, density=True)
+        hist, edges = np.histogram(local_signal_peaks, bins=min(10, len(primitives)), density=True)
         bin_width = edges[1] - edges[0]
-        axes.plot(edges[:-1] + bin_width / 2., hist * bin_width, c='r', label='Local plasticity signals')
+        axes.plot(edges[:-1] + bin_width / 2., hist * bin_width, c='r', label='Local eligibility signals')
         axes.set_xlabel('Peak local plasticity signal amplitudes (a.u.)')
         axes.set_ylabel('Probability')
-        axes.set_title('Local signal amplitude distribution (all inputs, all cells)')
+        axes.set_title('Local signal amplitude distribution')
         axes.legend(loc='best', frameon=False, framealpha=0.5)
         clean_axes(axes)
         fig.tight_layout()
         fig.show()
 
-        fig, axes = plt.subplots(1)
-        hist, edges = np.histogram(each_cell_local_signal_peak, bins=min(10, len(primitives)), density=True)
-        bin_width = edges[1] - edges[0]
-        axes.plot(edges[:-1] + bin_width / 2., hist * bin_width, c='r', label='Local potentiation signals')
-        axes.set_xlabel('Peak local plasticity signal amplitudes (a.u.)')
-        axes.set_ylabel('Probability')
-        axes.set_title('Local signal amplitude distribution (each cell)')
-        axes.legend(loc='best', frameon=False, framealpha=0.5)
-        clean_axes(axes)
-        fig.tight_layout()
-        fig.show()
-
-        hist, edges = np.histogram(each_cell_global_signal_peak, bins=min(10, len(primitives)), density=True)
+        hist, edges = np.histogram(global_signal_peaks, bins=min(10, len(primitives)), density=True)
         bin_width = edges[1] - edges[0]
         fig, axes = plt.subplots(1)
         axes.plot(edges[:-1] + bin_width / 2., hist * bin_width, c='k')
         axes.set_xlabel('Peak global plasticity signal amplitudes (a.u.)')
         axes.set_ylabel('Probability')
-        axes.set_title('Global signal amplitude distribution (each cell)')
+        axes.set_title('Global signal amplitude distribution')
         clean_axes(axes)
         fig.tight_layout()
         fig.show()
-    signal_amplitude_features = {'local_signal_max': np.max(each_cell_local_signal_peak),
-                                 'global_signal_max': np.max(each_cell_global_signal_peak)
+    signal_amplitude_features = {'local_signal_max': np.max(local_signal_peaks),
+                                 'global_signal_max': np.max(global_signal_peaks)
                                  }
     if context.verbose > 1:
-        print('Process: %i: signal_amplitude features; local_signal_max: %.2E, global_signal_max: %.2E' % \
+        print('Process: %i: signal_amplitude features; local_signal_max: %.2E, global_signal_max: %.2E' %
               (os.getpid(), signal_amplitude_features['local_signal_max'],
                signal_amplitude_features['global_signal_max']))
     return signal_amplitude_features
@@ -826,8 +800,8 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
 
         if current_residual_score > 1.1 * prev_residual_score:
             if context.verbose > 0:
-                print('optimize_BTSP_D_CA1: calculate_model_ramp: pid: %i; aborting - residual score not ' \
-                      'decreasing; induction: %i, lap: %i' % (os.getpid(), context.induction, induction_lap + 1))
+                print('optimize_biBTSP_%s: calculate_model_ramp: pid: %i; aborting - residual score not decreasing; '
+                      'induction: %i, lap: %i' % (BTSP_model_name, os.getpid(), context.induction, induction_lap + 1))
             if plot:
                 axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
                 clean_axes(axes)
@@ -1460,13 +1434,15 @@ def compute_features_model_ramp(x, cell_id=None, induction=None, local_signal_pe
     update_source_contexts(x, context)
     start_time = time.time()
     if context.disp:
-        print('Process: %i: computing model_ramp_features for cell_id: %i, induction: %i with x: %s' % \
+        print('Process: %i: computing model_ramp_features for cell_id: %i, induction: %i with x: %s' %
               (os.getpid(), context.cell_id, context.induction, ', '.join('%.3E' % i for i in x)))
+        sys.stdout.flush()
     result = calculate_model_ramp(local_signal_peak=local_signal_peak, global_signal_peak=global_signal_peak,
                                   export=export, plot=plot)
     if context.disp:
-        print('Process: %i: computing model_ramp_features for cell_id: %i, induction: %i took %.1f s' % \
+        print('Process: %i: computing model_ramp_features for cell_id: %i, induction: %i took %.1f s' %
               (os.getpid(), context.cell_id, context.induction, time.time() - start_time))
+        sys.stdout.flush()
     return result
 
 
@@ -1486,7 +1462,9 @@ def filter_features_model_ramp(primitives, current_features, export=False):
     for this_result_dict in primitives:
         if not this_result_dict:
             if context.verbose > 0:
-                print('optimize_BTSP_D_CA1: filter_features_model_ramp: pid: %i; model failed' % os.getpid())
+                print('optimize_biBTSP_%s: filter_features_model_ramp: pid: %i; model failed' %
+                      (BTSP_model_name, os.getpid()))
+                sys.stdout.flush()
             return dict()
         for cell_id in this_result_dict:
             cell_id = int(cell_id)
@@ -1558,7 +1536,7 @@ def get_objectives(features, export=False):
 def get_features_interactive(interface, x, plot=False):
     """
 
-    :param interface: :class: either 'IpypInterface', 'MPIFuturesInterface', or 'ParallelContextInterface'
+    :param interface: :class: 'IpypInterface', 'MPIFuturesInterface', 'ParallelContextInterface', or 'SerialInterface'
     :param x:
     :param plot:
     :return: dict
@@ -1583,25 +1561,26 @@ def get_features_interactive(interface, x, plot=False):
 
 @click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True, ))
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/optimize_BTSP_D_90cm_CA1_cli_config.yaml')
+              default='config/optimize_biBTSP_D_90cm_cli_config.yaml')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
 @click.option("--export-file-path", type=str, default=None)
 @click.option("--label", type=str, default=None)
 @click.option("--verbose", type=int, default=2)
 @click.option("--plot", is_flag=True)
+@click.option("--interactive", is_flag=True)
 @click.option("--debug", is_flag=True)
 @click.option("--plot-summary-figure", is_flag=True)
 @click.option("--model-file-path", type=str, default=None)
 @click.pass_context
-def main(cli, config_file_path, output_dir, export, export_file_path, label, verbose, plot, debug,
+def main(cli, config_file_path, output_dir, export, export_file_path, label, verbose, plot, interactive, debug,
          plot_summary_figure, model_file_path):
     """
     To execute on a single process on one cell from the experimental dataset:
-    python -i optimize_BTSP_D_CA1.py --cell_id=1 --plot --framework=serial
+    python -i optimize_biBTSP_D.py --cell_id=1 --plot --framework=serial --interactive
 
     To execute using MPI parallelism with 1 controller process and N - 1 worker processes:
-    mpirun -n N python -m mpi4py.futures optimize_BTSP_D_CA1.py --cell_id=1 --plot --framework=mpi
+    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_D.py --cell_id=1 --plot --framework=mpi -interactive
 
     To optimize the models by running many instances in parallel:
     mpirun -n N python -m mpi4py.futures -m nested.optimize --config-file-path=$PATH_TO_CONFIG_FILE --disp --export \
@@ -1609,8 +1588,8 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
 
     To plot results previously exported to a file on a single process:
     python
-    python -i optimize_BTSP_D_CA1.py --cell_id=1 --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
-        --framework=serial
+    python -i optimize_biBTSP_D.py --cell_id=1 --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
+        --framework=serial --interactive
 
     :param cli: contains unrecognized args as list of str
     :param config_file_path: str (path)
@@ -1620,6 +1599,7 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
     :param label: str
     :param verbose: int
     :param plot: bool
+    :param interactive: bool
     :param debug: bool
     :param plot_summary_figure: bool
     :param model_file_path: bool
@@ -1632,13 +1612,10 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
     context.interface = get_parallel_interface(source_file=__file__, source_package=__package__, **kwargs)
     context.interface.start(disp=context.disp)
     context.interface.ensure_controller()
-    context.interface.apply(config_optimize_interactive, __file__, config_file_path=config_file_path,
-                            output_dir=output_dir, export=export, export_file_path=export_file_path, label=label,
-                            disp=context.disp, verbose=verbose, plot=plot, **kwargs)
-    if not context.interface.controller_is_worker:
-        config_optimize_interactive(__file__, config_file_path=config_file_path, output_dir=output_dir,
-                                    export=export, export_file_path=export_file_path, label=label,
-                                    disp=context.disp, verbose=verbose, plot=plot, **kwargs)
+    config_optimize_interactive(__file__, config_file_path=config_file_path, output_dir=output_dir,
+                                export=export, export_file_path=export_file_path, label=label,
+                                disp=context.disp, interface=context.interface, verbose=verbose, plot=plot, **kwargs)
+
     if plot_summary_figure:
         context.interface.execute(plot_model_summary_figure, int(context.kwargs['cell_id']), model_file_path)
     else:
@@ -1653,14 +1630,14 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
                     x1_dict = param_source_dict['all']
                     x1_array = param_dict_to_array(x1_dict, context.param_names)
                 else:
-                    print('optimize_BTSP_D: problem loading params for cell_id: %s from params_path: %s' % \
-                          (kwargs['params_path'], context.kwargs['cell_id']))
+                    print('optimize_biBTSP_%s: problem loading params for cell_id: %s from params_path: %s' %
+                          (BTSP_model_name, kwargs['params_path'], context.kwargs['cell_id']))
             elif 'all' in param_source_dict:
                 x1_dict = param_source_dict['all']
                 x1_array = param_dict_to_array(x1_dict, context.param_names)
             else:
-                raise RuntimeError('optimize_BTSP_D: problem loading params from params_path: %s' %
-                                   context.kwargs['params_path'])
+                raise RuntimeError('optimize_biBTSP_%s: problem loading params from params_path: %s' %
+                                   (BTSP_model_name, context.kwargs['params_path']))
 
         if not debug:
             features = get_features_interactive(context.interface, x1_array, plot=plot)
@@ -1677,10 +1654,14 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
             pprint.pprint({key: val for (key, val) in viewitems(features) if key in context.feature_names})
             print('objectives')
             pprint.pprint({key: val for (key, val) in viewitems(objectives) if key in context.objective_names})
+            sys.stdout.flush()
             if plot:
                 context.interface.apply(plt.show)
 
-    context.update(locals())
+    if context.interactive:
+        context.update(locals())
+    else:
+        context.interface.stop()
 
 
 if __name__ == '__main__':

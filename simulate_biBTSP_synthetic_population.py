@@ -1161,7 +1161,7 @@ def plot_plateau_modulation():
 
 @click.command()
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/simulate_BTSP_CA1_synthetic_population_config.yaml')
+              default='config/simulate_biBTSP_synthetic_population_config.yaml')
 @click.option("--trial", type=int, default=0)
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
@@ -1180,12 +1180,12 @@ def main(config_file_path, trial, output_dir, export, export_file_path, label, v
     Utilizes nested.parallel for parallel map. Requires mpi4py and NEURON.
 
     Execute with N processes:
-    mpirun -n N python simulate_BTSP_CA1_synthetic_population.py --config-file-path=$PATH_TO_CONFIG_FILE --simulate \
+    mpirun -n N python simulate_biBTSP_synthetic_population.py --config-file-path=$PATH_TO_CONFIG_FILE --simulate \
         --export
 
     or interactively:
 
-    mpirun -n N python -i simulate_BTSP_CA1_synthetic_population.py --config-file-path=$PATH_TO_CONFIG_FILE --simulate \
+    mpirun -n N python -i simulate_biBTSP_synthetic_population.py --config-file-path=$PATH_TO_CONFIG_FILE --simulate \
         --interactive
 
     :param config_file_path: str (path)

@@ -997,7 +997,7 @@ def get_target_synthetic_ramp(induction_loc, target_peak_shift, ramp_x=None, tra
 
 @click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True,))
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/optimize_BTSP_CA1_synthetic_config.yaml')
+              default='config/optimize_biBTSP_synthetic_config.yaml')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
 @click.option("--export-file-path", type=str, default=None)

@@ -67,7 +67,7 @@ context = Context()
 @click.option("--cell-id", type=int, default=1)
 @click.option("--induction", type=int, default=1)
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/process_BTSP_CA1_data_config.yaml')
+              default='config/process_biBTSP_data_config.yaml')
 @click.option("--data-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True),
               default='data')
 @click.option("--plot", type=int, default=1)
@@ -86,7 +86,7 @@ def main(cell_id, induction, config_file_path, data_dir, plot, export, export_fi
     """
     context.update(locals())
     initialize()
-    print 'Processing cell_id: %i, induction: %i' % (cell_id, induction)
+    print('Processing cell_id: %i, induction: %i' % (cell_id, induction))
     if export_file_path is None:
         export_file_path = context.data_dir + '/%s_BTSP_CA1_data.hdf5' % \
                                               datetime.datetime.today().strftime('%Y%m%d_%H%M')
@@ -136,7 +136,7 @@ def main(cell_id, induction, config_file_path, data_dir, plot, export, export_fi
         plt.close()
 
     vel_window_bins = int(context.vel_window / context.dt) / 2
-    for count in xrange(2):
+    for count in range(2):
         complete_run_vel = np.array([])
         complete_position = np.array([])
         complete_t = np.array([])
@@ -150,7 +150,7 @@ def main(cell_id, induction, config_file_path, data_dir, plot, export, export_fi
                 running_dur += len(this_t) * context.dt
 
         for i in range(len(complete_position)):
-            indexes = range(i - vel_window_bins, i + vel_window_bins + 1)
+            indexes = list(range(i - vel_window_bins, i + vel_window_bins + 1))
             this_position_window = np.sum(np.diff(complete_position.take(indexes, mode='wrap')))
             this_t_window = np.sum(np.diff(complete_t.take(indexes, mode='wrap')))
             complete_run_vel = np.append(complete_run_vel, np.divide(this_position_window, this_t_window) * 1000.)
@@ -183,7 +183,7 @@ def main(cell_id, induction, config_file_path, data_dir, plot, export, export_fi
                 position['post'] = [mean_position]
                 t['post'] = [mean_t]
         else:
-            for i in xrange(len(t['pre'])):
+            for i in range(len(t['pre'])):
                 complete_t -= len(t['pre'][i]) * context.dt
                 complete_position -= context.track_length
             if plot>1:
@@ -248,7 +248,7 @@ def main(cell_id, induction, config_file_path, data_dir, plot, export, export_fi
         axes[0][1].set_xlabel('Time (s)')
         axes[0][0].set_ylabel('Induction current (nA)')
         axes[0][1].set_ylabel('Induction gate (a.u.)')
-    for i in xrange(len(position['pre'])):
+    for i in range(len(position['pre'])):
         induction_gate = np.append(induction_gate, np.zeros_like(position['pre'][i]))
     for i, this_position in enumerate(position['induction']):
         c = context.current_laps[i]
@@ -272,7 +272,7 @@ def main(cell_id, induction, config_file_path, data_dir, plot, export, export_fi
             axes[0][0].plot(this_position, this_current, label='Lap %i: Loc: %i cm, Dur: %i ms' %
                                                                (i, this_induction_loc, this_induction_dur))
             axes[0][1].plot(np.subtract(this_t, this_t[start_index]) / 1000., this_induction_gate)
-    for i in xrange(len(position['post'])):
+    for i in range(len(position['post'])):
         induction_gate = np.append(induction_gate, np.zeros_like(position['post'][i]))
     mean_induction_loc = np.mean(induction_locs)
     mean_induction_index = np.where(mean_position >= mean_induction_loc)[0][0]
@@ -409,13 +409,13 @@ def export_data(export_file_path=None):
         for category in context.raw_position:
             this_group['raw']['position'].create_group(category)
             this_group['raw']['t'].create_group(category)
-            for i in xrange(len(context.raw_position[category])):
+            for i in range(len(context.raw_position[category])):
                 lap_key = str(i)
                 this_group['raw']['position'][category].create_dataset(lap_key, compression='gzip',
                                                                        data=context.raw_position[category][i])
                 this_group['raw']['t'][category].create_dataset(lap_key, compression='gzip',
                                                                 data=context.raw_t[category][i])
-        for i in xrange(len(context.raw_current)):
+        for i in range(len(context.raw_current)):
             lap_key = str(i)
             this_group['raw']['current'].create_dataset(lap_key, compression='gzip', data=context.raw_current[i])
         this_group['raw'].create_group('exp_ramp')
@@ -430,7 +430,7 @@ def export_data(export_file_path=None):
         for category in context.position:
             this_group['processed']['position'].create_group(category)
             this_group['processed']['t'].create_group(category)
-            for i in xrange(len(context.position[category])):
+            for i in range(len(context.position[category])):
                 lap_key = str(i)
                 this_group['processed']['position'][category].create_dataset(
                     lap_key, compression='gzip', data=context.position[category][i])
@@ -438,7 +438,7 @@ def export_data(export_file_path=None):
                                                                       data=context.t[category][i])
         this_group['processed'].create_dataset('mean_position', compression='gzip', data=context.mean_position)
         this_group['processed'].create_dataset('mean_t', compression='gzip', data=context.mean_t)
-        for i in xrange(len(context.current)):
+        for i in range(len(context.current)):
             lap_key = str(i)
             this_group['processed']['current'].create_dataset(lap_key, compression='gzip', data=context.current[i])
         this_group['processed'].create_group('exp_ramp')
@@ -457,8 +457,8 @@ def export_data(export_file_path=None):
         this_group['complete'].create_dataset('position', compression='gzip', data=context.complete_position)
         this_group['complete'].create_dataset('t', compression='gzip', data=context.complete_t)
         this_group['complete'].create_dataset('induction_gate', compression='gzip', data=context.induction_gate)
-    print 'Exported data for cell: %i, induction: %i to %s' % (context.cell_id, context.induction,
-                                                               context.export_file_path)
+    print('Exported data for cell: %i, induction: %i to %s' % (context.cell_id, context.induction,
+                                                               context.export_file_path))
 
 
 if __name__ == '__main__':

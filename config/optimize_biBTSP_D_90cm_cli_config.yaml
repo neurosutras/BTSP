@@ -81,16 +81,16 @@ get_objectives:
   optimize_BTSP_D_CA1: get_objectives
 kwargs:
   data_file_name: 20190621_BTSP_CA1_data_calibrated_input.hdf5
-  input_field_width: 135.  # cm
+  input_field_width: 90.  # cm
   verbose: 1
   min_delta_weight: -0.2
-  params_path: config/20190118_BTSP_D_initial_params.yaml
+  params_path: config/20190225_biBTSP_D_best_params.yaml
 objective_names:
 - spont_residual_score
 - exp1_residual_score
 - exp2_residual_score
 - self_consistent_delta_residual_score
-optimization_title: bidirectional_BTSP_D_135cm
+optimization_title: bidirectional_BTSP_D_90cm
 param_gen: PopulationAnnealing
 param_names:
 - rMC_peak
