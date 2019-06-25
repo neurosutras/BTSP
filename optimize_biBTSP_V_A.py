@@ -17,9 +17,9 @@ the sign of changes in synaptic weight.
 signals, and updated once per lap.
 
 Linear dependence on eligibility signals:
-L_pot = k_pot * (1. - V / V_max)
-L_depot = k_depot * V / V_max
-dW/dt ~ L_pot - L_depot
+L_pot ~ eligibility_filter(pre_rate * (1. - V / V_max))
+L_depot ~ eligibility_filter(pre_rate *  V / V_max)
+dW/dt ~ k_pot * L_pot - k_depot * L_depot
 
 """
 __author__ = 'milsteina'
