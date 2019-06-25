@@ -19,6 +19,8 @@ set -x
 
 cd $HOME/BTSP
 
+source $HOME/.bash_profile_py3.ext
+
 srun -N $2 -n $cores -c 2 --cpu_bind=cores python -m nested.optimize \
     --config-file-path=config/optimize_biBTSP_D_45cm_cli_config.yaml --disp --output-dir=$SCRATCH/BTSP \
     --pop-size=200 --max-iter=50 --path-length=3 --disp --export --label=cell"$1" --cell_id=$1
