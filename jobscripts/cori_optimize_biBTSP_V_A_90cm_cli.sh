@@ -7,7 +7,7 @@ sbatch <<EOT
 #SBATCH -J $JOB_NAME
 #SBATCH -o /global/cscratch1/sd/aaronmil/BTSP/logs/"$JOB_NAME".%j.o
 #SBATCH -e /global/cscratch1/sd/aaronmil/BTSP/logs/"$JOB_NAME".%j.e
-#SBATCH -q regular
+#SBATCH -q premium
 #SBATCH -N $2
 #SBATCH -L SCRATCH
 #SBATCH -C haswell
@@ -19,7 +19,7 @@ set -x
 
 cd $HOME/BTSP
 
-srun -N $2 -n $cores -c 2 --cpu_bind=cores python -m nested.optimize \
+srun -N $2 -n $cores -c 2 --cpu_bind=cores python -m mpi4py.futures -m nested.optimize \
     --config-file-path=config/optimize_biBTSP_V_A_90cm_cli_config.yaml --disp --output-dir=$SCRATCH/BTSP \
-    --pop-size=200 --max-iter=50 --path-length=3 --disp --export --label=cell"$1" --cell_id=$1
+    --pop-size=200 --max-iter=50 --path-length=3 --disp --export --label=cell"$1" --cell_id=$1 --framework=mpi
 EOT
