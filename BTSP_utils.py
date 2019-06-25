@@ -284,7 +284,7 @@ def get_exp_rise_decay_filter(rise, decay, max_time_scale, dt):
     return filter_t, filter
 
 
-def get_signal_filters(local_signal_rise, local_signal_decay, global_signal_rise, global_signal_decay, dt,
+def get_dual_signal_filters(local_signal_rise, local_signal_decay, global_signal_rise, global_signal_decay, dt,
                        plot=False):
     """
     :param local_signal_rise: float
@@ -296,8 +296,10 @@ def get_signal_filters(local_signal_rise, local_signal_decay, global_signal_rise
     :return: array, array
     """
     max_time_scale = max(local_signal_rise + local_signal_decay, global_signal_rise + global_signal_decay)
-    local_signal_filter_t, local_signal_filter = get_exp_rise_decay_filter(local_signal_rise, local_signal_decay, max_time_scale, dt)
-    global_filter_t, global_filter = get_exp_rise_decay_filter(global_signal_rise, global_signal_decay, max_time_scale, dt)
+    local_signal_filter_t, local_signal_filter = \
+        get_exp_rise_decay_filter(local_signal_rise, local_signal_decay, max_time_scale, dt)
+    global_filter_t, global_filter = \
+        get_exp_rise_decay_filter(global_signal_rise, global_signal_decay, max_time_scale, dt)
     if plot:
         fig, axes = plt.subplots(1)
         axes.plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='r',
@@ -313,6 +315,47 @@ def get_signal_filters(local_signal_rise, local_signal_decay, global_signal_rise
         fig.tight_layout()
         fig.show()
     return local_signal_filter_t, local_signal_filter, global_filter_t, global_filter
+
+
+def get_triple_signal_filters(pot_signal_rise, pot_signal_decay, depot_signal_rise, depot_signal_decay,
+                              global_signal_rise, global_signal_decay, dt, plot=False):
+    """
+    :param pot_signal_rise: float
+    :param pot_signal_decay: float
+    :param depot_signal_rise: float
+    :param depot_signal_decay: float
+    :param global_signal_rise: float
+    :param global_signal_decay: float
+    :param dt: float
+    :param plot: bool
+    :return: array, array
+    """
+    max_time_scale = max(pot_signal_rise + pot_signal_decay, depot_signal_rise + depot_signal_decay,
+                         global_signal_rise + global_signal_decay)
+    pot_signal_filter_t, pot_signal_filter = \
+        get_exp_rise_decay_filter(pot_signal_rise, pot_signal_decay, max_time_scale, dt)
+    depot_signal_filter_t, depot_signal_filter = \
+        get_exp_rise_decay_filter(depot_signal_rise, depot_signal_decay, max_time_scale, dt)
+    global_filter_t, global_filter = \
+        get_exp_rise_decay_filter(global_signal_rise, global_signal_decay, max_time_scale, dt)
+    if plot:
+        fig, axes = plt.subplots(1)
+        axes.plot(pot_signal_filter_t / 1000., pot_signal_filter / np.max(pot_signal_filter), color='r',
+                  label='Potentiation eligibility signal filter')
+        axes.plot(depot_signal_filter_t / 1000., depot_signal_filter / np.max(depot_signal_filter), color='r',
+                  label='De-potentiation eligibility signal filter')
+        axes.plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
+                  label='Global plasticity signal filter')
+        axes.set_xlabel('Time (s)')
+        axes.set_ylabel('Normalized filter amplitude')
+        axes.set_title('Plasticity signal filters')
+        axes.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        axes.set_xlim(-0.5, max(5000., pot_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
+        clean_axes(axes)
+        fig.tight_layout()
+        fig.show()
+    return pot_signal_filter_t, pot_signal_filter, depot_signal_filter_t, depot_signal_filter, \
+           global_filter_t, global_filter
 
 
 def get_local_signal(rate_map, local_filter, dt):
@@ -347,6 +390,25 @@ def get_local_signal_population(local_filter, rate_maps, dt):
     local_signals = []
     for rate_map in rate_maps:
         local_signals.append(get_local_signal(rate_map, local_filter, dt))
+    return local_signals
+
+
+def get_voltage_dependent_eligibility_signal_population(local_filter, normalized_ramp, phi, rate_maps, dt):
+    """
+
+    :param local_filter: array
+    :param normalized_ramp: array
+    :param phi: lambda
+    :param rate_maps: list of array
+    :param dt: float
+    :return: list of array
+    """
+    local_signals = []
+    this_phi = phi(normalized_ramp)
+
+    for rate_map in rate_maps:
+        local_signals.append(get_local_signal(np.multiply(rate_map, this_phi), local_filter, dt))
+
     return local_signals
 
 

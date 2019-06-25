@@ -8,18 +8,34 @@ includes:
 
 Features/assumptions of the phenomenological model:
 1) Synaptic weights in a silent cell are all = 1 prior to field induction 1. w(t0) = 1
-2) Activity at each synapse generates a long duration 'local plasticity signal', or an 'eligibility trace' for
+2) Activity at each synapse generates long duration 'local plasticity signals', or an 'eligibility traces' for
 synaptic plasticity.
 3) Dendritic plateaus generate a long duration 'global plasticity signal', or a 'gating trace' for synaptic plasticity.
-4) The low-pass filtered somatic membrane voltage at the time of activity at each synapse influences the magnitude and
-the sign of changes in synaptic weight.
-5) Changes in weight at each synapse are integrated over periods of nonzero overlap between eligibility and gating
+4) Changes in weight at each synapse are integrated over periods of nonzero overlap between eligibility and gating
 signals, and updated once per lap.
 
+Features/assumptions of the voltage-dependent mechanistic model:
+1) Synaptic strength is equivalent to the number of AMPA-Rs at a synapse (quantal size).
+2) Dendritic plateaus generate a global gating signal that mobilizes AMPA-Rs, allowing them to be either inserted or
+removed from synapses.
+3) Activity at each synapse generates a local potentiation eligibility signal that, in conjunction with the global
+gating signal, can activate a forward process to increase the number of AMPA-Rs stably incorporated into synapses. The
+amplitude of this eligibility signal is inversely proportional to the postsynaptic voltage at the time of a presynaptic
+spike.
+4) Activity at each synapse generates a local depotentiation eligibility signal that, in conjunction with the global
+gating signal, can activate a reverse process to decrease the number of AMPA-Rs stably incorporated into synapses. The
+amplitude of this eligibility signal is proportional to the postsynaptic voltage at the time of a presynaptic spike.
+5) global_signals are pooled across all cells and normalized to a peak value of 1.
+6) local_signals are pooled across all cells and normalized to a peak value of 1.
+7) f_pot represents the "sensitivity" of the forward process to the presence of the pot_signal. The transformation
+f_pot is linear.
+8) f_depot represents the "sensitivity" of the reverse process to the presence of the depot_signal. The transformation
+f_depot is linear.
+
 Linear dependence on eligibility signals:
-L_pot ~ eligibility_filter(pre_rate * (1. - V / V_max))
-L_depot ~ eligibility_filter(pre_rate *  V / V_max)
-dW/dt ~ k_pot * L_pot - k_depot * L_depot
+L_pot ~ local_signal_filter(pre_rate * (1. - V / V_max))
+L_depot ~ local_signal_filter(pre_rate *  V / V_max)
+dW/dt ~ k_pot * f_pot(L_pot) - k_depot * f_depot(L_depot)
 
 """
 __author__ = 'milsteina'
@@ -457,26 +473,6 @@ def plot_data_summary():
     fig.show()
 
 
-def get_voltage_dependent_eligibility_signal_population(local_filter, normalized_ramp, phi, rate_maps, dt, plot=False):
-    """
-
-    :param local_filter: array
-    :param normalized_ramp: array
-    :param phi: lambda
-    :param rate_maps: list of array
-    :param dt: float
-    :param plot: bool
-    :return: list of array
-    """
-    local_signals = []
-    this_phi = phi(normalized_ramp)
-
-    for rate_map in rate_maps:
-        local_signals.append(get_local_signal(np.multiply(rate_map, this_phi), local_filter, dt))
-
-    return local_signals
-
-
 def get_args_static_signal_amplitudes():
     """
     A nested map operation is required to compute model signal amplitudes. The arguments to be mapped are the same
@@ -504,7 +500,7 @@ def compute_features_signal_amplitudes(x, cell_id=None, induction=None, export=F
         sys.stdout.flush()
     start_time = time.time()
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
-        get_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
+        get_dual_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
                            context.global_signal_decay, context.down_dt, plot)
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
     local_signals = get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt)
@@ -577,7 +573,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     :return: dict
     """
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
-        get_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
+        get_dual_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
                            context.global_signal_decay, context.down_dt, plot)
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
 
@@ -1482,10 +1478,9 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
 
     To optimize the models by running many instances in parallel:
     mpirun -n N python -m mpi4py.futures -m nested.optimize --config-file-path=$PATH_TO_CONFIG_FILE --disp --export \
-        --cell_id=1 --framework=mpi --pop-size=200 --path-length=3 --max-iter=50 --label=model_D_cell_1
+        --cell_id=1 --framework=mpi --pop-size=200 --path-length=3 --max-iter=50 --label=cell1
 
     To plot results previously exported to a file on a single process:
-    python
     python -i optimize_biBTSP_V_A.py --cell_id=1 --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
         --framework=serial --interactive
 

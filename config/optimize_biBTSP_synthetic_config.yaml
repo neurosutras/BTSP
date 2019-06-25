@@ -134,7 +134,7 @@ target_range:
   peak_val: 0.01
   min_val: 0.01
   residuals: 0.1
-  weights_smoothness: 0.01
+  weights_smoothness: 0.005
   delta_min_val: 0.01
   delta_peak_val: 0.01
 target_val:

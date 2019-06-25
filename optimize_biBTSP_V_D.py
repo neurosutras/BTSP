@@ -8,27 +8,47 @@ includes:
 
 Features/assumptions of the phenomenological model:
 1) Synaptic weights in a silent cell are all = 1 prior to field induction 1. w(t0) = 1
-2) Activity at each synapse generates a long duration 'local plasticity signal', or an 'eligibility trace' for
+2) Activity at each synapse generates long duration 'local plasticity signals', or an 'eligibility traces' for
 synaptic plasticity.
 3) Dendritic plateaus generate a long duration 'global plasticity signal', or a 'gating trace' for synaptic plasticity.
-4) The low-pass filtered somatic membrane voltage at the time of activity at each synapse influences the magnitude and
-the sign of changes in synaptic weight.
-5) Changes in weight at each synapse are integrated over periods of nonzero overlap between eligibility and gating
+4) Changes in weight at each synapse are integrated over periods of nonzero overlap between eligibility and gating
 signals, and updated once per lap.
 
-Nonlinear dependence on voltage:
-dW/dt ~ k_pot * f_pot(V / V_max) - k_depot * f_depot(V / V_max)
-f_pot: ascending sigmoid
-f_depot: descending sigmoid
+Features/assumptions of the voltage-dependent mechanistic model:
+1) Synaptic strength is equivalent to the number of AMPA-Rs at a synapse (quantal size).
+2) Dendritic plateaus generate a global gating signal that mobilizes AMPA-Rs, allowing them to be either inserted or
+removed from synapses.
+3) Activity at each synapse generates a local potentiation eligibility signal that, in conjunction with the global
+gating signal, can activate a forward process to increase the number of AMPA-Rs stably incorporated into synapses. The
+amplitude of this eligibility signal is inversely proportional to the postsynaptic voltage at the time of a presynaptic
+spike.
+4) Activity at each synapse generates a local depotentiation eligibility signal that, in conjunction with the global
+gating signal, can activate a reverse process to decrease the number of AMPA-Rs stably incorporated into synapses. The
+amplitude of this eligibility signal is proportional to the postsynaptic voltage at the time of a presynaptic spike.
+5) global_signals are pooled across all cells and normalized to a peak value of 1.
+6) local_signals are pooled across all cells and normalized to a peak value of 1.
+7) f_pot represents the "sensitivity" of the forward process to the presence of the pot_signal. The transformation
+f_pot is linear.
+8) f_depot represents the "sensitivity" of the reverse process to the presence of the depot_signal. The transformation
+f_depot is linear.
 
+Linear dependence on eligibility signals:
+L_pot ~ pot_signal_filter(pre_rate * (1. - V / V_max))
+L_depot ~ depot_signal_filter(pre_rate *  V / V_max)
+dW/dt ~ k_pot * f_pot(L_pot) - k_depot * f_depot(L_depot)
+
+biBTSP_V_D vs. biBTSP_V_A: Potentiation and de-potentiation eligibility signals are driven by different filters.
 """
 __author__ = 'milsteina'
 from BTSP_utils import *
+from nested.parallel import *
 from nested.optimize_utils import *
 import click
 
-
 context = Context()
+
+
+BTSP_model_name = 'V_D'
 
 
 def config_worker():
@@ -44,10 +64,11 @@ def init_context():
 
     """
     if context.data_file_path is None or not os.path.isfile(context.data_file_path):
-        raise IOError('init_context: invalid data_file_path: %s' % context.data_file_path)
+        raise IOError('optimize_biBTSP_%s: init_context: invalid data_file_path: %s' %
+                      (BTSP_model_name, context.data_file_path))
+
     with h5py.File(context.data_file_path, 'r') as f:
         dt = f['defaults'].attrs['dt']  # ms
-        input_field_width = f['defaults'].attrs['input_field_width']  # cm
         input_field_peak_rate = f['defaults'].attrs['input_field_peak_rate']  # Hz
         num_inputs = f['defaults'].attrs['num_inputs']
         track_length = f['defaults'].attrs['track_length']  # cm
@@ -56,19 +77,30 @@ def init_context():
         default_run_vel = f['defaults'].attrs['default_run_vel']  # cm/s
         generic_position_dt = f['defaults'].attrs['generic_position_dt']  # ms
         default_interp_dx = f['defaults'].attrs['default_interp_dx']  # cm
-        ramp_scaling_factor = f['defaults'].attrs['ramp_scaling_factor']
         binned_x = f['defaults']['binned_x'][:]
         generic_x = f['defaults']['generic_x'][:]
         generic_t = f['defaults']['generic_t'][:]
         default_interp_t = f['defaults']['default_interp_t'][:]
         default_interp_x = f['defaults']['default_interp_x'][:]
         extended_x = f['defaults']['extended_x'][:]
-        input_rate_maps = f['defaults']['input_rate_maps'][:]
-        peak_locs = f['defaults']['peak_locs'][:]
+
+        if 'input_field_width' not in context() or context.input_field_width is None:
+            raise RuntimeError('optimize_biBTSP_%s: init context: missing required parameter: input_field_width' %
+                               BTSP_model_name)
+        input_field_width_key = str(int(context.input_field_width))
+        if 'calibrated_input' not in f or input_field_width_key not in f['calibrated_input']:
+            raise RuntimeError('optimize_biBTSP_%s: init context: data for input_field_width: %.1f not found in the '
+                               'provided data_file_path: %s' %
+                               (BTSP_model_name, float(context.input_field_width), context.data_file_path))
+        input_field_width = f['calibrated_input'][input_field_width_key].attrs['input_field_width']  # cm
+        input_rate_maps, peak_locs = \
+            generate_spatial_rate_maps(binned_x, num_inputs, input_field_peak_rate, input_field_width, track_length)
+        ramp_scaling_factor = f['calibrated_input'][input_field_width_key].attrs['ramp_scaling_factor']
+
+        all_data_keys = [(int(cell_id), int(induction)) for cell_id in f['data'] for induction in f['data'][cell_id]]
         if 'data_keys' not in context() or context.data_keys is None:
             if 'cell_id' not in context() or context.cell_id == 'all' or context.cell_id is None:
-                    context.data_keys = \
-                        [(int(cell_id), int(induction)) for cell_id in f['data'] for induction in f['data'][cell_id]]
+                context.data_keys = all_data_keys
             else:
                 context.data_keys = \
                     [(int(context.cell_id), int(induction)) for induction in f['data'][str(context.cell_id)]]
@@ -81,14 +113,15 @@ def init_context():
                                  ('1' not in f['data'][cell_id] or
                                   'before' not in f['data'][cell_id]['1']['raw']['exp_ramp'])]
     if context.verbose > 1:
-        print 'pid: %i; optimize_BTSP_V_B_CA1: processing the following data_keys: %s' % \
-              (os.getpid(), str(context.data_keys))
+        print('optimize_biBTSP_%s: pid: %i; processing the following data_keys: %s' %
+              (BTSP_model_name, os.getpid(), str(context.data_keys)))
     self_consistent_cell_ids = [cell_id for (cell_id, induction) in context.data_keys if induction == 1 and
-                                 (cell_id, 2) in context.data_keys]
+                                (cell_id, 2) in context.data_keys]
     down_dt = 10.  # ms, to speed up optimization
     context.update(locals())
     context.cell_id = None
     context.induction = None
+    context.data_cache = defaultdict(dict)
 
 
 def import_data(cell_id, induction):
@@ -101,84 +134,99 @@ def import_data(cell_id, induction):
     induction = int(induction)
     if cell_id == context.cell_id and induction == context.induction:
         return
-    cell_key = str(cell_id)
-    induction_key = str(induction)
-    with h5py.File(context.data_file_path, 'r') as f:
-        if cell_key not in f['data'] or induction_key not in f['data'][cell_key]:
-            raise KeyError('optimize_BTSP_V_B_CA1: no data found for cell_id: %s, induction: %s' %
-                           (cell_key, induction_key))
-        else:
-            context.cell_id = cell_id
-            context.induction = induction
-        this_group = f['data'][cell_key][induction_key]
-        context.induction_locs = this_group.attrs['induction_locs']
-        context.induction_durs = this_group.attrs['induction_durs']
-        context.exp_ramp_raw = {}
-        context.exp_ramp = {}
-        if 'before' in this_group['raw']['exp_ramp']:
-            context.exp_ramp_raw['before'] = this_group['raw']['exp_ramp']['before'][:]
-        context.position = {}
-        context.t = {}
-        context.current = []
-        for category in this_group['processed']['position']:
-            context.position[category] = []
-            context.t[category] = []
-            for i in xrange(len(this_group['processed']['position'][category])):
-                lap_key = str(i)
-                context.position[category].append(this_group['processed']['position'][category][lap_key][:])
-                context.t[category].append(this_group['processed']['t'][category][lap_key][:])
-        for i in xrange(len(this_group['processed']['current'])):
-            lap_key = str(i)
-            context.current.append(this_group['processed']['current'][lap_key][:])
-        context.mean_position = this_group['processed']['mean_position'][:]
-        context.mean_t = this_group['processed']['mean_t'][:]
 
-        # TODO: Need to re-interpolate exp_ramp_vs_t when replacing exp_ramp['after'] with ['before'] from induction 2
-        context.exp_ramp_vs_t = {'after': this_group['processed']['exp_ramp_vs_t']['after'][:]}
-        if 'before' in this_group['processed']['exp_ramp']:
-            context.exp_ramp['before'] = this_group['processed']['exp_ramp']['before'][:]
-            context.exp_ramp_vs_t['before'] = this_group['processed']['exp_ramp_vs_t']['before'][:]
-        context.LSA_ramp = {}
-        context.LSA_ramp_offset = {}
-        if 'before' in this_group['processed']['LSA_ramp']:
-            context.LSA_ramp['before'] = this_group['processed']['LSA_ramp']['before'][:]
-            context.LSA_ramp_offset['before'] = this_group['processed']['LSA_ramp']['before'].attrs['ramp_offset']
-        context.LSA_weights = {}
-        context.LSA_weights['before'] = this_group['processed']['LSA_weights']['before'][:]
-        context.complete_run_vel = this_group['complete']['run_vel'][:]
-        context.complete_run_vel_gate = this_group['complete']['run_vel_gate'][:]
-        context.complete_position = this_group['complete']['position'][:]
-        context.complete_t = this_group['complete']['t'][:]
-        context.induction_gate = this_group['complete']['induction_gate'][:]
-        # if both induction 1 and 2 are in dataset, for self-consistency, use same target_ramp
-        if induction == 1 and '2' in f['data'][cell_key]:
-            this_group = f['data'][cell_key]['2']
-            context.exp_ramp_raw['after'] = this_group['raw']['exp_ramp']['before'][:]
-            context.exp_ramp['after'] = this_group['processed']['exp_ramp']['before'][:]
-            context.LSA_ramp['after'] = this_group['processed']['LSA_ramp']['before'][:]
-            context.LSA_ramp_offset['after'] = this_group['processed']['LSA_ramp']['before'].attrs['ramp_offset']
-            context.LSA_weights['after'] = this_group['processed']['LSA_weights']['before'][:]
-        else:
-            context.exp_ramp_raw['after'] = this_group['raw']['exp_ramp']['after'][:]
-            context.exp_ramp['after'] = this_group['processed']['exp_ramp']['after'][:]
-            context.LSA_ramp['after'] = this_group['processed']['LSA_ramp']['after'][:]
-            context.LSA_ramp_offset['after'] = this_group['processed']['LSA_ramp']['after'].attrs['ramp_offset']
-            context.LSA_weights['after'] = this_group['processed']['LSA_weights']['after'][:]
-        context.peak_ramp_amp = 0.
-        for this_induction_key in f['data'][cell_key]:
-            if 'before' in f['data'][cell_key][this_induction_key]['processed']['exp_ramp']:
-                context.peak_ramp_amp = \
-                    max(context.peak_ramp_amp,
-                        np.max(f['data'][cell_key][this_induction_key]['processed']['exp_ramp']['before'][:]))
-            if 'after' in f['data'][cell_key][this_induction_key]['processed']['exp_ramp']:
-                context.peak_ramp_amp = \
-                    max(context.peak_ramp_amp,
-                        np.max(f['data'][cell_key][this_induction_key]['processed']['exp_ramp']['after'][:]))
+    if cell_id in context.data_cache and induction in context.data_cache[cell_id]:
+        induction_context = context.data_cache[cell_id][induction]
+    else:
+        cell_key = str(cell_id)
+        induction_key = str(induction)
+
+        induction_context = Context()
+
+        with h5py.File(context.data_file_path, 'r') as f:
+            if cell_key not in f['data'] or induction_key not in f['data'][cell_key]:
+                raise KeyError('optimize_biBTSP_%s: no data found for cell_id: %s, induction: %s' %
+                               (BTSP_model_name, cell_key, induction_key))
+            data_group = f['data'][cell_key][induction_key]
+            induction_context.induction_locs = data_group.attrs['induction_locs']
+            induction_context.induction_durs = data_group.attrs['induction_durs']
+            induction_context.exp_ramp_raw = {}
+            induction_context.exp_ramp = {}
+            if 'before' in data_group['raw']['exp_ramp']:
+                induction_context.exp_ramp_raw['before'] = data_group['raw']['exp_ramp']['before'][:]
+            induction_context.position = {}
+            induction_context.t = {}
+            induction_context.current = []
+            for category in data_group['processed']['position']:
+                induction_context.position[category] = []
+                induction_context.t[category] = []
+                for i in range(len(data_group['processed']['position'][category])):
+                    lap_key = str(i)
+                    induction_context.position[category].append(
+                        data_group['processed']['position'][category][lap_key][:])
+                    induction_context.t[category].append(data_group['processed']['t'][category][lap_key][:])
+            for i in range(len(data_group['processed']['current'])):
+                lap_key = str(i)
+                induction_context.current.append(data_group['processed']['current'][lap_key][:])
+            induction_context.mean_position = data_group['processed']['mean_position'][:]
+            induction_context.mean_t = data_group['processed']['mean_t'][:]
+
+            # TODO: exp_ramp_vs_t reflects mean, rather than min delay to plateau across laps
+            induction_context.exp_ramp_vs_t = {'after': data_group['processed']['exp_ramp_vs_t']['after'][:]}
+            if 'before' in data_group['processed']['exp_ramp']:
+                induction_context.exp_ramp['before'] = data_group['processed']['exp_ramp']['before'][:]
+                induction_context.exp_ramp_vs_t['before'] = data_group['processed']['exp_ramp_vs_t']['before'][:]
+            induction_context.LSA_ramp = {}
+            induction_context.LSA_ramp_offset = {}
+            calibrated_input_group = f['calibrated_input'][context.input_field_width_key][cell_key][induction_key]
+            if 'before' in calibrated_input_group['LSA_ramp']:
+                induction_context.LSA_ramp['before'] = calibrated_input_group['LSA_ramp']['before'][:]
+                induction_context.LSA_ramp_offset['before'] = calibrated_input_group['LSA_ramp']['before'].attrs[
+                    'ramp_offset']
+            induction_context.LSA_weights = {}
+            induction_context.LSA_weights['before'] = calibrated_input_group['LSA_weights']['before'][:]
+            induction_context.complete_run_vel = data_group['complete']['run_vel'][:]
+            induction_context.complete_run_vel_gate = data_group['complete']['run_vel_gate'][:]
+            induction_context.complete_position = data_group['complete']['position'][:]
+            induction_context.complete_t = data_group['complete']['t'][:]
+            induction_context.induction_gate = data_group['complete']['induction_gate'][:]
+            # if both induction 1 and 2 are in dataset, for self-consistency, use same target_ramp
+            if induction == 1 and '2' in f['data'][cell_key]:
+                data_group = f['data'][cell_key]['2']
+                calibrated_input_group = f['calibrated_input'][context.input_field_width_key][cell_key]['2']
+                induction_context.exp_ramp_raw['after'] = data_group['raw']['exp_ramp']['before'][:]
+                induction_context.exp_ramp['after'] = data_group['processed']['exp_ramp']['before'][:]
+                induction_context.LSA_ramp['after'] = calibrated_input_group['LSA_ramp']['before'][:]
+                induction_context.LSA_ramp_offset['after'] = calibrated_input_group['LSA_ramp']['before'].attrs[
+                    'ramp_offset']
+                induction_context.LSA_weights['after'] = calibrated_input_group['LSA_weights']['before'][:]
+            else:
+                induction_context.exp_ramp_raw['after'] = data_group['raw']['exp_ramp']['after'][:]
+                induction_context.exp_ramp['after'] = data_group['processed']['exp_ramp']['after'][:]
+                induction_context.LSA_ramp['after'] = calibrated_input_group['LSA_ramp']['after'][:]
+                induction_context.LSA_ramp_offset['after'] = calibrated_input_group['LSA_ramp']['after'].attrs[
+                    'ramp_offset']
+                induction_context.LSA_weights['after'] = calibrated_input_group['LSA_weights']['after'][:]
+            induction_context.peak_ramp_amp = 0.
+            for this_induction_key in f['data'][cell_key]:
+                if 'before' in f['data'][cell_key][this_induction_key]['processed']['exp_ramp']:
+                    induction_context.peak_ramp_amp = \
+                        max(induction_context.peak_ramp_amp,
+                            np.max(f['data'][cell_key][this_induction_key]['processed']['exp_ramp']['before'][:]))
+                if 'after' in f['data'][cell_key][this_induction_key]['processed']['exp_ramp']:
+                    induction_context.peak_ramp_amp = \
+                        max(induction_context.peak_ramp_amp,
+                            np.max(f['data'][cell_key][this_induction_key]['processed']['exp_ramp']['after'][:]))
+        context.data_cache[cell_id][induction] = induction_context
+    context.update(induction_context())
+
     context.mean_induction_start_loc = np.mean(context.induction_locs)
     context.mean_induction_dur = np.mean(context.induction_durs)
-    mean_induction_start_index = np.where(context.mean_position >= context.mean_induction_start_loc)[0][0]
-    mean_induction_stop_index = np.where(context.mean_t >= context.mean_t[mean_induction_start_index] +
-                                         context.mean_induction_dur)[0][0]
+    mean_induction_start_index = \
+    np.where(context.mean_position >= context.mean_induction_start_loc)[0][0]
+    mean_induction_stop_index = \
+    np.where(context.mean_t >= context.mean_t[mean_induction_start_index] +
+             context.mean_induction_dur)[0][0]
     context.mean_induction_stop_loc = context.mean_position[mean_induction_stop_index]
     induction_start_times = []
     induction_stop_times = []
@@ -186,8 +234,10 @@ def import_data(cell_id, induction):
     track_stop_times = []
     running_position = 0.
     running_t = 0.
-    for i, (this_induction_loc, this_induction_dur) in enumerate(zip(context.induction_locs, context.induction_durs)):
-        this_induction_start_index = np.where(context.complete_position >= this_induction_loc + running_position)[0][0]
+    for i, (this_induction_loc, this_induction_dur) in enumerate(
+            zip(context.induction_locs, context.induction_durs)):
+        this_induction_start_index = \
+        np.where(context.complete_position >= this_induction_loc + running_position)[0][0]
         this_induction_start_time = context.complete_t[this_induction_start_index]
         this_induction_stop_time = this_induction_start_time + this_induction_dur
         track_start_times.append(running_t)
@@ -200,16 +250,23 @@ def import_data(cell_id, induction):
     context.induction_stop_times = np.array(induction_stop_times)
     context.track_start_times = np.array(track_start_times)
     context.track_stop_times = np.array(track_stop_times)
-    context.complete_rate_maps = get_complete_rate_maps(context.input_rate_maps, context.binned_x)
-    context.down_t = np.arange(context.complete_t[0], context.complete_t[-1] + context.down_dt / 2., context.down_dt)
+    context.complete_rate_maps = \
+        get_complete_rate_maps(context.input_rate_maps, context.binned_x, context.position,
+                               context.complete_run_vel_gate)
+    context.down_t = np.arange(context.complete_t[0],
+                                         context.complete_t[-1] + context.down_dt / 2., context.down_dt)
     context.down_rate_maps = []
     for rate_map in context.complete_rate_maps:
         this_down_rate_map = np.interp(context.down_t, context.complete_t, rate_map)
         context.down_rate_maps.append(this_down_rate_map)
-    context.down_induction_gate = np.interp(context.down_t, context.complete_t, context.induction_gate)
+    context.down_induction_gate = np.interp(context.down_t, context.complete_t,
+                                                      context.induction_gate)
+    context.cell_id = cell_id
+    context.induction = induction
+
     if context.verbose > 1:
-        print 'optimize_BTSP_V_B_CA1: process: %i loaded data for cell: %i, induction: %i' % \
-              (os.getpid(), cell_id, induction)
+        print('optimize_biBTSP_%s: process: %i loaded data for cell: %i, induction: %i' %
+              (BTSP_model_name, os.getpid(), cell_id, induction))
 
 
 def update_model_params(x, local_context):
@@ -293,13 +350,15 @@ def plot_data():
     mean_induction_index = np.where(context.mean_position >= context.mean_induction_start_loc)[0][0]
     mean_induction_onset = context.mean_t[mean_induction_index]
     peak_val, ramp_width, peak_shift, ratio, start_loc, peak_loc, end_loc, min_val, min_loc = \
-        calculate_ramp_features(context, context.exp_ramp['after'], context.mean_induction_start_loc)
-    start_index, peak_index, end_index, min_index = get_indexes_from_ramp_bounds_with_wrap(context.binned_x, start_loc, peak_loc,
-                                                                                end_loc, min_loc)
+        calculate_ramp_features(ramp=context.exp_ramp['after'], induction_loc=context.mean_induction_start_loc,
+                                binned_x=context.binned_x, interp_x=context.default_interp_x,
+                                track_length=context.track_length)
+    start_index, peak_index, end_index, min_index = \
+        get_indexes_from_ramp_bounds_with_wrap(context.binned_x, start_loc, peak_loc, end_loc, min_loc)
     axes[1][0].scatter(context.binned_x[[start_index, peak_index, end_index]],
                        context.exp_ramp['after'][[start_index, peak_index, end_index]])
-    start_index, peak_index, end_index, min_index = get_indexes_from_ramp_bounds_with_wrap(context.mean_position, start_loc,
-                                                                                peak_loc, end_loc, min_loc)
+    start_index, peak_index, end_index, min_index = \
+        get_indexes_from_ramp_bounds_with_wrap(context.mean_position, start_loc, peak_loc, end_loc, min_loc)
     this_shifted_t = np.subtract(context.mean_t, mean_induction_onset) / 1000.
     axes[1][1].plot(this_shifted_t, context.exp_ramp_vs_t['after'])
     axes[1][1].scatter(this_shifted_t[[start_index, peak_index, end_index]],
@@ -343,8 +402,7 @@ def plot_data():
     clean_axes(axes)
     fig.tight_layout(h_pad=0.2)
     plt.subplots_adjust(top=0.9)
-    plt.show()
-    plt.close()
+    fig.show()
 
 
 def plot_data_summary():
@@ -364,8 +422,8 @@ def plot_data_summary():
 
     fig, axes = plt.subplots(1, 3, figsize=[16., 3.75])
     pretty_position = np.array(context.complete_position % context.track_length)
-    for i in xrange(1, len(pretty_position)):
-        if pretty_position[i] - pretty_position[i-1] < -context.track_length / 2.:
+    for i in range(1, len(pretty_position)):
+        if pretty_position[i] - pretty_position[i - 1] < -context.track_length / 2.:
             pretty_position[i] = np.nan
 
     axes[0].plot(context.complete_t / 1000., pretty_position, c='k')
@@ -413,161 +471,7 @@ def plot_data_summary():
     fig.tight_layout(h_pad=0.2)
     fig.suptitle('Cell: %i' % context.cell_id, fontsize=mpl.rcParams['font.size'])
     plt.subplots_adjust(top=0.9)
-    plt.show()
-    plt.close()
-
-
-def get_complete_rate_maps(input_rate_maps, input_x):
-    """
-    :param input_rate_maps: array
-    :param input_x: array (x resolution of input)
-    :return: list of array
-    """
-    complete_rate_maps = []
-    for j in xrange(len(input_rate_maps)):
-        this_complete_rate_map = np.array([])
-        for group in ['pre', 'induction', 'post']:
-            for i, this_position in enumerate(context.position[group]):
-                this_rate_map = np.interp(this_position, input_x, input_rate_maps[j])
-                this_complete_rate_map = np.append(this_complete_rate_map, this_rate_map)
-        this_complete_rate_map = np.multiply(this_complete_rate_map, context.complete_run_vel_gate)
-        if len(this_complete_rate_map) != len(context.complete_run_vel_gate):
-            print 'get_complete_rate_maps: mismatched array length'
-        complete_rate_maps.append(this_complete_rate_map)
-    return complete_rate_maps
-
-
-def get_complete_ramp(current_ramp, input_x):
-    """
-    :param current_ramp: array
-    :param input_x: array (x resolution of input)
-    :return: array
-    """
-    complete_ramp = np.array([])
-    for group in ['pre', 'induction', 'post']:
-        for i, this_position in enumerate(context.position[group]):
-            this_lap_vm = np.interp(this_position, input_x, current_ramp)
-            complete_ramp = np.append(complete_ramp, this_lap_vm)
-    complete_ramp = np.multiply(complete_ramp, context.complete_run_vel_gate)
-    complete_ramp[np.where(context.induction_gate == 1.)[0]] = context.peak_ramp_amp + context.delta_peak_ramp_amp
-    if len(complete_ramp) != len(context.complete_run_vel_gate):
-        print 'get_complete_ramp: mismatched array length'
-
-    return complete_ramp
-
-
-def get_filter(rise, decay, max_time_scale, dt=None):
-    """
-    :param rise: float
-    :param decay: float
-    :param max_time_scale: float
-    :param dt: float
-    :return: array, array
-    """
-    if dt is None:
-        dt = context.dt
-    filter_t = np.arange(0., 6. * max_time_scale, dt)
-    filter = np.exp(-filter_t / decay) - np.exp(-filter_t / rise)
-    peak_index = np.where(filter == np.max(filter))[0][0]
-    decay_indexes = np.where(filter[peak_index:] < 0.001 * np.max(filter))[0]
-    if np.any(decay_indexes):
-        filter = filter[:peak_index + decay_indexes[0]]
-    filter /= np.sum(filter)
-    filter_t = filter_t[:len(filter)]
-    return filter_t, filter
-
-
-def get_signal_filters(local_signal_rise, local_signal_decay, global_signal_rise, global_signal_decay, dt=None,
-                       plot=False):
-    """
-    :param local_signal_rise: float
-    :param local_signal_decay: float
-    :param global_signal_rise: float
-    :param global_signal_decay: float
-    :param dt: float
-    :param plot: bool
-    :return: array, array
-    """
-    max_time_scale = max(local_signal_rise + local_signal_decay, global_signal_rise + global_signal_decay)
-    local_signal_filter_t, local_signal_filter = get_exp_rise_decay_filter(local_signal_rise, local_signal_decay, max_time_scale, dt)
-    global_filter_t, global_filter = get_exp_rise_decay_filter(global_signal_rise, global_signal_decay, max_time_scale, dt)
-    if plot:
-        fig, axes = plt.subplots(1)
-        axes.plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='r',
-                  label='Local plasticity signal filter')
-        axes.plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
-                  label='Global plasticity signal filter')
-        axes.set_xlabel('Time (s)')
-        axes.set_ylabel('Normalized filter amplitude')
-        axes.set_title('Plasticity signal filters')
-        axes.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-        axes.set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
-        clean_axes(axes)
-        fig.tight_layout()
-        fig.show()
-    return local_signal_filter_t, local_signal_filter, global_filter_t, global_filter
-
-
-def get_local_signal(rate_map, local_filter, dt):
-    """
-
-    :param rate_map: array
-    :param local_filter: array
-    :param dt: float
-    :return: array
-    """
-    return np.convolve(0.001 * dt * rate_map, local_filter)[:len(rate_map)]
-
-
-def get_global_signal(induction_gate, global_filter):
-    """
-
-    :param induction_gate: array
-    :param global_filter: array
-    :return: array
-    """
-    return np.convolve(induction_gate, global_filter)[:len(induction_gate)]
-
-
-def get_local_signal_population(local_filter):
-    """
-
-    :param local_filter:
-    :return:
-    """
-    local_signals = []
-    for rate_map in context.down_rate_maps:
-        local_signals.append(get_local_signal(rate_map, local_filter, context.down_dt))
-    return local_signals
-
-
-def get_voltage_dependent_local_signal_population(local_filter, current_complete_ramp, phi, plot=False):
-    """
-
-    :param local_filter: array
-    :param current_complete_ramp: array
-    :param phi: lambda
-    :param plot: bool
-    :return: list of array
-    """
-    local_signals = []
-    normalized_ramp = current_complete_ramp / (context.peak_ramp_amp + context.delta_peak_ramp_amp)
-
-    this_phi = phi(normalized_ramp)
-    if plot:
-        fig, axes = plt.subplots()
-        ramp_range = np.linspace(np.min(normalized_ramp), np.max(normalized_ramp), 10000)
-        axes.plot(ramp_range, phi(ramp_range))
-        axes.set_ylabel('Normalized rate')
-        axes.set_xlabel('Normalized ramp amplitude')
-        axes.set_title('Rate of change in synaptic weight')
-        clean_axes(axes)
-        fig.tight_layout()
-        fig.show()
-    for rate_map in context.down_rate_maps:
-        local_signals.append(get_local_signal(np.multiply(rate_map, this_phi), local_filter, context.down_dt))
-
-    return local_signals
+    fig.show()
 
 
 def get_args_static_signal_amplitudes():
@@ -576,12 +480,7 @@ def get_args_static_signal_amplitudes():
     (static) for each set of parameters.
     :return: list of list
     """
-    with h5py.File(context.data_file_path, 'r') as f:
-        data_keys = []
-        for cell_key in f['data']:
-            for induction_key in f['data'][cell_key]:
-                data_keys.append((int(cell_key), int(induction_key)))
-    return zip(*data_keys)
+    return list(zip(*context.all_data_keys))
 
 
 def compute_features_signal_amplitudes(x, cell_id=None, induction=None, export=False, plot=False):
@@ -597,32 +496,26 @@ def compute_features_signal_amplitudes(x, cell_id=None, induction=None, export=F
     import_data(cell_id, induction)
     update_source_contexts(x, context)
     if context.verbose > 1:
-        print 'Process: %i: computing signal_amplitude features for cell_id: %i, induction: %i with x: %s' % \
-              (os.getpid(), context.cell_id, context.induction, ', '.join('%.3E' % i for i in x))
+        print('Process: %i: computing signal_amplitude features for cell_id: %i, induction: %i with x: %s' % \
+              (os.getpid(), context.cell_id, context.induction, ', '.join('%.3E' % i for i in x)))
+        sys.stdout.flush()
     start_time = time.time()
-    local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
-        get_dual_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
-                           context.global_signal_decay, context.down_dt, plot)
+    pot_signal_filter_t, pot_signal_filter, depot_signal_filter_t, depot_signal_filter, \
+    global_filter_t, global_filter = \
+        get_triple_signal_filters(context.pot_signal_rise, context.pot_signal_decay,
+                                  context.depot_signal_rise, context.depot_signal_decay,
+                                  context.global_signal_rise, context.global_signal_decay, context.down_dt, plot)
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
-    local_signals = get_local_signal_population(local_signal_filter)
-    local_signal_peaks = [np.max(local_signal) for local_signal in local_signals]
-    if plot:
-        fig, axes = plt.subplots(1)
-        hist, edges = np.histogram(local_signal_peaks, density=True)
-        bin_width = edges[1] - edges[0]
-        axes.plot(edges[:-1]+bin_width/2., hist * bin_width, c='r', label='Local plasticity signals')
-        axes.set_xlabel('Peak local plasticity signal amplitudes (a.u.)')
-        axes.set_ylabel('Probability')
-        axes.set_title('Local signal amplitude distribution')
-        axes.legend(loc='best', frameon=False, framealpha=0.5)
-        clean_axes(axes)
-        fig.tight_layout()
-        fig.show()
-    result = {'local_signal_peaks': local_signal_peaks,
+    pot_signals = get_local_signal_population(pot_signal_filter, context.down_rate_maps, context.down_dt)
+    depot_signals = get_local_signal_population(depot_signal_filter, context.down_rate_maps, context.down_dt)
+
+    result = {'pot_signal_peak': np.max(pot_signals),
+              'depot_signal_peak': np.max(depot_signals),
               'global_signal_peak': np.max(global_signal)}
     if context.verbose > 1:
-        print 'Process: %i: computing signal_amplitude features for cell_id: %i, induction: %i took %.1f s' % \
-              (os.getpid(), context.cell_id, context.induction, time.time() - start_time)
+        print('Process: %i: computing signal_amplitude features for cell_id: %i, induction: %i took %.1f s' %
+              (os.getpid(), context.cell_id, context.induction, time.time() - start_time))
+        sys.stdout.flush()
     return {cell_id: {induction: result}}
 
 
@@ -635,202 +528,91 @@ def filter_features_signal_amplitudes(primitives, current_features, export=False
     :param plot: bool
     :return: dict
     """
-    all_inputs_local_signal_peaks = np.array([], dtype='float32')
-    each_cell_local_signal_peak = []
-    each_cell_global_signal_peak = []
+    pot_signal_peaks = []
+    depot_signal_peaks = []
+    global_signal_peaks = []
     for this_dict in primitives:
         for cell_id in this_dict:
             for induction_id in this_dict[cell_id]:
-                each_cell_global_signal_peak.append(this_dict[cell_id][induction_id]['global_signal_peak'])
-                each_cell_local_signal_peak.append(
-                    np.max(this_dict[cell_id][induction_id]['local_signal_peaks']))
-                all_inputs_local_signal_peaks = np.append(all_inputs_local_signal_peaks,
-                                                          this_dict[cell_id][induction_id]['local_signal_peaks'])
+                global_signal_peaks.append(this_dict[cell_id][induction_id]['global_signal_peak'])
+                pot_signal_peaks.append(this_dict[cell_id][induction_id]['pot_signal_peak'])
+                depot_signal_peaks.append(this_dict[cell_id][induction_id]['depot_signal_peak'])
     if plot:
         fig, axes = plt.subplots(1)
-        hist, edges = np.histogram(all_inputs_local_signal_peaks, bins=10, density=True)
+        hist, edges = np.histogram(pot_signal_peaks, bins=min(10, len(primitives)), density=True)
         bin_width = edges[1] - edges[0]
-        axes.plot(edges[:-1] + bin_width / 2., hist * bin_width, c='r', label='Local plasticity signals')
+        axes.plot(edges[:-1] + bin_width / 2., hist * bin_width, c='c', label='Potentiation eligibility signals')
+        hist, edges = np.histogram(depot_signal_peaks, bins=min(10, len(primitives)), density=True)
+        bin_width = edges[1] - edges[0]
+        axes.plot(edges[:-1] + bin_width / 2., hist * bin_width, c='r', label='De-potentiation eligibility signals')
         axes.set_xlabel('Peak local plasticity signal amplitudes (a.u.)')
         axes.set_ylabel('Probability')
-        axes.set_title('Local signal amplitude distribution (all inputs, all cells)')
+        axes.set_title('Local signal amplitude distribution')
         axes.legend(loc='best', frameon=False, framealpha=0.5)
         clean_axes(axes)
         fig.tight_layout()
         fig.show()
 
-        fig, axes = plt.subplots(1)
-        hist, edges = np.histogram(each_cell_local_signal_peak, bins=min(10, len(primitives)), density=True)
-        bin_width = edges[1] - edges[0]
-        axes.plot(edges[:-1] + bin_width / 2., hist * bin_width, c='r', label='Local potentiation signals')
-        axes.set_xlabel('Peak local plasticity signal amplitudes (a.u.)')
-        axes.set_ylabel('Probability')
-        axes.set_title('Local signal amplitude distribution (each cell)')
-        axes.legend(loc='best', frameon=False, framealpha=0.5)
-        clean_axes(axes)
-        fig.tight_layout()
-        fig.show()
-
-        hist, edges = np.histogram(each_cell_global_signal_peak, bins=min(10, len(primitives)), density=True)
+        hist, edges = np.histogram(global_signal_peaks, bins=min(10, len(primitives)), density=True)
         bin_width = edges[1] - edges[0]
         fig, axes = plt.subplots(1)
         axes.plot(edges[:-1] + bin_width / 2., hist * bin_width, c='k')
         axes.set_xlabel('Peak global plasticity signal amplitudes (a.u.)')
         axes.set_ylabel('Probability')
-        axes.set_title('Global signal amplitude distribution (each cell)')
+        axes.set_title('Global signal amplitude distribution')
         clean_axes(axes)
         fig.tight_layout()
         fig.show()
-    signal_amplitude_features = {'local_signal_max': np.max(each_cell_local_signal_peak),
-                                 'global_signal_max': np.max(each_cell_global_signal_peak)
+    signal_amplitude_features = {'pot_signal_max': np.max(pot_signal_peaks),
+                                 'depot_signal_max': np.max(pot_signal_peaks),
+                                 'global_signal_max': np.max(global_signal_peaks)
                                  }
     if context.verbose > 1:
-        print 'Process: %i: signal_amplitude features; local_signal_max: %.2E, global_signal_max: %.2E' % \
-              (os.getpid(), signal_amplitude_features['local_signal_max'],
-               signal_amplitude_features['global_signal_max'])
+        print('Process: %i: signal_amplitude features; pot_signal_max: %.2E, depot_signal_max: %.2E, '
+              'global_signal_max: %.2E' % (os.getpid(), signal_amplitude_features['pot_signal_max'],
+                                           signal_amplitude_features['depot_signal_max'],
+                                           signal_amplitude_features['global_signal_max']))
     return signal_amplitude_features
 
 
-def get_model_ramp(delta_weights, input_x=None, ramp_x=None, allow_offset=False, impose_offset=None, plot=False):
+def calculate_model_ramp(pot_signal_peak=None, depot_signal_peak=None, global_signal_peak=None, export=False,
+                         plot=False):
     """
 
-    :param delta_weights: array
-    :param input_x: array (x resolution of inputs)
-    :param ramp_x: array (x resolution of ramp)
-    :param allow_offset: bool (allow special case where baseline Vm before 1st induction is unknown)
-    :param impose_offset: float (impose Vm offset from 1st induction on 2nd induction)
-    :param plot: bool
-    :return: array
-    """
-    if input_x is None:
-        input_x = context.binned_x
-    if ramp_x is None:
-        ramp_x = context.binned_x
-    model_ramp = np.multiply(delta_weights.dot(context.input_rate_maps), context.ramp_scaling_factor)
-    if len(model_ramp) != len(ramp_x):
-        model_ramp = np.interp(ramp_x, input_x, model_ramp)
-
-    if impose_offset is not None:
-        ramp_offset = impose_offset
-        model_ramp -= impose_offset
-    elif allow_offset:
-        model_ramp, ramp_offset = subtract_baseline(model_ramp)
-    else:
-        ramp_offset = 0.
-
-    if plot:
-        fig, axes = plt.subplots(1)
-        max_ramp = max(np.max(model_ramp), np.max(context.exp_ramp['after']))
-        axes.hlines(max_ramp * 1.2,
-                       xmin=context.mean_induction_start_loc,
-                       xmax=context.mean_induction_stop_loc, linewidth=2)
-        axes.plot(context.binned_x, context.exp_ramp['after'], label='Experiment')
-        axes.plot(context.binned_x, model_ramp, label='Model')
-        axes.set_ylim(-0.5, max_ramp * 1.4)
-        axes.set_xlabel('Location (cm)')
-        axes.set_ylabel('Ramp amplitude (mV)')
-        axes.set_title('Cell_id: %i, Induction: %i' % (context.cell_id, context.induction))
-        clean_axes(axes)
-        fig.tight_layout()
-        plt.show()
-        plt.close()
-
-    return model_ramp, ramp_offset
-
-
-def get_residual_score(delta_weights, target_ramp, input_x=None, ramp_x=None, allow_offset=False, impose_offset=None,
-                       disp=False, full_output=False):
-    """
-
-    :param delta_weights: array
-    :param target_ramp: array
-    :param input_x: array
-    :param ramp_x: array
-    :param allow_offset: bool (allow special case where baseline Vm before 1st induction is unknown)
-    :param impose_offset: float (impose Vm offset from 1st induction on 2nd induction)
-    :param disp: bool
-    :param full_output: bool
-    :return: float
-    """
-    if ramp_x is None:
-        ramp_x = context.binned_x
-    if input_x is None:
-        input_x = context.binned_x
-    if len(target_ramp) != len(input_x):
-        exp_ramp = np.interp(input_x, ramp_x, target_ramp)
-    else:
-        exp_ramp = np.array(target_ramp)
-
-    model_ramp, ramp_offset = get_model_ramp(delta_weights, input_x=input_x, ramp_x=ramp_x, allow_offset=allow_offset,
-                                             impose_offset=impose_offset)
-    Err = 0.
-    if allow_offset:
-        Err += (ramp_offset / context.target_range['ramp_offset']) ** 2.
-
-    ramp_amp, ramp_width, peak_shift, ratio, start_loc, peak_loc, end_loc, min_val, min_loc = {}, {}, {}, {}, {}, {}, \
-                                                                                              {}, {}, {}
-    ramp_amp['target'], ramp_width['target'], peak_shift['target'], ratio['target'], start_loc['target'], \
-    peak_loc['target'], end_loc['target'], min_val['target'], min_loc['target'] = \
-        calculate_ramp_features(context, exp_ramp, context.mean_induction_start_loc)
-
-    ramp_amp['model'], ramp_width['model'], peak_shift['model'], ratio['model'], start_loc['model'], \
-    peak_loc['model'], end_loc['model'], min_val['model'], min_loc['model'] = \
-        calculate_ramp_features(context, model_ramp, context.mean_induction_start_loc)
-
-    if disp:
-        print 'exp: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f, ' \
-              'end_loc: %.1f, min_val: %.1f, min_loc: %.1f' % \
-              (ramp_amp['target'], ramp_width['target'], peak_shift['target'], ratio['target'], start_loc['target'],
-               peak_loc['target'], end_loc['target'], min_val['target'], min_loc['target'])
-        print 'model: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f' \
-              ', end_loc: %.1f, min_val: %.1f, min_loc: %.1f' % \
-              (ramp_amp['model'], ramp_width['model'], peak_shift['model'], ratio['model'], start_loc['model'],
-               peak_loc['model'], end_loc['model'], min_val['model'], min_loc['model'])
-    sys.stdout.flush()
-
-    start_index, peak_index, end_index, min_index = \
-        get_indexes_from_ramp_bounds_with_wrap(ramp_x, start_loc['target'], peak_loc['target'], end_loc['target'],
-                                               min_loc['target'])
-
-    model_val_at_target_min_loc = model_ramp[min_index]
-    Err += ((model_val_at_target_min_loc - min_val['target']) / context.target_range['delta_min_val']) ** 2.
-    Err += ((min_val['model'] - min_val['target']) / context.target_range['delta_min_val']) ** 2.
-    model_val_at_target_peak_loc = model_ramp[peak_index]
-    Err += ((model_val_at_target_peak_loc - ramp_amp['target']) / context.target_range['delta_peak_val']) ** 2.
-
-    for i in xrange(len(exp_ramp)):
-        Err += ((exp_ramp[i] - model_ramp[i]) / context.target_range['residuals']) ** 2.
-    # regularization
-    for delta in np.diff(np.insert(delta_weights, 0, delta_weights[-1])):
-        Err += (delta / context.target_range['weights_smoothness']) ** 2.
-
-    if full_output:
-        return model_ramp, delta_weights, ramp_offset, Err
-    else:
-        return Err
-
-
-def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export=False, plot=False):
-    """
-
-    :param local_signal_peak: float
+    :param pot_signal_peak: float
+    :param depot_signal_peak: float
     :param global_signal_peak: float
     :param export: bool
     :param plot: bool
     :return: dict
     """
-    local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
-        get_dual_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
-                           context.global_signal_decay, context.down_dt, plot)
+    pot_signal_filter_t, pot_signal_filter, depot_signal_filter_t, depot_signal_filter, \
+    global_filter_t, global_filter = \
+        get_triple_signal_filters(context.pot_signal_rise, context.pot_signal_decay,
+                                  context.depot_signal_rise, context.depot_signal_decay,
+                                  context.global_signal_rise, context.global_signal_decay, context.down_dt, plot)
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
 
-    # BCM-like voltage dependence; nonlinear
+    # BCM-like voltage dependence; linear
     signal_xrange = np.linspace(0., 1., 10000)
-    pot_rate = scaled_single_sigmoid(context.r_pot_th, context.r_pot_th - context.r_pot_peak, signal_xrange,
-                                     ylim=[1., 0.])
-    depot_rate = scaled_single_sigmoid(context.r_depot_th, context.r_depot_th + context.r_depot_peak, signal_xrange)
-    phi = np.vectorize(lambda x: context.k_pot * pot_rate(min(1., max(0., x))) -
-                                 context.k_depot * depot_rate(max(0., min(1., x))))
+    pot_phi = np.vectorize(lambda x: min(1., max(0., (1. - x))))
+    depot_phi = np.vectorize(lambda x: min(1., max(0., x)))
+
+    pot_rate = lambda x: x
+    depot_rate = lambda x: x
+
+    if plot:
+        fig, axes = plt.subplots(1)
+        depot_scale = context.k_depot / context.k_pot
+        axes.plot(signal_xrange, pot_rate(signal_xrange), c='c', label='Potentiation rate')
+        axes.plot(signal_xrange, depot_rate(signal_xrange) * depot_scale, c='r', label='De-potentiation rate')
+        axes.set_xlabel('Normalized eligibility signal amplitude (a.u.)')
+        axes.set_ylabel('Normalized rate')
+        axes.set_title('Plasticity signal transformations')
+        axes.legend(loc='best', frameon=False, framealpha=0.5)
+        clean_axes(axes)
+        fig.tight_layout()
+        fig.show()
 
     allow_offset = False
     initial_delta_weights = context.LSA_weights['before']
@@ -840,7 +622,9 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             initial_ramp = context.LSA_ramp['before']
             initial_ramp_offset = None
         else:
-            initial_ramp, discard_ramp_offset = get_model_ramp(initial_delta_weights)
+            initial_ramp, discard_ramp_offset = \
+                get_model_ramp(initial_delta_weights, ramp_x=context.binned_x, input_x=context.binned_x,
+                               input_rate_maps=context.input_rate_maps, ramp_scaling_factor=context.ramp_scaling_factor)
             initial_ramp_offset = context.LSA_ramp_offset['after']
     else:
         initial_ramp = context.LSA_ramp['before']
@@ -854,7 +638,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     target_ramp = context.exp_ramp['after']
 
     prev_residual_score = 0.
-    for i in xrange(len(target_ramp)):
+    for i in range(len(target_ramp)):
         prev_residual_score += ((current_ramp[i] - target_ramp[i]) / context.target_range['residuals']) ** 2.
 
     if plot:
@@ -863,7 +647,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
         axes[0].plot(context.down_t / 1000., global_signal)
         axes[0].set_ylabel('Plasticity gating signal')
         axes[1].set_xlabel('Time (s)')
-        axes[1].set_ylabel('Ramp amplitude (mV)')
+        axes[1].set_ylabel('Normalized ramp amplitude (mV)')
 
         fig2, axes2 = plt.subplots(1, 2, sharex=True)
         fig2.suptitle('Induction: %i' % context.induction)
@@ -873,12 +657,37 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
         axes2[1].set_ylabel('Change in synaptic weight')
         axes2[1].set_xlabel('Location (cm)')
 
-    for induction_lap in xrange(len(context.induction_start_times)):
-        current_complete_ramp = np.interp(context.down_t, context.complete_t,
-                                          get_complete_ramp(current_ramp, context.binned_x))
-        local_signals = np.divide(
-            get_voltage_dependent_local_signal_population(local_signal_filter, current_complete_ramp, phi,
-                                                          plot=plot and induction_lap == 0), local_signal_peak)
+    this_peak_ramp_amp = context.peak_ramp_amp + context.delta_peak_ramp_amp
+
+    for induction_lap in range(len(context.induction_start_times)):
+        current_complete_ramp = get_complete_ramp(current_ramp, context.binned_x, context.position,
+                                                  context.complete_run_vel_gate, context.induction_gate,
+                                                  this_peak_ramp_amp)
+        current_complete_normalized_ramp = \
+            np.divide(np.interp(context.down_t, context.complete_t, current_complete_ramp), this_peak_ramp_amp)
+        pot_eligibility_signals = np.divide(
+            get_voltage_dependent_eligibility_signal_population(pot_signal_filter, current_complete_normalized_ramp,
+                                                                pot_phi, context.down_rate_maps, context.down_dt),
+            pot_signal_peak)
+        depot_eligibility_signals = np.divide(
+            get_voltage_dependent_eligibility_signal_population(depot_signal_filter, current_complete_normalized_ramp,
+                                                                depot_phi, context.down_rate_maps, context.down_dt),
+            depot_signal_peak)
+
+        if plot and induction_lap == 0:
+            fig, axes = plt.subplots()
+            voltage_range = np.linspace(np.min(current_complete_normalized_ramp),
+                                        np.max(current_complete_normalized_ramp), 10000)
+            axes.plot(voltage_range, pot_phi(voltage_range), c='c', label='Potentiation')
+            axes.plot(voltage_range, depot_phi(voltage_range), c='r', label='De-potentiation')
+            axes.set_ylabel('Voltage-dependent modulation factor')
+            axes.set_xlabel('Normalized ramp amplitude')
+            axes.set_title('Linear voltage-dependent modulation\nof synaptic eligibility')
+            axes.legend(loc='best', frameon=False, framealpha=0.5)
+            clean_axes(axes)
+            fig.tight_layout()
+            fig.show()
+
         if induction_lap == 0:
             start_time = context.down_t[0]
         else:
@@ -889,31 +698,39 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             stop_time = context.induction_start_times[induction_lap + 1]
         indexes = np.where((context.down_t >= start_time) & (context.down_t <= stop_time))
         next_delta_weights = []
-        for i, this_local_signal in enumerate(local_signals):
-            this_delta_weight = np.trapz(np.multiply(this_local_signal[indexes], global_signal[indexes]),
-                                         dx=context.down_dt/1000.)
+        for i, (this_pot_signal, this_depot_signal) in \
+                enumerate(zip(pot_eligibility_signals, depot_eligibility_signals)):
+            this_pot_rate = np.trapz(np.multiply(pot_rate(this_pot_signal[indexes]), global_signal[indexes]),
+                                     dx=context.down_dt / 1000.)
+            this_depot_rate = np.trapz(np.multiply(depot_rate(this_depot_signal[indexes]), global_signal[indexes]),
+                                       dx=context.down_dt / 1000.)
+
+            this_delta_weight = context.k_pot * this_pot_rate - context.k_depot * this_depot_rate
             next_delta_weights.append(max(current_delta_weights[i] + this_delta_weight, -1.))
         if plot:
-            axes[1].plot(context.down_t[indexes] / 1000., current_complete_ramp[indexes],
+            axes[1].plot(context.down_t[indexes] / 1000., current_complete_normalized_ramp[indexes],
                          label='Lap: %i' % (induction_lap + 1))
             axes2[1].plot(context.peak_locs, np.subtract(next_delta_weights, current_delta_weights),
                           label='Induction lap: %i' % (induction_lap + 1))
         current_delta_weights = np.array(next_delta_weights)
         delta_weights_snapshots.append(current_delta_weights)
-        current_ramp, discard_ramp_offset = get_model_ramp(current_delta_weights, allow_offset=allow_offset,
-                                                           impose_offset=initial_ramp_offset)
+        current_ramp, discard_ramp_offset = \
+            get_model_ramp(current_delta_weights, ramp_x=context.binned_x, input_x=context.binned_x,
+                           input_rate_maps=context.input_rate_maps, ramp_scaling_factor=context.ramp_scaling_factor,
+                           allow_offset=allow_offset, impose_offset=initial_ramp_offset)
+
         if plot:
             axes2[0].plot(context.binned_x, current_ramp)
         ramp_snapshots.append(current_ramp)
 
         current_residual_score = 0.
-        for i in xrange(len(target_ramp)):
+        for i in range(len(target_ramp)):
             current_residual_score += ((current_ramp[i] - target_ramp[i]) / context.target_range['residuals']) ** 2.
 
         if current_residual_score > 1.1 * prev_residual_score:
             if context.verbose > 0:
-                print 'optimize_BTSP_V_B_CA1: calculate_model_ramp: pid: %i; aborting - residual score not ' \
-                      'decreasing; induction: %i, lap: %i' % (os.getpid(), context.induction, induction_lap + 1)
+                print('optimize_biBTSP_%s: calculate_model_ramp: pid: %i; aborting - residual score not decreasing; '
+                      'induction: %i, lap: %i' % (BTSP_model_name, os.getpid(), context.induction, induction_lap + 1))
             if plot:
                 axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
                 axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
@@ -944,7 +761,11 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             allow_offset = True
 
     model_ramp, discard_delta_weights, model_ramp_offset, model_residual_score = \
-        get_residual_score(current_delta_weights, target_ramp, allow_offset=allow_offset,
+        get_residual_score(current_delta_weights, target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
+                           interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
+                           ramp_scaling_factor=context.ramp_scaling_factor,
+                           induction_loc=context.mean_induction_start_loc, track_length=context.track_length,
+                           target_range=context.target_range, allow_offset=allow_offset,
                            impose_offset=initial_ramp_offset, full_output=True)
 
     if allow_offset and context.induction == 1:
@@ -956,7 +777,11 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     if context.cell_id in context.allow_offset_cell_ids and context.induction == 1:
         LSA_delta_weights = context.LSA_weights['after']
         LSA_ramp, LSA_delta_weights, LSA_ramp_offset, LSA_residual_score = \
-            get_residual_score(LSA_delta_weights, target_ramp, allow_offset=allow_offset,
+            get_residual_score(LSA_delta_weights, target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
+                               interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
+                               ramp_scaling_factor=context.ramp_scaling_factor,
+                               induction_loc=context.mean_induction_start_loc, track_length=context.track_length,
+                               target_range=context.target_range, allow_offset=allow_offset,
                                impose_offset=initial_ramp_offset, full_output=True)
         result['self_consistent_delta_residual_score'] = max(0., model_residual_score - LSA_residual_score)
     else:
@@ -967,32 +792,38 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
 
     ramp_amp['target'], ramp_width['target'], peak_shift['target'], ratio['target'], start_loc['target'], \
     peak_loc['target'], end_loc['target'], min_val['target'], min_loc['target'] = \
-        calculate_ramp_features(context, target_ramp, context.mean_induction_start_loc)
+        calculate_ramp_features(ramp=target_ramp, induction_loc=context.mean_induction_start_loc,
+                                binned_x=context.binned_x, interp_x=context.default_interp_x,
+                                track_length=context.track_length)
 
     ramp_amp['model'], ramp_width['model'], peak_shift['model'], ratio['model'], start_loc['model'], \
     peak_loc['model'], end_loc['model'], min_val['model'], min_loc['model'] = \
-        calculate_ramp_features(context, model_ramp, context.mean_induction_start_loc)
+        calculate_ramp_features(ramp=model_ramp, induction_loc=context.mean_induction_start_loc,
+                                binned_x=context.binned_x, interp_x=context.default_interp_x,
+                                track_length=context.track_length)
 
     if LSA_ramp is not None:
         ramp_amp['LSA'], ramp_width['LSA'], peak_shift['LSA'], ratio['LSA'], start_loc['LSA'], \
         peak_loc['LSA'], end_loc['LSA'], min_val['LSA'], min_loc['LSA'] = \
-            calculate_ramp_features(context, LSA_ramp, context.mean_induction_start_loc)
+            calculate_ramp_features(ramp=LSA_ramp, induction_loc=context.mean_induction_start_loc,
+                                    binned_x=context.binned_x, interp_x=context.default_interp_x,
+                                    track_length=context.track_length)
 
     if context.verbose > 0:
-        print 'Process: %i; cell: %i; induction: %i:' % (os.getpid(), context.cell_id, context.induction)
-        print 'exp: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f, ' \
+        print('Process: %i; cell: %i; induction: %i:' % (os.getpid(), context.cell_id, context.induction))
+        print('exp: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f, ' \
               'end_loc: %.1f, min_val: %.1f, min_loc: %.1f' % \
               (ramp_amp['target'], ramp_width['target'], peak_shift['target'], ratio['target'], start_loc['target'],
-               peak_loc['target'], end_loc['target'], min_val['target'], min_loc['target'])
+               peak_loc['target'], end_loc['target'], min_val['target'], min_loc['target']))
         if LSA_ramp is not None:
-            print 'LSA: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, ' \
+            print('LSA: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, ' \
                   'peak_loc: %.1f, end_loc: %.1f, min_val: %.1f, min_loc: %.1f, ramp_offset: %.3f' % \
                   (ramp_amp['LSA'], ramp_width['LSA'], peak_shift['LSA'], ratio['LSA'], start_loc['LSA'],
-                   peak_loc['LSA'], end_loc['LSA'], min_val['LSA'], min_loc['LSA'], LSA_ramp_offset)
-        print 'model: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f' \
+                   peak_loc['LSA'], end_loc['LSA'], min_val['LSA'], min_loc['LSA'], LSA_ramp_offset))
+        print('model: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f' \
               ', end_loc: %.1f, min_val: %.1f, min_loc: %.1f, ramp_offset: %.3f' % \
               (ramp_amp['model'], ramp_width['model'], peak_shift['model'], ratio['model'], start_loc['model'],
-               peak_loc['model'], end_loc['model'], min_val['model'], min_loc['model'], model_ramp_offset)
+               peak_loc['model'], end_loc['model'], min_val['model'], min_loc['model'], model_ramp_offset))
         sys.stdout.flush()
 
     result['delta_amp'] = ramp_amp['model'] - ramp_amp['target']
@@ -1038,9 +869,13 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
 
     local_peak_loc, local_peak_shift = {}, {}
     local_peak_loc['target'], local_peak_shift['target'] = \
-        get_local_peak_shift(context, target_ramp, context.mean_induction_start_loc)
+        get_local_peak_shift(ramp=target_ramp, induction_loc=context.mean_induction_start_loc,
+                             binned_x=context.binned_x, interp_x=context.default_interp_x,
+                             track_length=context.track_length)
     local_peak_loc['model'], local_peak_shift['model'] = \
-        get_local_peak_shift(context, model_ramp, context.mean_induction_start_loc)
+        get_local_peak_shift(ramp=model_ramp, induction_loc=context.mean_induction_start_loc,
+                             binned_x=context.binned_x, interp_x=context.default_interp_x,
+                             track_length=context.track_length)
 
     if export:
         with h5py.File(context.temp_output_path, 'a') as f:
@@ -1050,7 +885,10 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
                 group = f[shared_context_key]
                 group.create_dataset('peak_locs', compression='gzip', data=context.peak_locs)
                 group.create_dataset('binned_x', compression='gzip', data=context.binned_x)
-                group.create_dataset('param_names', compression='gzip', data=context.param_names)
+                group.create_dataset('signal_xrange', compression='gzip', data=signal_xrange)
+                group.create_dataset('param_names', compression='gzip', data=np.asarray(context.param_names, dtype='S'))
+                group.attrs['input_field_width'] = context.input_field_width
+                group.attrs['ramp_scaling_factor'] = context.ramp_scaling_factor
             exported_data_key = 'exported_data'
             if exported_data_key not in f:
                 f.create_group(exported_data_key)
@@ -1077,12 +915,16 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             group.create_dataset('initial_weights', compression='gzip', data=np.add(initial_delta_weights, 1.))
             group.create_dataset('global_signal', compression='gzip', data=global_signal)
             group.create_dataset('down_t', compression='gzip', data=context.down_t)
+            group.create_dataset('pot_rate', compression='gzip', data=pot_rate(signal_xrange))
+            group.create_dataset('depot_rate', compression='gzip', data=depot_rate(signal_xrange))
             group.create_dataset('param_array', compression='gzip', data=context.x_array)
-            group.create_dataset('local_signal_filter_t', compression='gzip', data=local_signal_filter_t)
-            group.create_dataset('local_signal_filter', compression='gzip', data=local_signal_filter)
+            group.create_dataset('pot_signal_filter_t', compression='gzip', data=pot_signal_filter_t)
+            group.create_dataset('pot_signal_filter', compression='gzip', data=pot_signal_filter)
+            group.create_dataset('depot_signal_filter_t', compression='gzip', data=depot_signal_filter_t)
+            group.create_dataset('depot_signal_filter', compression='gzip', data=depot_signal_filter)
             group.create_dataset('global_filter_t', compression='gzip', data=global_filter_t)
             group.create_dataset('global_filter', compression='gzip', data=global_filter)
-            group.attrs['local_signal_peak'] = local_signal_peak
+            group.attrs['pot_signal_peak'] = pot_signal_peak
             group.attrs['global_signal_peak'] = global_signal_peak
             group.attrs['mean_induction_start_loc'] = context.mean_induction_start_loc
             group.attrs['mean_induction_stop_loc'] = context.mean_induction_stop_loc
@@ -1144,14 +986,18 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     with h5py.File(model_file_path, 'r') as f:
         group = f['exported_data'][str(cell_id)]['2']['model_ramp_features']
         x = group['param_array'][:]
-        if 'local_signal_peak' not in group.attrs or 'global_signal_peak' not in group.attrs:
+        if 'pot_signal_peak' not in group.attrs or 'depot_signal_peak' not in group.attrs or \
+                'global_signal_peak' not in group.attrs:
             raise KeyError('plot_model_summary_figure: missing required attributes for cell_id: %i, '
                            'induction 2; from file: %s' % (cell_id, model_file_path))
         group = f['exported_data'][str(cell_id)]['2']['model_ramp_features']
-        local_signal_peak = group.attrs['local_signal_peak']
+        pot_signal_peak = group.attrs['pot_signal_peak']
+        depot_signal_peak = group.attrs['depot_signal_peak']
         global_signal_peak = group.attrs['global_signal_peak']
-        local_signal_filter_t = group['local_signal_filter_t'][:]
-        local_signal_filter = group['local_signal_filter'][:]
+        pot_signal_filter_t = group['pot_signal_filter_t'][:]
+        pot_signal_filter = group['pot_signal_filter'][:]
+        depot_signal_filter_t = group['depot_signal_filter_t'][:]
+        depot_signal_filter = group['depot_signal_filter'][:]
         global_filter_t = group['global_filter_t'][:]
         global_filter = group['global_filter'][:]
         initial_weights = group['initial_weights'][:]
@@ -1160,10 +1006,10 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
         target_ramp = group['target_ramp'][:]
         model_ramp = group['model_ramp'][:]
         ramp_snapshots = []
-        for lap in xrange(len(group['ramp_snapshots'])):
+        for lap in range(len(group['ramp_snapshots'])):
             ramp_snapshots.append(group['ramp_snapshots'][str(lap)][:])
         delta_weights_snapshots = []
-        for lap in xrange(len(group['delta_weights_snapshots'])):
+        for lap in range(len(group['delta_weights_snapshots'])):
             delta_weights_snapshots.append(group['delta_weights_snapshots'][str(lap)][:])
         final_weights = group['model_weights'][:]
 
@@ -1171,9 +1017,13 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     update_source_contexts(x)
 
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
-    local_signals = np.divide(get_local_signal_population(local_signal_filter), local_signal_peak)
 
     signal_xrange = np.linspace(0., 1., 10000)
+    pot_phi = np.vectorize(lambda x: min(1., max(0., (1. - x))))
+    depot_phi = np.vectorize(lambda x: min(1., max(0., x)))
+
+    pot_rate = lambda x: x
+    depot_rate = lambda x: x
 
     resolution = 10
     input_sample_indexes = np.arange(0, len(context.peak_locs), resolution)
@@ -1244,15 +1094,18 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     bar_loc = ymax - 0.5
     this_axis.hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
     # this_axis.set_title('Bidirectional BTSP model', fontsize=mpl.rcParams['font.size'])
-    this_axis.legend(loc=(0.05, 0.95), frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
+    this_axis.legend(loc=(0.05, 0.95), frameon=False, framealpha=0.5, handlelength=1,
+                     fontsize=mpl.rcParams['font.size'])
     this_axis.set_xticks(np.arange(0., context.track_length, 45.))
 
     this_axis = fig.add_subplot(gs0[0, 2])
     axes.append(this_axis)
-    xmax = max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.
+    xmax = max(5000., pot_signal_filter_t[-1], depot_signal_filter_t[-1], global_filter_t[-1]) / 1000.
     xmax = math.ceil(xmax)
-    this_axis.plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='lightgray',
-                   label='Synaptic\neligibility signal')
+    this_axis.plot(pot_signal_filter_t / 1000., pot_signal_filter / np.max(pot_signal_filter), color='c',
+                   label='Potentiation\neligibility signal')
+    this_axis.plot(depot_signal_filter_t / 1000., depot_signal_filter / np.max(depot_signal_filter), color='r',
+                   label='De-potentiation\neligibility signal')
     this_axis.plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
                    label='Dendritic\ngating signal')
     this_axis.set_xlabel('Time (s)')
@@ -1261,24 +1114,18 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     this_axis.set_xlim(-0.5, xmax)
     this_axis.set_title('Plasticity signal kinetics', fontsize=mpl.rcParams['font.size'])
     this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-    this_axis.set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
 
     this_axis = fig.add_subplot(gs0[0, 3])
     axes.append(this_axis)
-    voltage_range = np.linspace(0., 1., 10000)
-    pot_rate = scaled_single_sigmoid(context.r_pot_th, context.r_pot_th - context.r_pot_peak, signal_xrange,
-                                     ylim=[1., 0.])
-    depot_rate = scaled_single_sigmoid(context.r_depot_th, context.r_depot_th + context.r_depot_peak, signal_xrange)
-    phi = np.vectorize(lambda x: context.k_pot * pot_rate(min(1., max(0., x))) -
-                                 context.k_depot * depot_rate(max(0., min(1., x))))
-    this_phi = phi(voltage_range)
-    this_axis.plot(voltage_range, this_phi/np.max(this_phi), c='k')
-    this_axis.plot(voltage_range, np.zeros_like(voltage_range), linestyle='--', c='grey')
-    this_axis.set_xlabel('Normalized voltage')
+    depot_scale = context.k_depot / context.k_pot
+    this_axis.plot(signal_xrange, pot_rate(signal_xrange), label='Potentiation', c='c')
+    this_axis.plot(signal_xrange, depot_rate(signal_xrange) * depot_scale, label='De-potentiation', c='r')
+    this_axis.set_xlabel('Normalized eligibility signal')
     this_axis.set_ylabel('Normalized rate')
+    this_axis.set_ylim(0., this_axis.get_ylim()[1])
     this_axis.set_xlim(0., 1.)
     this_axis.set_title('Rate of change in synaptic weight', fontsize=mpl.rcParams['font.size'])
-
+    this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
     clean_axes(axes)
 
     colors = ['r', 'c']
@@ -1355,12 +1202,12 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
         this_axis = fig.add_subplot(gs0[row, 0])
         axes2.append(this_axis)
         this_max_rate_map = np.zeros_like(context.input_rate_maps[0])
-        for i in (index for index in input_sample_indexes if index not in example_input_dict.itervalues()):
+        for i in (index for index in input_sample_indexes if index not in viewvalues(example_input_dict)):
             rate_map = np.array(context.input_rate_maps[i])
             rate_map *= weights[i] * context.ramp_scaling_factor
             ymax = max(ymax, np.max(rate_map))
             this_axis.plot(context.binned_x, rate_map, c='lightgray', zorder=0, linewidth=0.75)  # , alpha=0.5)
-        for i, (name, index) in enumerate(example_input_dict.iteritems()):
+        for i, (name, index) in enumerate(viewitems(example_input_dict)):
             rate_map = np.array(context.input_rate_maps[index])
             rate_map *= weights[index] * context.ramp_scaling_factor
             ymax = max(ymax, np.max(rate_map))
@@ -1378,6 +1225,20 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     clean_axes(axes2)
     fig.show()
 
+    voltage_range = np.linspace(0., 1., 10000)
+    fig, this_axis = plt.subplots()
+    this_axis.plot(voltage_range, pot_phi(voltage_range), c='c', label='Potentiation')
+    this_axis.plot(voltage_range, depot_phi(voltage_range), c='r', label='De-potentiation')
+    this_axis.plot(voltage_range, np.zeros_like(voltage_range), linestyle='--', c='grey')
+    this_axis.set_xlabel('Normalized voltage')
+    this_axis.set_ylabel('Voltage-dependent modulation factor')
+    this_axis.set_xlim(0., 1.)
+    this_axis.set_title('Linear voltage-dependent modulation\nof synaptic eligibility')
+    this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+    clean_axes(this_axis)
+    fig.tight_layout()
+    fig.show()
+
     fig2, axes2 = plt.subplots(1, 2, sharex=True)
     fig2.suptitle('Induction: %i' % context.induction)
     axes2[0].plot(context.binned_x, ramp_snapshots[0], c='k', label='Before')
@@ -1385,7 +1246,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     axes2[0].set_xlabel('Location (cm)')
     axes2[1].set_ylabel('Change in synaptic weight')
     axes2[1].set_xlabel('Location (cm)')
-    for i in xrange(1, len(ramp_snapshots)):
+    for i in range(1, len(ramp_snapshots)):
         current_ramp = ramp_snapshots[i]
         current_delta_weights = np.subtract(delta_weights_snapshots[i], delta_weights_snapshots[i-1])
         axes2[0].plot(context.binned_x, current_ramp)
@@ -1395,35 +1256,29 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     fig2.tight_layout()
     fig2.show()
 
-
     # New figures
 
     fig, axes = plt.subplots(2, 3, figsize=(12., 6.5))
-    xmax = max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.
+    xmax = max(5000., pot_signal_filter_t[-1], depot_signal_filter_t[-1], global_filter_t[-1]) / 1000.
     xmax = math.ceil(xmax)
-    axes[0][0].plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='darkgray',
-                   label='Synaptic\neligibility signal')
+    axes[0][0].plot(pot_signal_filter_t / 1000., pot_signal_filter / np.max(pot_signal_filter), color='c',
+                    label='Potentiation\neligibility signal')
+    axes[0][0].plot(depot_signal_filter_t / 1000., depot_signal_filter / np.max(depot_signal_filter), color='r',
+                    label='De-potentiation\neligibility signal')
     axes[0][0].plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
-                   label='Dendritic\ngating signal')
+                    label='Dendritic\ngating signal')
     axes[0][0].set_xlabel('Time (s)')
     axes[0][0].set_ylabel('Normalized amplitude')
     axes[0][0].set_xlim(-0.5, xmax)
     axes[0][0].set_title('Plasticity signal kinetics', fontsize=mpl.rcParams['font.size'], pad=10.)
     axes[0][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-    axes[0][0].set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
 
-    axes[0][1].set_xlabel('Normalized voltage')
+    axes[0][1].set_xlabel('Normalized eligibility signal')
     axes[0][1].set_ylabel('Normalized rate')
-    axes[0][1].set_title('Sigmoidal q$_{+}$, sigmoidal q$_{-}$', fontsize=mpl.rcParams['font.size'], pad=10.)
+    axes[0][1].set_title('Linear q$_{+}$, linear q$_{-}$', fontsize=mpl.rcParams['font.size'], pad=10.)
     axes[0][1].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='q$_{+}$ (Potentiation)')
-    axes[0][1].plot(signal_xrange, depot_rate(signal_xrange), c='r', label='q$_{-}$ (De-potentiation)')
+    axes[0][1].plot(signal_xrange, depot_rate(signal_xrange) * depot_scale, c='r', label='q$_{-}$ (De-potentiation)')
     axes[0][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-
-    axes[0][2].plot(voltage_range, this_phi / np.max(this_phi), c='k')
-    axes[0][2].axhline(y=0., linestyle='--', c='grey')
-    axes[0][2].set_xlabel('Normalized voltage')
-    axes[0][2].set_ylabel('Normalized rate')
-    axes[0][2].set_title('Net rate of change in synaptic weight', fontsize=mpl.rcParams['font.size'], pad=10.)
 
     bar_loc = max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.) * 0.95
     delta_weights = np.subtract(final_weights, initial_weights)
@@ -1442,7 +1297,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     axes[1][2].set_xticks(np.arange(0., context.track_length, 45.))
     axes[1][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
     axes[1][1].set_ylim([min(-1., np.min(model_ramp) - 1., np.min(target_ramp) - 1.),
-                      max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.)])
+                         max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.)])
     axes[1][2].set_ylim([-peak_weight, peak_weight * 1.1])
     axes[1][1].set_title('Voltage-dependent model', fontsize=mpl.rcParams['font.size'], pad=10.)
 
@@ -1476,18 +1331,19 @@ def get_args_dynamic_model_ramp(x, features):
     :return: list of list
     """
     group_size = len(context.data_keys)
-    return [list(item) for item in zip(*context.data_keys)] + [[features['local_signal_max']] * group_size] + \
-           [[features['global_signal_max']] * group_size]
+    return [list(item) for item in zip(*context.data_keys)] + [[features['pot_signal_max']] * group_size] + \
+           [[features['depot_signal_max']] * group_size] + [[features['global_signal_max']] * group_size]
 
 
-def compute_features_model_ramp(x, cell_id=None, induction=None, local_signal_peak=None, global_signal_peak=None,
-                                export=False, plot=False):
+def compute_features_model_ramp(x, cell_id=None, induction=None, pot_signal_peak=None, depot_signal_peak=None,
+                                global_signal_peak=None, export=False, plot=False):
     """
 
     :param x: array
     :param cell_id: int
     :param induction: int
-    :param local_signal_peak: float
+    :param pot_signal_peak: float
+    :param depot_signal_peak: float
     :param global_signal_peak: float
     :param export: bool
     :param plot: bool
@@ -1497,13 +1353,15 @@ def compute_features_model_ramp(x, cell_id=None, induction=None, local_signal_pe
     update_source_contexts(x, context)
     start_time = time.time()
     if context.disp:
-        print 'Process: %i: computing model_ramp_features for cell_id: %i, induction: %i with x: %s' % \
-              (os.getpid(), context.cell_id, context.induction, ', '.join('%.3E' % i for i in x))
-    result = calculate_model_ramp(local_signal_peak=local_signal_peak, global_signal_peak=global_signal_peak,
-                                  export=export, plot=plot)
+        print('Process: %i: computing model_ramp_features for cell_id: %i, induction: %i with x: %s' %
+              (os.getpid(), context.cell_id, context.induction, ', '.join('%.3E' % i for i in x)))
+        sys.stdout.flush()
+    result = calculate_model_ramp(pot_signal_peak=pot_signal_peak, depot_signal_peak=depot_signal_peak,
+                                  global_signal_peak=global_signal_peak, export=export, plot=plot)
     if context.disp:
-        print 'Process: %i: computing model_ramp_features for cell_id: %i, induction: %i took %.1f s' % \
-              (os.getpid(), context.cell_id, context.induction, time.time() - start_time)
+        print('Process: %i: computing model_ramp_features for cell_id: %i, induction: %i took %.1f s' %
+              (os.getpid(), context.cell_id, context.induction, time.time() - start_time))
+        sys.stdout.flush()
     return result
 
 
@@ -1523,7 +1381,9 @@ def filter_features_model_ramp(primitives, current_features, export=False):
     for this_result_dict in primitives:
         if not this_result_dict:
             if context.verbose > 0:
-                print 'optimize_BTSP_V_B_CA1: filter_features_model_ramp: pid: %i; model failed' % os.getpid()
+                print('optimize_biBTSP_%s: filter_features_model_ramp: pid: %i; model failed' %
+                      (BTSP_model_name, os.getpid()))
+                sys.stdout.flush()
             return dict()
         for cell_id in this_result_dict:
             cell_id = int(cell_id)
@@ -1592,56 +1452,62 @@ def get_objectives(features, export=False):
     return features, objectives
 
 
-def get_features_interactive(x, plot=False):
+def get_features_interactive(interface, x, plot=False):
     """
 
+    :param interface: :class: 'IpypInterface', 'MPIFuturesInterface', 'ParallelContextInterface', or 'SerialInterface'
     :param x:
     :param plot:
     :return: dict
     """
     features = {}
-    args = get_args_static_signal_amplitudes()
+    args = interface.execute(get_args_static_signal_amplitudes)
     group_size = len(args[0])
     sequences = [[x] * group_size] + args + [[context.export] * group_size]  # + [[plot] * group_size]
-    primitives = map(compute_features_signal_amplitudes, *sequences)
-    new_features = filter_features_signal_amplitudes(primitives, features, context.export, plot)
+    primitives = interface.map(compute_features_signal_amplitudes, *sequences)
+    new_features = interface.execute(filter_features_signal_amplitudes, primitives, features, context.export, plot)
     features.update(new_features)
 
-    args = get_args_dynamic_model_ramp(x, features)
+    args = interface.execute(get_args_dynamic_model_ramp, x, features)
     group_size = len(args[0])
     sequences = [[x] * group_size] + args + [[context.export] * group_size] + [[plot] * group_size]
-    primitives = map(compute_features_model_ramp, *sequences)
-    new_features = filter_features_model_ramp(primitives, features, context.export)
+    primitives = interface.map(compute_features_model_ramp, *sequences)
+    new_features = interface.execute(filter_features_model_ramp, primitives, features, context.export)
     features.update(new_features)
 
     return features
 
 
-@click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True,))
+@click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True, ))
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/optimize_BTSP_V_B_CA1_cli_config.yaml')
+              default='config/optimize_biBTSP_V_D_90cm_cli_config.yaml')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
 @click.option("--export-file-path", type=str, default=None)
 @click.option("--label", type=str, default=None)
 @click.option("--verbose", type=int, default=2)
 @click.option("--plot", is_flag=True)
+@click.option("--interactive", is_flag=True)
 @click.option("--debug", is_flag=True)
-@click.option("--model-summary-figure", is_flag=True)
+@click.option("--plot-summary-figure", is_flag=True)
 @click.option("--model-file-path", type=str, default=None)
 @click.pass_context
-def main(cli, config_file_path, output_dir, export, export_file_path, label, verbose, plot, debug,
-         model_summary_figure, model_file_path):
+def main(cli, config_file_path, output_dir, export, export_file_path, label, verbose, plot, interactive, debug,
+         plot_summary_figure, model_file_path):
     """
-    Parallel optimization is meant to be executed by the module nested.optimize using the syntax:
-    for N processes:
-    mpirun -n N python -m nested.optimize --config-file-path=$PATH_TO_CONFIG_FILE --disp --export
+    To execute on a single process on one cell from the experimental dataset:
+    python -i optimize_biBTSP_V_D.py --cell_id=1 --plot --framework=serial --interactive
 
-    This script can be executed as main with the command line interface to debug the model code, and to generate plots
-    after optimization has completed, e.g.:
+    To execute using MPI parallelism with 1 controller process and N - 1 worker processes:
+    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_V_D.py --cell_id=1 --plot --framework=mpi -interactive
 
-    ipython
-    run optimize_BTSP_V_B_CA1 --model-summary-figure --cell_id=1 --model-file-path=$PATH_TO_MODEL_FILE
+    To optimize the models by running many instances in parallel:
+    mpirun -n N python -m mpi4py.futures -m nested.optimize --config-file-path=$PATH_TO_CONFIG_FILE --disp --export \
+        --cell_id=1 --framework=mpi --pop-size=200 --path-length=3 --max-iter=50 --label=cell1
+
+    To plot results previously exported to a file on a single process:
+    python -i optimize_biBTSP_V_D.py --cell_id=1 --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
+        --framework=serial --interactive
 
     :param cli: contains unrecognized args as list of str
     :param config_file_path: str (path)
@@ -1651,20 +1517,25 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
     :param label: str
     :param verbose: int
     :param plot: bool
+    :param interactive: bool
     :param debug: bool
-    :param model_summary_figure: bool
+    :param plot_summary_figure: bool
     :param model_file_path: bool
     """
     # requires a global variable context: :class:'Context'
     context.update(locals())
     kwargs = get_unknown_click_arg_dict(cli.args)
     context.disp = verbose > 0
-    config_optimize_interactive(__file__, config_file_path=config_file_path, output_dir=output_dir, export=export,
-                                export_file_path=export_file_path, label=label, disp=context.disp, verbose=verbose,
-                                **kwargs)
 
-    if model_summary_figure:
-        plot_model_summary_figure(int(context.kwargs['cell_id']), model_file_path)
+    context.interface = get_parallel_interface(source_file=__file__, source_package=__package__, **kwargs)
+    context.interface.start(disp=context.disp)
+    context.interface.ensure_controller()
+    config_optimize_interactive(__file__, config_file_path=config_file_path, output_dir=output_dir,
+                                export=export, export_file_path=export_file_path, label=label,
+                                disp=context.disp, interface=context.interface, verbose=verbose, plot=plot, **kwargs)
+
+    if plot_summary_figure:
+        context.interface.execute(plot_model_summary_figure, int(context.kwargs['cell_id']), model_file_path)
     else:
         x1_array = context.x0_array
         if 'params_path' in context.kwargs and os.path.isfile(context.kwargs['params_path']):
@@ -1677,27 +1548,38 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
                     x1_dict = param_source_dict['all']
                     x1_array = param_dict_to_array(x1_dict, context.param_names)
                 else:
-                    print 'optimize_BTSP_V_B: problem loading params for cell_id: %s from params_path: %s' % \
-                          (kwargs['params_path'], context.kwargs['cell_id'])
+                    print('optimize_biBTSP_%s: problem loading params for cell_id: %s from params_path: %s' %
+                          (BTSP_model_name, kwargs['params_path'], context.kwargs['cell_id']))
             elif 'all' in param_source_dict:
                 x1_dict = param_source_dict['all']
                 x1_array = param_dict_to_array(x1_dict, context.param_names)
             else:
-                raise RuntimeError('optimize_BTSP_V_B: problem loading params from params_path: %s' %
-                                   context.kwargs['params_path'])
+                raise RuntimeError('optimize_biBTSP_%s: problem loading params from params_path: %s' %
+                                   (BTSP_model_name, context.kwargs['params_path']))
 
         if not debug:
-            features = get_features_interactive(x1_array, plot=plot)
-            features, objectives = get_objectives(features, context.export)
-            if export and os.path.isfile(context.temp_output_path):
-                merge_exported_data([context.temp_output_path], context.export_file_path, True)
-                os.remove(context.temp_output_path)
-            print 'features:'
-            pprint.pprint({key: val for (key, val) in features.iteritems() if key in context.feature_names})
-            print 'objectives'
-            pprint.pprint({key: val for (key, val) in objectives.iteritems() if key in context.objective_names})
+            features = get_features_interactive(context.interface, x1_array, plot=plot)
+            features, objectives = context.interface.execute(get_objectives, features, context.export)
+            if export:
+                temp_output_path_list = [temp_output_path for temp_output_path in
+                                         context.interface.get('context.temp_output_path') if
+                                         os.path.isfile(temp_output_path)]
+                if len(temp_output_path_list) > 0:
+                    merge_exported_data(temp_output_path_list, context.export_file_path, verbose=context.disp)
+                    for temp_output_path in temp_output_path_list:
+                        os.remove(temp_output_path)
+            print('features:')
+            pprint.pprint({key: val for (key, val) in viewitems(features) if key in context.feature_names})
+            print('objectives')
+            pprint.pprint({key: val for (key, val) in viewitems(objectives) if key in context.objective_names})
+            sys.stdout.flush()
+            if plot:
+                context.interface.apply(plt.show)
 
-    context.update(locals())
+    if context.interactive:
+        context.update(locals())
+    else:
+        context.interface.stop()
 
 
 if __name__ == '__main__':

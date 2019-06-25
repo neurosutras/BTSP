@@ -93,7 +93,7 @@ target_range:
   delta_min_val: 0.01
   delta_peak_val: 0.01
   residuals: 0.1
-  weights_smoothness: 0.01
+  weights_smoothness: 0.005
 target_val:
 x0:
   global_signal_decay: 3.000893E+02

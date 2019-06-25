@@ -155,7 +155,7 @@ def init_context():
     context.update(locals())
 
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
-        get_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
+        get_dual_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
                            context.global_signal_decay, dt)
 
     local_signals = get_local_signal_population(complete_rate_maps, local_signal_filter, dt)
@@ -254,7 +254,7 @@ def get_filter(rise, decay, max_time_scale, dt=None):
     return filter_t, filter
 
 
-def get_signal_filters(local_signal_rise, local_signal_decay, global_signal_rise, global_signal_decay, dt=None,
+def get_dual_signal_filters(local_signal_rise, local_signal_decay, global_signal_rise, global_signal_decay, dt=None,
                        plot=False):
     """
     :param local_signal_rise: float

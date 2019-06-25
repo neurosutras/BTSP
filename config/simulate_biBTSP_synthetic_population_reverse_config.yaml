@@ -20,7 +20,7 @@ reward_locs:
 seed_offset: 80000000000
 target_range:
   residuals: 0.1
-  weights_smoothness: 0.01
+  weights_smoothness: 0.005
   delta_min_val: 0.01
   delta_peak_val: 0.01
 x0:

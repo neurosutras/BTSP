@@ -569,7 +569,7 @@ def calculate_model_ramp(induction, export=False, plot=False):
     :return: dict
     """
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
-        get_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
+        get_dual_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
                            context.global_signal_decay, context.down_dt, plot)
 
     global_signal = get_global_signal(context.down_induction_gate[induction], global_filter)

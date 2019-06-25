@@ -8,13 +8,13 @@ includes:
 
 Features/assumptions of the phenomenological model:
 1) Synaptic weights in a silent cell are all = 1 prior to field induction 1. w(t0) = 1
-2) Activity at each synapse generates a long duration 'local plasticity signal', or an 'eligibility trace' for
+2) Activity at each synapse generates long duration 'local plasticity signals', or an 'eligibility traces' for
 synaptic plasticity.
 3) Dendritic plateaus generate a long duration 'global plasticity signal', or a 'gating trace' for synaptic plasticity.
-4) Synaptic weights w1 at time t1 after a plateau are a function of the initial weights w0 at time t0, and the two
-plasticity signals.
+4) Changes in weight at each synapse are integrated over periods of nonzero overlap between eligibility and gating
+signals, and updated once per lap.
 
-Features/assumptions of the mechanistic model:
+Features/assumptions of the bistable synapse model:
 1) Synaptic strength is equivalent to the number of AMPA-Rs at a synapse (quantal size). 
 2) Dendritic plateaus generate a global gating signal that mobilizes AMPA-Rs, allowing them to be either inserted or
 removed from synapses.
@@ -24,21 +24,19 @@ can activate a forward process to increase the number of AMPA-Rs stably incorpor
 can activate a reverse process to decrease the number of AMPA-Rs stably incorporated into synapses.
 5) AMPAR-s can be in 2 states (Markov-style kinetic scheme):
 
-     rMC0 * global_signal * f_p(local_signal)
+     rMC0 * global_signal * f_pot(local_signal)
 M (mobile) <----------------------> C (captured by a synapse)
-     rCM0 * global_signal * f_d(local_signal)
+     rCM0 * global_signal * f_depot(local_signal)
 
 6) At rest 100% of non-synaptic receptors are in state M, mobile and available for synaptic capture.
 7) global_signals are pooled across all cells and normalized to a peak value of 1.
 8) local_signals are pooled across all cells and normalized to a peak value of 1.
-9) f_p represents the "sensitivity" of the forward process to the presence of the local_signal.  The transformation f_p
-has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
-10) f_d represents the "sensitivity" of the reverse process to the presence of the local_signal. local_signals
-are pooled across all cells and normalized to a peak value of 1. The transformation f_d is a piecewise function with two
-components: a rising phase and a decaying phase. Each phase has the flexibility to be any segment of a sigmoid (so
-can be linear, exponential rise, or saturating).
+9) f_pot represents the "sensitivity" of the forward process to the presence of the local_signal. The transformation
+f_pot has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
+10) f_depot represents the "sensitivity" of the reverse process to the presence of the local_signal. The transformation
+f_depot has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
 
-biBTSP_D vs. orig_biBTSP: De-potentiation is restricted to a single sigmoid. Weights updated once per lap instead of
+biBTSP_D vs. biBTSP_orig: De-potentiation is restricted to a single sigmoid. Weights updated once per lap instead of
 once per time step. Relaxed constraints on sigmoid slope compared to original version.
 """
 __author__ = 'milsteina'
@@ -493,7 +491,7 @@ def compute_features_signal_amplitudes(x, cell_id=None, induction=None, export=F
         sys.stdout.flush()
     start_time = time.time()
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
-        get_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
+        get_dual_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
                            context.global_signal_decay, context.down_dt, plot)
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
     local_signals = get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt)
@@ -566,7 +564,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     :return: dict
     """
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
-        get_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
+        get_dual_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
                            context.global_signal_decay, context.down_dt, plot)
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
     local_signals = \
@@ -1106,7 +1104,6 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     this_axis.set_xlim(-0.5, xmax)
     this_axis.set_title('Plasticity signal kinetics', fontsize=mpl.rcParams['font.size'])
     this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-    this_axis.set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
 
     this_axis = fig.add_subplot(gs0[0, 3])
     axes.append(this_axis)
@@ -1249,7 +1246,6 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     axes[0][0].set_xlim(-0.5, xmax)
     axes[0][0].set_title('Plasticity signal kinetics', fontsize=mpl.rcParams['font.size'], pad=10.)
     axes[0][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-    axes[0][0].set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
 
     axes[0][1].set_xlabel('Normalized eligibility signal')
     axes[0][1].set_ylabel('Normalized rate')
@@ -1493,10 +1489,9 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
 
     To optimize the models by running many instances in parallel:
     mpirun -n N python -m mpi4py.futures -m nested.optimize --config-file-path=$PATH_TO_CONFIG_FILE --disp --export \
-        --cell_id=1 --framework=mpi --pop-size=200 --path-length=3 --max-iter=50 --label=model_D_cell_1
+        --cell_id=1 --framework=mpi --pop-size=200 --path-length=3 --max-iter=50 --label=cell1
 
     To plot results previously exported to a file on a single process:
-    python
     python -i optimize_biBTSP_D.py --cell_id=1 --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
         --framework=serial --interactive
 

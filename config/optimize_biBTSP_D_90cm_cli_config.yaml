@@ -46,6 +46,10 @@ rel_bounds:
   - '>'
   - 1.0
   - global_signal_decay
+- - rMC0
+  - '>'
+  - 1.0
+  - rCM0
 feature_names:
 - spont_delta_amp
 - spont_delta_width
@@ -84,7 +88,7 @@ kwargs:
   input_field_width: 90.  # cm
   verbose: 1
   min_delta_weight: -0.2
-  params_path: config/20190225_biBTSP_D_best_params.yaml
+  params_path: config/20190625_biBTSP_D_90cm_initial_params.yaml
 objective_names:
 - spont_residual_score
 - exp1_residual_score

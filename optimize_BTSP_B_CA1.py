@@ -559,7 +559,7 @@ def compute_features_signal_amplitudes(x, cell_id=None, induction=None, export=F
               (os.getpid(), context.cell_id, context.induction, ', '.join('%.3E' % i for i in x))
     start_time = time.time()
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
-        get_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
+        get_dual_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
                            context.global_signal_decay, context.down_dt, plot)
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
     local_signals = get_local_signal_population(local_signal_filter)
@@ -834,7 +834,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     :return: dict
     """
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
-        get_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
+        get_dual_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
                            context.global_signal_decay, context.down_dt, plot)
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
     local_signals = np.divide(get_local_signal_population(local_signal_filter), local_signal_peak)
