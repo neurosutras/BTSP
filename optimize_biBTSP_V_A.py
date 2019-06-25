@@ -119,97 +119,98 @@ def import_data(cell_id, induction):
         return
 
     if cell_id in context.data_cache and induction in context.data_cache[cell_id]:
-        context.update(context.data_cache[cell_id][induction]())
-        context.cell_id = cell_id
-        context.induction = induction
-        return
+        induction_context = context.data_cache[cell_id][induction]
+    else:
+        cell_key = str(cell_id)
+        induction_key = str(induction)
 
-    cell_key = str(cell_id)
-    induction_key = str(induction)
+        induction_context = Context()
 
-    induction_context = Context()
-
-    with h5py.File(context.data_file_path, 'r') as f:
-        if cell_key not in f['data'] or induction_key not in f['data'][cell_key]:
-            raise KeyError('optimize_biBTSP_%s: no data found for cell_id: %s, induction: %s' %
-                           (BTSP_model_name, cell_key, induction_key))
-        data_group = f['data'][cell_key][induction_key]
-        induction_context.induction_locs = data_group.attrs['induction_locs']
-        induction_context.induction_durs = data_group.attrs['induction_durs']
-        induction_context.exp_ramp_raw = {}
-        induction_context.exp_ramp = {}
-        if 'before' in data_group['raw']['exp_ramp']:
-            induction_context.exp_ramp_raw['before'] = data_group['raw']['exp_ramp']['before'][:]
-        induction_context.position = {}
-        induction_context.t = {}
-        induction_context.current = []
-        for category in data_group['processed']['position']:
-            induction_context.position[category] = []
-            induction_context.t[category] = []
-            for i in range(len(data_group['processed']['position'][category])):
+        with h5py.File(context.data_file_path, 'r') as f:
+            if cell_key not in f['data'] or induction_key not in f['data'][cell_key]:
+                raise KeyError('optimize_biBTSP_%s: no data found for cell_id: %s, induction: %s' %
+                               (BTSP_model_name, cell_key, induction_key))
+            data_group = f['data'][cell_key][induction_key]
+            induction_context.induction_locs = data_group.attrs['induction_locs']
+            induction_context.induction_durs = data_group.attrs['induction_durs']
+            induction_context.exp_ramp_raw = {}
+            induction_context.exp_ramp = {}
+            if 'before' in data_group['raw']['exp_ramp']:
+                induction_context.exp_ramp_raw['before'] = data_group['raw']['exp_ramp']['before'][:]
+            induction_context.position = {}
+            induction_context.t = {}
+            induction_context.current = []
+            for category in data_group['processed']['position']:
+                induction_context.position[category] = []
+                induction_context.t[category] = []
+                for i in range(len(data_group['processed']['position'][category])):
+                    lap_key = str(i)
+                    induction_context.position[category].append(
+                        data_group['processed']['position'][category][lap_key][:])
+                    induction_context.t[category].append(data_group['processed']['t'][category][lap_key][:])
+            for i in range(len(data_group['processed']['current'])):
                 lap_key = str(i)
-                induction_context.position[category].append(data_group['processed']['position'][category][lap_key][:])
-                induction_context.t[category].append(data_group['processed']['t'][category][lap_key][:])
-        for i in range(len(data_group['processed']['current'])):
-            lap_key = str(i)
-            induction_context.current.append(data_group['processed']['current'][lap_key][:])
-        induction_context.mean_position = data_group['processed']['mean_position'][:]
-        induction_context.mean_t = data_group['processed']['mean_t'][:]
+                induction_context.current.append(data_group['processed']['current'][lap_key][:])
+            induction_context.mean_position = data_group['processed']['mean_position'][:]
+            induction_context.mean_t = data_group['processed']['mean_t'][:]
 
-        # TODO: Need to re-interpolate exp_ramp_vs_t when replacing exp_ramp['after'] with ['before'] from induction 2
-        induction_context.exp_ramp_vs_t = {'after': data_group['processed']['exp_ramp_vs_t']['after'][:]}
-        if 'before' in data_group['processed']['exp_ramp']:
-            induction_context.exp_ramp['before'] = data_group['processed']['exp_ramp']['before'][:]
-            induction_context.exp_ramp_vs_t['before'] = data_group['processed']['exp_ramp_vs_t']['before'][:]
-        induction_context.LSA_ramp = {}
-        induction_context.LSA_ramp_offset = {}
-        calibrated_input_group = f['calibrated_input'][context.input_field_width_key][cell_key][induction_key]
-        if 'before' in calibrated_input_group['LSA_ramp']:
-            induction_context.LSA_ramp['before'] = calibrated_input_group['LSA_ramp']['before'][:]
-            induction_context.LSA_ramp_offset['before'] = calibrated_input_group['LSA_ramp']['before'].attrs[
-                'ramp_offset']
-        induction_context.LSA_weights = {}
-        induction_context.LSA_weights['before'] = calibrated_input_group['LSA_weights']['before'][:]
-        induction_context.complete_run_vel = data_group['complete']['run_vel'][:]
-        induction_context.complete_run_vel_gate = data_group['complete']['run_vel_gate'][:]
-        induction_context.complete_position = data_group['complete']['position'][:]
-        induction_context.complete_t = data_group['complete']['t'][:]
-        induction_context.induction_gate = data_group['complete']['induction_gate'][:]
-        # if both induction 1 and 2 are in dataset, for self-consistency, use same target_ramp
-        if induction == 1 and '2' in f['data'][cell_key]:
-            data_group = f['data'][cell_key]['2']
-            calibrated_input_group = f['calibrated_input'][context.input_field_width_key][cell_key]['2']
-            induction_context.exp_ramp_raw['after'] = data_group['raw']['exp_ramp']['before'][:]
-            induction_context.exp_ramp['after'] = data_group['processed']['exp_ramp']['before'][:]
-            induction_context.LSA_ramp['after'] = calibrated_input_group['LSA_ramp']['before'][:]
-            induction_context.LSA_ramp_offset['after'] = calibrated_input_group['LSA_ramp']['before'].attrs[
-                'ramp_offset']
-            induction_context.LSA_weights['after'] = calibrated_input_group['LSA_weights']['before'][:]
-        else:
-            induction_context.exp_ramp_raw['after'] = data_group['raw']['exp_ramp']['after'][:]
-            induction_context.exp_ramp['after'] = data_group['processed']['exp_ramp']['after'][:]
-            induction_context.LSA_ramp['after'] = calibrated_input_group['LSA_ramp']['after'][:]
-            induction_context.LSA_ramp_offset['after'] = calibrated_input_group['LSA_ramp']['after'].attrs[
-                'ramp_offset']
-            induction_context.LSA_weights['after'] = calibrated_input_group['LSA_weights']['after'][:]
-        context.peak_ramp_amp = 0.
-        for this_induction_key in f['data'][cell_key]:
-            if 'before' in f['data'][cell_key][this_induction_key]['processed']['exp_ramp']:
-                context.peak_ramp_amp = \
-                    max(context.peak_ramp_amp,
-                        np.max(f['data'][cell_key][this_induction_key]['processed']['exp_ramp']['before'][:]))
-            if 'after' in f['data'][cell_key][this_induction_key]['processed']['exp_ramp']:
-                context.peak_ramp_amp = \
-                    max(context.peak_ramp_amp,
-                        np.max(f['data'][cell_key][this_induction_key]['processed']['exp_ramp']['after'][:]))
-    induction_context.mean_induction_start_loc = np.mean(induction_context.induction_locs)
-    induction_context.mean_induction_dur = np.mean(induction_context.induction_durs)
+            # TODO: exp_ramp_vs_t reflects mean, rather than min delay to plateau across laps
+            induction_context.exp_ramp_vs_t = {'after': data_group['processed']['exp_ramp_vs_t']['after'][:]}
+            if 'before' in data_group['processed']['exp_ramp']:
+                induction_context.exp_ramp['before'] = data_group['processed']['exp_ramp']['before'][:]
+                induction_context.exp_ramp_vs_t['before'] = data_group['processed']['exp_ramp_vs_t']['before'][:]
+            induction_context.LSA_ramp = {}
+            induction_context.LSA_ramp_offset = {}
+            calibrated_input_group = f['calibrated_input'][context.input_field_width_key][cell_key][induction_key]
+            if 'before' in calibrated_input_group['LSA_ramp']:
+                induction_context.LSA_ramp['before'] = calibrated_input_group['LSA_ramp']['before'][:]
+                induction_context.LSA_ramp_offset['before'] = calibrated_input_group['LSA_ramp']['before'].attrs[
+                    'ramp_offset']
+            induction_context.LSA_weights = {}
+            induction_context.LSA_weights['before'] = calibrated_input_group['LSA_weights']['before'][:]
+            induction_context.complete_run_vel = data_group['complete']['run_vel'][:]
+            induction_context.complete_run_vel_gate = data_group['complete']['run_vel_gate'][:]
+            induction_context.complete_position = data_group['complete']['position'][:]
+            induction_context.complete_t = data_group['complete']['t'][:]
+            induction_context.induction_gate = data_group['complete']['induction_gate'][:]
+            # if both induction 1 and 2 are in dataset, for self-consistency, use same target_ramp
+            if induction == 1 and '2' in f['data'][cell_key]:
+                data_group = f['data'][cell_key]['2']
+                calibrated_input_group = f['calibrated_input'][context.input_field_width_key][cell_key]['2']
+                induction_context.exp_ramp_raw['after'] = data_group['raw']['exp_ramp']['before'][:]
+                induction_context.exp_ramp['after'] = data_group['processed']['exp_ramp']['before'][:]
+                induction_context.LSA_ramp['after'] = calibrated_input_group['LSA_ramp']['before'][:]
+                induction_context.LSA_ramp_offset['after'] = calibrated_input_group['LSA_ramp']['before'].attrs[
+                    'ramp_offset']
+                induction_context.LSA_weights['after'] = calibrated_input_group['LSA_weights']['before'][:]
+            else:
+                induction_context.exp_ramp_raw['after'] = data_group['raw']['exp_ramp']['after'][:]
+                induction_context.exp_ramp['after'] = data_group['processed']['exp_ramp']['after'][:]
+                induction_context.LSA_ramp['after'] = calibrated_input_group['LSA_ramp']['after'][:]
+                induction_context.LSA_ramp_offset['after'] = calibrated_input_group['LSA_ramp']['after'].attrs[
+                    'ramp_offset']
+                induction_context.LSA_weights['after'] = calibrated_input_group['LSA_weights']['after'][:]
+            induction_context.peak_ramp_amp = 0.
+            for this_induction_key in f['data'][cell_key]:
+                if 'before' in f['data'][cell_key][this_induction_key]['processed']['exp_ramp']:
+                    induction_context.peak_ramp_amp = \
+                        max(induction_context.peak_ramp_amp,
+                            np.max(f['data'][cell_key][this_induction_key]['processed']['exp_ramp']['before'][:]))
+                if 'after' in f['data'][cell_key][this_induction_key]['processed']['exp_ramp']:
+                    induction_context.peak_ramp_amp = \
+                        max(induction_context.peak_ramp_amp,
+                            np.max(f['data'][cell_key][this_induction_key]['processed']['exp_ramp']['after'][:]))
+        context.data_cache[cell_id][induction] = induction_context
+    context.update(induction_context())
+
+    context.mean_induction_start_loc = np.mean(context.induction_locs)
+    context.mean_induction_dur = np.mean(context.induction_durs)
     mean_induction_start_index = \
-    np.where(induction_context.mean_position >= induction_context.mean_induction_start_loc)[0][0]
+    np.where(context.mean_position >= context.mean_induction_start_loc)[0][0]
     mean_induction_stop_index = \
-    np.where(induction_context.mean_t >= induction_context.mean_t[mean_induction_start_index] +
-             induction_context.mean_induction_dur)[0][0]
-    induction_context.mean_induction_stop_loc = induction_context.mean_position[mean_induction_stop_index]
+    np.where(context.mean_t >= context.mean_t[mean_induction_start_index] +
+             context.mean_induction_dur)[0][0]
+    context.mean_induction_stop_loc = context.mean_position[mean_induction_stop_index]
     induction_start_times = []
     induction_stop_times = []
     track_start_times = []
@@ -217,36 +218,35 @@ def import_data(cell_id, induction):
     running_position = 0.
     running_t = 0.
     for i, (this_induction_loc, this_induction_dur) in enumerate(
-            zip(induction_context.induction_locs, induction_context.induction_durs)):
+            zip(context.induction_locs, context.induction_durs)):
         this_induction_start_index = \
-        np.where(induction_context.complete_position >= this_induction_loc + running_position)[0][0]
-        this_induction_start_time = induction_context.complete_t[this_induction_start_index]
+        np.where(context.complete_position >= this_induction_loc + running_position)[0][0]
+        this_induction_start_time = context.complete_t[this_induction_start_index]
         this_induction_stop_time = this_induction_start_time + this_induction_dur
         track_start_times.append(running_t)
-        running_t += len(induction_context.t['induction'][i]) * context.dt
+        running_t += len(context.t['induction'][i]) * context.dt
         track_stop_times.append(running_t)
         induction_start_times.append(this_induction_start_time)
         induction_stop_times.append(this_induction_stop_time)
         running_position += context.track_length
-    induction_context.induction_start_times = np.array(induction_start_times)
-    induction_context.induction_stop_times = np.array(induction_stop_times)
-    induction_context.track_start_times = np.array(track_start_times)
-    induction_context.track_stop_times = np.array(track_stop_times)
-    induction_context.complete_rate_maps = \
-        get_complete_rate_maps(context.input_rate_maps, context.binned_x, induction_context.position,
-                               induction_context.complete_run_vel_gate)
-    induction_context.down_t = np.arange(induction_context.complete_t[0],
-                                         induction_context.complete_t[-1] + context.down_dt / 2., context.down_dt)
-    induction_context.down_rate_maps = []
-    for rate_map in induction_context.complete_rate_maps:
-        this_down_rate_map = np.interp(induction_context.down_t, induction_context.complete_t, rate_map)
-        induction_context.down_rate_maps.append(this_down_rate_map)
-    induction_context.down_induction_gate = np.interp(induction_context.down_t, induction_context.complete_t,
-                                                      induction_context.induction_gate)
+    context.induction_start_times = np.array(induction_start_times)
+    context.induction_stop_times = np.array(induction_stop_times)
+    context.track_start_times = np.array(track_start_times)
+    context.track_stop_times = np.array(track_stop_times)
+    context.complete_rate_maps = \
+        get_complete_rate_maps(context.input_rate_maps, context.binned_x, context.position,
+                               context.complete_run_vel_gate)
+    context.down_t = np.arange(context.complete_t[0],
+                                         context.complete_t[-1] + context.down_dt / 2., context.down_dt)
+    context.down_rate_maps = []
+    for rate_map in context.complete_rate_maps:
+        this_down_rate_map = np.interp(context.down_t, context.complete_t, rate_map)
+        context.down_rate_maps.append(this_down_rate_map)
+    context.down_induction_gate = np.interp(context.down_t, context.complete_t,
+                                                      context.induction_gate)
     context.cell_id = cell_id
     context.induction = induction
-    context.data_cache[cell_id][induction] = induction_context
-    context.update(induction_context())
+
     if context.verbose > 1:
         print('optimize_biBTSP_%s: process: %i loaded data for cell: %i, induction: %i' %
               (BTSP_model_name, os.getpid(), cell_id, induction))
