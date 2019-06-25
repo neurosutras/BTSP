@@ -85,7 +85,7 @@ def init_context():
         default_interp_t = f['defaults']['default_interp_t'][:]
         default_interp_x = f['defaults']['default_interp_x'][:]
         extended_x = f['defaults']['extended_x'][:]
-        # import these from a 'calibrated_input' group instead
+
         if 'input_field_width' not in context() or context.input_field_width is None:
             raise RuntimeError('optimize_biBTSP_%s: init context: missing required parameter: input_field_width' %
                                BTSP_model_name)
@@ -466,91 +466,6 @@ def plot_data_summary():
     fig.show()
 
 
-def get_filter(rise, decay, max_time_scale, dt=None):
-    """
-    :param rise: float
-    :param decay: float
-    :param max_time_scale: float
-    :param dt: float
-    :return: array, array
-    """
-    if dt is None:
-        dt = context.dt
-    filter_t = np.arange(0., 6. * max_time_scale, dt)
-    filter = np.exp(-filter_t / decay) - np.exp(-filter_t / rise)
-    peak_index = np.where(filter == np.max(filter))[0][0]
-    decay_indexes = np.where(filter[peak_index:] < 0.001 * np.max(filter))[0]
-    if np.any(decay_indexes):
-        filter = filter[:peak_index + decay_indexes[0]]
-    filter /= np.sum(filter)
-    filter_t = filter_t[:len(filter)]
-    return filter_t, filter
-
-
-def get_signal_filters(local_signal_rise, local_signal_decay, global_signal_rise, global_signal_decay, dt=None,
-                       plot=False):
-    """
-    :param local_signal_rise: float
-    :param local_signal_decay: float
-    :param global_signal_rise: float
-    :param global_signal_decay: float
-    :param dt: float
-    :param plot: bool
-    :return: array, array
-    """
-    max_time_scale = max(local_signal_rise + local_signal_decay, global_signal_rise + global_signal_decay)
-    local_signal_filter_t, local_signal_filter = get_filter(local_signal_rise, local_signal_decay, max_time_scale, dt)
-    global_filter_t, global_filter = get_filter(global_signal_rise, global_signal_decay, max_time_scale, dt)
-    if plot:
-        fig, axes = plt.subplots(1)
-        axes.plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='r',
-                  label='Local plasticity signal filter')
-        axes.plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
-                  label='Global plasticity signal filter')
-        axes.set_xlabel('Time (s)')
-        axes.set_ylabel('Normalized filter amplitude')
-        axes.set_title('Plasticity signal filters')
-        axes.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-        axes.set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
-        clean_axes(axes)
-        fig.tight_layout()
-        fig.show()
-    return local_signal_filter_t, local_signal_filter, global_filter_t, global_filter
-
-
-def get_local_signal(rate_map, local_filter, dt):
-    """
-
-    :param rate_map: array
-    :param local_filter: array
-    :param dt: float
-    :return: array
-    """
-    return np.convolve(0.001 * dt * rate_map, local_filter)[:len(rate_map)]
-
-
-def get_global_signal(induction_gate, global_filter):
-    """
-
-    :param induction_gate: array
-    :param global_filter: array
-    :return: array
-    """
-    return np.convolve(induction_gate, global_filter)[:len(induction_gate)]
-
-
-def get_local_signal_population(local_filter):
-    """
-
-    :param local_filter:
-    :return:
-    """
-    local_signals = []
-    for rate_map in context.down_rate_maps:
-        local_signals.append(get_local_signal(rate_map, local_filter, context.down_dt))
-    return local_signals
-
-
 def get_args_static_signal_amplitudes():
     """
     A nested map operation is required to compute model signal amplitudes. The arguments to be mapped are the same
@@ -581,7 +496,7 @@ def compute_features_signal_amplitudes(x, cell_id=None, induction=None, export=F
         get_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
                            context.global_signal_decay, context.down_dt, plot)
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
-    local_signals = get_local_signal_population(local_signal_filter)
+    local_signals = get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt)
 
     result = {'local_signal_peak': np.max(local_signals),
               'global_signal_peak': np.max(global_signal)}
@@ -654,22 +569,19 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
         get_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
                            context.global_signal_decay, context.down_dt, plot)
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
-    local_signals = np.divide(get_local_signal_population(local_signal_filter), local_signal_peak)
+    local_signals = \
+        np.divide(get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt),
+                  local_signal_peak)
 
     signal_xrange = np.linspace(0., 1., 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(context.rMC_th, context.rMC_th + context.rMC_peak, signal_xrange))
     depot_rate = np.vectorize(scaled_single_sigmoid(context.rCM_th, context.rCM_th + context.rCM_peak, signal_xrange))
     if plot:
         fig, axes = plt.subplots(1)
-        if context.rMC0 > context.rCM0:
-            pot_scale = 1.
-            depot_scale = context.rCM0 / context.rMC0
-        else:
-            pot_scale = context.rMC0 / context.rCM0
-            depot_scale = 1.
-        axes.plot(signal_xrange, pot_rate(signal_xrange) * pot_scale, label='Potentiation rate')
+        depot_scale = context.rCM0 / context.rMC0
+        axes.plot(signal_xrange, pot_rate(signal_xrange), label='Potentiation rate')
         axes.plot(signal_xrange, depot_rate(signal_xrange) * depot_scale, label='De-potentiation rate')
-        axes.set_xlabel('Normalized plasticity signal amplitude (a.u.)')
+        axes.set_xlabel('Normalized eligibility signal amplitude (a.u.)')
         axes.set_ylabel('Normalized rate')
         axes.set_title('Plasticity signal transformations')
         axes.legend(loc='best', frameon=False, framealpha=0.5)
@@ -974,7 +886,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
                 group.create_dataset('peak_locs', compression='gzip', data=context.peak_locs)
                 group.create_dataset('binned_x', compression='gzip', data=context.binned_x)
                 group.create_dataset('signal_xrange', compression='gzip', data=signal_xrange)
-                group.create_dataset('param_names', compression='gzip', data=context.param_names)
+                group.create_dataset('param_names', compression='gzip', data=np.asarray(context.param_names, dtype='S'))
                 group.attrs['input_field_width'] = context.input_field_width
                 group.attrs['ramp_scaling_factor'] = context.ramp_scaling_factor
             exported_data_key = 'exported_data'
@@ -1099,7 +1011,9 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     update_source_contexts(x)
 
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
-    local_signals = np.divide(get_local_signal_population(local_signal_filter), local_signal_peak)
+    local_signals = \
+        np.divide(get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt),
+                  local_signal_peak)
 
     signal_xrange = np.linspace(0., 1., 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(context.rMC_th, context.rMC_th + context.rMC_peak, signal_xrange))
@@ -1196,14 +1110,9 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
 
     this_axis = fig.add_subplot(gs0[0, 3])
     axes.append(this_axis)
-    if context.rMC0 > context.rCM0:
-        pot_scale = 1.
-        depot_scale = context.rCM0 / context.rMC0
-    else:
-        pot_scale = context.rMC0 / context.rCM0
-        depot_scale = 1.
-    this_axis.plot(signal_xrange, pot_rate(signal_xrange) * pot_scale, label='Potentiation', c='r')
-    this_axis.plot(signal_xrange, depot_rate(signal_xrange) * depot_scale, label='De-potentiation', c='c')
+    depot_scale = context.rCM0 / context.rMC0
+    this_axis.plot(signal_xrange, pot_rate(signal_xrange), label='Potentiation', c='c')
+    this_axis.plot(signal_xrange, depot_rate(signal_xrange) * depot_scale, label='De-potentiation', c='r')
     this_axis.set_xlabel('Normalized eligibility signal')
     this_axis.set_ylabel('Normalized rate')
     this_axis.set_ylim(0., this_axis.get_ylim()[1])
@@ -1346,12 +1255,12 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     axes[0][1].set_ylabel('Normalized rate')
     axes[0][1].set_title('Sigmoidal q$_{+}$, sigmoidal q$_{-}$', fontsize=mpl.rcParams['font.size'], pad=10.)
     axes[0][1].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='q$_{+}$ (Potentiation)')
-    axes[0][1].plot(signal_xrange, depot_rate(signal_xrange), c='r', label='q$_{-}$ (De-potentiation)')
+    axes[0][1].plot(signal_xrange, depot_rate(signal_xrange) * depot_scale, c='r', label='q$_{-}$ (De-potentiation)')
     axes[0][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
 
     cmap = cm.jet
     for w in np.linspace(0., 1., 10):
-        net_delta_weight = pot_rate(signal_xrange) * pot_scale * (1. - w) - depot_rate(signal_xrange) * depot_scale * w
+        net_delta_weight = pot_rate(signal_xrange) * (1. - w) - depot_rate(signal_xrange) * depot_scale * w
         axes[0][2].plot(signal_xrange, net_delta_weight, c=cmap(w))
     axes[0][2].axhline(y=0., linestyle='--', c='grey')
     axes[0][2].set_xlabel('Normalized eligibility signal')

@@ -489,8 +489,8 @@ def get_signal_filters(local_signal_rise, local_signal_decay, global_signal_rise
     :return: array, array
     """
     max_time_scale = max(local_signal_rise + local_signal_decay, global_signal_rise + global_signal_decay)
-    local_signal_filter_t, local_signal_filter = get_filter(local_signal_rise, local_signal_decay, max_time_scale, dt)
-    global_filter_t, global_filter = get_filter(global_signal_rise, global_signal_decay, max_time_scale, dt)
+    local_signal_filter_t, local_signal_filter = get_exp_rise_decay_filter(local_signal_rise, local_signal_decay, max_time_scale, dt)
+    global_filter_t, global_filter = get_exp_rise_decay_filter(global_signal_rise, global_signal_decay, max_time_scale, dt)
     if plot:
         fig, axes = plt.subplots(1)
         axes.plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='r',

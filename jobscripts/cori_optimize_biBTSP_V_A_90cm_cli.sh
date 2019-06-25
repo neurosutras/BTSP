@@ -1,6 +1,6 @@
 #!/bin/bash -l
 export DATE=$(date +%Y%m%d_%H%M%S)
-export JOB_NAME=optimize_BTSP_V_A_CA1_cell"$1"_"$DATE"
+export JOB_NAME=optimize_biBTSP_V_A_cell"$1"_"$DATE"
 export cores=$(($2 * 32))
 sbatch <<EOT
 #!/bin/bash -l
@@ -20,6 +20,6 @@ set -x
 cd $HOME/BTSP
 
 srun -N $2 -n $cores -c 2 --cpu_bind=cores python -m nested.optimize \
-    --config-file-path=config/optimize_BTSP_V_A_CA1_cli_config.yaml --disp --output-dir=$SCRATCH/BTSP \
+    --config-file-path=config/optimize_biBTSP_V_A_90cm_cli_config.yaml --disp --output-dir=$SCRATCH/BTSP \
     --pop-size=200 --max-iter=50 --path-length=3 --disp --export --label=cell"$1" --cell_id=$1
 EOT

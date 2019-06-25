@@ -106,7 +106,7 @@ def merge_min_t_arrays(context, induction_loc, backward_t, forward_t, debug=Fals
 
 @click.command()
 @click.option("--data-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='data/20180411_BTSP2_CA1_data.hdf5')
+              default='data/20190621_biBTSP_data_calibrated_input.hdf5')
 @click.option("--model-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
               default='data/20180511_BTSP_all_cells_PopulationAnnealing_optimization_merged_exported_output.hdf5')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')

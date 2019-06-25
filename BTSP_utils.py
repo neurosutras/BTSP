@@ -241,6 +241,115 @@ def get_complete_rate_maps(input_rate_maps, input_x, position, complete_run_vel_
     return complete_rate_maps
 
 
+def get_complete_ramp(current_ramp, input_x, position, complete_run_vel_gate, induction_gate, peak_ramp_amp):
+    """
+
+    :param current_ramp: array
+    :param input_x: array (x resolution of input)
+    :param position: nested dict of array
+    :param complete_run_vel_gate: array
+    :param induction_gate: array
+    :param peak_ramp_amp: float
+    :return: array
+    """
+    complete_ramp = np.array([])
+    for group in ['pre', 'induction', 'post']:
+        for i, this_position in enumerate(position[group]):
+            this_lap_vm = np.interp(this_position, input_x, current_ramp)
+            complete_ramp = np.append(complete_ramp, this_lap_vm)
+    complete_ramp = np.multiply(complete_ramp, complete_run_vel_gate)
+    complete_ramp[np.where(induction_gate == 1.)[0]] = peak_ramp_amp
+    if len(complete_ramp) != len(complete_run_vel_gate):
+        print('get_complete_ramp: mismatched array length')
+
+    return complete_ramp
+
+
+def get_exp_rise_decay_filter(rise, decay, max_time_scale, dt):
+    """
+    :param rise: float
+    :param decay: float
+    :param max_time_scale: float
+    :param dt: float
+    :return: array, array
+    """
+    filter_t = np.arange(0., 6. * max_time_scale, dt)
+    filter = np.exp(-filter_t / decay) - np.exp(-filter_t / rise)
+    peak_index = np.where(filter == np.max(filter))[0][0]
+    decay_indexes = np.where(filter[peak_index:] < 0.001 * np.max(filter))[0]
+    if np.any(decay_indexes):
+        filter = filter[:peak_index + decay_indexes[0]]
+    filter /= np.sum(filter)
+    filter_t = filter_t[:len(filter)]
+    return filter_t, filter
+
+
+def get_signal_filters(local_signal_rise, local_signal_decay, global_signal_rise, global_signal_decay, dt,
+                       plot=False):
+    """
+    :param local_signal_rise: float
+    :param local_signal_decay: float
+    :param global_signal_rise: float
+    :param global_signal_decay: float
+    :param dt: float
+    :param plot: bool
+    :return: array, array
+    """
+    max_time_scale = max(local_signal_rise + local_signal_decay, global_signal_rise + global_signal_decay)
+    local_signal_filter_t, local_signal_filter = get_exp_rise_decay_filter(local_signal_rise, local_signal_decay, max_time_scale, dt)
+    global_filter_t, global_filter = get_exp_rise_decay_filter(global_signal_rise, global_signal_decay, max_time_scale, dt)
+    if plot:
+        fig, axes = plt.subplots(1)
+        axes.plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='r',
+                  label='Local plasticity signal filter')
+        axes.plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
+                  label='Global plasticity signal filter')
+        axes.set_xlabel('Time (s)')
+        axes.set_ylabel('Normalized filter amplitude')
+        axes.set_title('Plasticity signal filters')
+        axes.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        axes.set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
+        clean_axes(axes)
+        fig.tight_layout()
+        fig.show()
+    return local_signal_filter_t, local_signal_filter, global_filter_t, global_filter
+
+
+def get_local_signal(rate_map, local_filter, dt):
+    """
+
+    :param rate_map: array
+    :param local_filter: array
+    :param dt: float
+    :return: array
+    """
+    return np.convolve(0.001 * dt * rate_map, local_filter)[:len(rate_map)]
+
+
+def get_global_signal(induction_gate, global_filter):
+    """
+
+    :param induction_gate: array
+    :param global_filter: array
+    :return: array
+    """
+    return np.convolve(induction_gate, global_filter)[:len(induction_gate)]
+
+
+def get_local_signal_population(local_filter, rate_maps, dt):
+    """
+
+    :param local_filter: array
+    :param rate_maps: list of array
+    :param dt: float
+    :return:
+    """
+    local_signals = []
+    for rate_map in rate_maps:
+        local_signals.append(get_local_signal(rate_map, local_filter, dt))
+    return local_signals
+
+
 def sigmoid_segment(slope, th, xlim=None, ylim=None):
     """
     Transform a sigmoid to intersect x and y range limits.
