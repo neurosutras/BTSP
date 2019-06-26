@@ -350,7 +350,7 @@ def get_triple_signal_filters(pot_signal_rise, pot_signal_decay, depot_signal_ri
         axes.set_ylabel('Normalized filter amplitude')
         axes.set_title('Plasticity signal filters')
         axes.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-        axes.set_xlim(-0.5, max(5000., pot_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
+        axes.set_xlim(-0.5, max(5000., max_time_scale * 6.) / 1000.)
         clean_axes(axes)
         fig.tight_layout()
         fig.show()
@@ -410,6 +410,24 @@ def get_voltage_dependent_eligibility_signal_population(local_filter, normalized
         local_signals.append(get_local_signal(np.multiply(rate_map, this_phi), local_filter, dt))
 
     return local_signals
+
+
+def weights_path_distance_exceeds_threshold(weights_snapshots, threshold=2.):
+    """
+    If changes in weights across laps are monotonic, the path distance is equal to the euclidean distance. However, if
+    weight changes change sign across laps, the path distance can increase. This method checks if the weight changes
+    across the population of inputs exceed a threshold fold increase of path distance relative to euclidean distance.
+    :param weights_snapshots: list of array
+    :return: bool
+    """
+    weights_snapshots = np.array(weights_snapshots)
+    weights_diff = np.diff(weights_snapshots, axis=0)
+    path_distance = np.sum(np.abs(weights_diff), axis=0)
+    path_distance_pop_sum = np.sum(path_distance)
+    euc_distance = np.abs(np.sum(weights_diff, axis=0))
+    euc_distance_pop_sum = np.sum(euc_distance)
+
+    return path_distance_pop_sum > threshold * euc_distance_pop_sum
 
 
 def sigmoid_segment(slope, th, xlim=None, ylim=None):

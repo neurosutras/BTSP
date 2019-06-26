@@ -66,6 +66,11 @@ def init_context():
         raise IOError('optimize_biBTSP_%s: init_context: invalid data_file_path: %s' %
                       (BTSP_model_name, context.data_file_path))
 
+    if 'weights_path_distance_threshold' not in context():
+        context.weights_path_distance_threshold = 2.
+    else:
+        context.weights_path_distance_threshold = float(context.weights_path_distance_threshold)
+
     with h5py.File(context.data_file_path, 'r') as f:
         dt = f['defaults'].attrs['dt']  # ms
         input_field_peak_rate = f['defaults'].attrs['input_field_peak_rate']  # Hz
@@ -621,9 +626,11 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
 
     target_ramp = context.exp_ramp['after']
 
+    """
     prev_residual_score = 0.
     for i in range(len(target_ramp)):
         prev_residual_score += ((current_ramp[i] - target_ramp[i]) / context.target_range['residuals']) ** 2.
+    """
 
     if plot:
         fig, axes = plt.subplots(2, sharex=True)
@@ -707,6 +714,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             axes2[0].plot(context.binned_x, current_ramp)
         ramp_snapshots.append(current_ramp)
 
+        """
         current_residual_score = 0.
         for i in range(len(target_ramp)):
             current_residual_score += ((current_ramp[i] - target_ramp[i]) / context.target_range['residuals']) ** 2.
@@ -726,6 +734,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
                 fig2.show()
             return dict()
         prev_residual_score = current_residual_score
+        """
 
     if plot:
         axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
@@ -942,6 +951,14 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             group.create_group('delta_weights_snapshots')
             for i, this_delta_weights in enumerate(delta_weights_snapshots):
                 group['delta_weights_snapshots'].create_dataset(str(i), data=this_delta_weights)
+
+    # catch models with excessive fluctuations in weights across laps:
+    if weights_path_distance_exceeds_threshold(delta_weights_snapshots, context.weights_path_distance_threshold):
+        if context.verbose > 0:
+            print('optimize_biBTSP_%s: calculate_model_ramp: pid: %i; aborting - excessive fluctuations in weights '
+                  'across laps; cell_id: %i, induction: %i' %
+                  (BTSP_model_name, os.getpid(), context.cell_id, context.induction))
+        return dict()
 
     return {context.cell_id: {context.induction: result}}
 

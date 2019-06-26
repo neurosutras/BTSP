@@ -13,22 +13,22 @@ bounds:
   - 1.
   rMC0: !!python/tuple
   - 0.01
-  - 3.
+  - 10.
   rCM0: !!python/tuple
   - 0.01
-  - 3.
+  - 10.
   local_signal_rise: !!python/tuple
   - 5.
   - 200.
   local_signal_decay: !!python/tuple
   - 50.
-  - 4000.
+  - 2500.
   global_signal_rise: !!python/tuple
   - 5.
   - 200.
   global_signal_decay: !!python/tuple
   - 50.
-  - 3000.
+  - 2500.
   peak_delta_weight: !!python/tuple
   - 1.5
   - 4.
@@ -113,7 +113,7 @@ target_range:
   delta_min_val: 0.01
   delta_peak_val: 0.01
   residuals: 0.1
-  weights_smoothness: 0.005
+  weights_smoothness: 0.01
 target_val:
 x0:
   global_signal_decay: 3.000893E+02

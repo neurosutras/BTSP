@@ -1,0 +1,10 @@
+1:
+  delta_peak_ramp_amp: 3.176565E+00
+  depot_signal_decay: 3.997085E+03
+  depot_signal_rise: 8.193095E+01
+  global_signal_decay: 2.454382E+02
+  global_signal_rise: 1.273163E+02
+  k_depot: 5.052859E+00
+  k_pot: 1.499858E+01
+  pot_signal_decay: 4.649621E+02
+  pot_signal_rise: 1.996649E+02

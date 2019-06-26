@@ -67,6 +67,11 @@ def init_context():
         raise IOError('optimize_biBTSP_%s: init_context: invalid data_file_path: %s' %
                       (BTSP_model_name, context.data_file_path))
 
+    if 'weights_path_distance_threshold' not in context():
+        context.weights_path_distance_threshold = 2.
+    else:
+        context.weights_path_distance_threshold = float(context.weights_path_distance_threshold)
+
     with h5py.File(context.data_file_path, 'r') as f:
         dt = f['defaults'].attrs['dt']  # ms
         input_field_peak_rate = f['defaults'].attrs['input_field_peak_rate']  # Hz
@@ -637,9 +642,11 @@ def calculate_model_ramp(pot_signal_peak=None, depot_signal_peak=None, global_si
 
     target_ramp = context.exp_ramp['after']
 
+    """
     prev_residual_score = 0.
     for i in range(len(target_ramp)):
         prev_residual_score += ((current_ramp[i] - target_ramp[i]) / context.target_range['residuals']) ** 2.
+    """
 
     if plot:
         fig, axes = plt.subplots(2, sharex=True)
@@ -675,18 +682,18 @@ def calculate_model_ramp(pot_signal_peak=None, depot_signal_peak=None, global_si
             depot_signal_peak)
 
         if plot and induction_lap == 0:
-            fig, axes = plt.subplots()
+            fig3, axes3 = plt.subplots()
             voltage_range = np.linspace(np.min(current_complete_normalized_ramp),
                                         np.max(current_complete_normalized_ramp), 10000)
-            axes.plot(voltage_range, pot_phi(voltage_range), c='c', label='Potentiation')
-            axes.plot(voltage_range, depot_phi(voltage_range), c='r', label='De-potentiation')
-            axes.set_ylabel('Voltage-dependent modulation factor')
-            axes.set_xlabel('Normalized ramp amplitude')
-            axes.set_title('Linear voltage-dependent modulation\nof synaptic eligibility')
-            axes.legend(loc='best', frameon=False, framealpha=0.5)
-            clean_axes(axes)
-            fig.tight_layout()
-            fig.show()
+            axes3.plot(voltage_range, pot_phi(voltage_range), c='c', label='Potentiation')
+            axes3.plot(voltage_range, depot_phi(voltage_range), c='r', label='De-potentiation')
+            axes3.set_ylabel('Voltage-dependent modulation factor')
+            axes3.set_xlabel('Normalized ramp amplitude')
+            axes3.set_title('Linear voltage-dependent modulation\nof synaptic eligibility')
+            axes3.legend(loc='best', frameon=False, framealpha=0.5)
+            clean_axes(axes3)
+            fig3.tight_layout()
+            fig3.show()
 
         if induction_lap == 0:
             start_time = context.down_t[0]
@@ -723,6 +730,7 @@ def calculate_model_ramp(pot_signal_peak=None, depot_signal_peak=None, global_si
             axes2[0].plot(context.binned_x, current_ramp)
         ramp_snapshots.append(current_ramp)
 
+        """
         current_residual_score = 0.
         for i in range(len(target_ramp)):
             current_residual_score += ((current_ramp[i] - target_ramp[i]) / context.target_range['residuals']) ** 2.
@@ -742,6 +750,7 @@ def calculate_model_ramp(pot_signal_peak=None, depot_signal_peak=None, global_si
                 fig2.show()
             return dict()
         prev_residual_score = current_residual_score
+        """
 
     if plot:
         axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
@@ -925,6 +934,7 @@ def calculate_model_ramp(pot_signal_peak=None, depot_signal_peak=None, global_si
             group.create_dataset('global_filter_t', compression='gzip', data=global_filter_t)
             group.create_dataset('global_filter', compression='gzip', data=global_filter)
             group.attrs['pot_signal_peak'] = pot_signal_peak
+            group.attrs['depot_signal_peak'] = pot_signal_peak
             group.attrs['global_signal_peak'] = global_signal_peak
             group.attrs['mean_induction_start_loc'] = context.mean_induction_start_loc
             group.attrs['mean_induction_stop_loc'] = context.mean_induction_stop_loc
@@ -960,6 +970,14 @@ def calculate_model_ramp(pot_signal_peak=None, depot_signal_peak=None, global_si
             group.create_group('delta_weights_snapshots')
             for i, this_delta_weights in enumerate(delta_weights_snapshots):
                 group['delta_weights_snapshots'].create_dataset(str(i), data=this_delta_weights)
+
+    # catch models with excessive fluctuations in weights across laps:
+    if weights_path_distance_exceeds_threshold(delta_weights_snapshots, context.weights_path_distance_threshold):
+        if context.verbose > 0:
+            print('optimize_biBTSP_%s: calculate_model_ramp: pid: %i; aborting - excessive fluctuations in weights '
+                  'across laps; cell_id: %i, induction: %i' %
+                  (BTSP_model_name, os.getpid(), context.cell_id, context.induction))
+        return dict()
 
     return {context.cell_id: {context.induction: result}}
 

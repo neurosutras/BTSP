@@ -1,22 +1,22 @@
 bounds:
   k_pot: !!python/tuple
   - 0.1
-  - 15.
+  - 10.
   k_depot: !!python/tuple
   - 0.1
-  - 15.
+  - 10.
   local_signal_rise: !!python/tuple
   - 5.
   - 200.
   local_signal_decay: !!python/tuple
   - 50.
-  - 4000.
+  - 2500.
   global_signal_rise: !!python/tuple
   - 5.
   - 200.
   global_signal_decay: !!python/tuple
   - 50.
-  - 3000.
+  - 2500.
   delta_peak_ramp_amp: !!python/tuple
   - 0.
   - 10.
@@ -96,7 +96,7 @@ target_range:
   delta_min_val: 0.01
   delta_peak_val: 0.01
   residuals: 0.1
-  weights_smoothness: 0.005
+  weights_smoothness: 0.01
 target_val:
 x0:
   k_pot: 9.991864E+00
