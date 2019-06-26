@@ -1118,7 +1118,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
     clean_axes(axes)
 
-    colors = ['r', 'c']
+    colors = ['c', 'r']
     """
     axes1 = [[fig.add_subplot(gs1[row, col]) for col in xrange(2)] for row in xrange(2)]
     axes1[0][0].get_shared_x_axes().join(axes1[0][0], axes1[0][1], axes1[1][0], axes1[1][1])
