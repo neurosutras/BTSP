@@ -242,8 +242,6 @@ def import_data(cell_id, induction):
         induction_stop_times.append(this_induction_stop_time)
         running_position += context.track_length
     context.induction_start_times = np.array(induction_start_times)
-    print('debug: cell_id: %i, induction: %i, induction_intervals: %s' %
-          (cell_id, induction, str(np.diff(induction_start_times))))
     context.induction_stop_times = np.array(induction_stop_times)
     context.track_start_times = np.array(track_start_times)
     context.track_stop_times = np.array(track_stop_times)

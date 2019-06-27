@@ -666,18 +666,18 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             local_signal_peak)
 
         if plot and induction_lap == 0:
-            fig, axes = plt.subplots()
+            fig3, axes3 = plt.subplots()
             voltage_range = np.linspace(np.min(current_complete_normalized_ramp),
                                         np.max(current_complete_normalized_ramp), 10000)
-            axes.plot(voltage_range, pot_phi(voltage_range), c='c', label='Potentiation')
-            axes.plot(voltage_range, depot_phi(voltage_range), c='r', label='De-potentiation')
-            axes.set_ylabel('Voltage-dependent modulation factor')
-            axes.set_xlabel('Normalized ramp amplitude')
-            axes.set_title('Linear voltage-dependent modulation\nof synaptic eligibility')
-            axes.legend(loc='best', frameon=False, framealpha=0.5)
-            clean_axes(axes)
-            fig.tight_layout()
-            fig.show()
+            axes3.plot(voltage_range, pot_phi(voltage_range), c='c', label='Potentiation')
+            axes3.plot(voltage_range, depot_phi(voltage_range), c='r', label='De-potentiation')
+            axes3.set_ylabel('Voltage-dependent modulation factor')
+            axes3.set_xlabel('Normalized ramp amplitude')
+            axes3.set_title('Linear voltage-dependent modulation\nof synaptic eligibility')
+            axes3.legend(loc='best', frameon=False, framealpha=0.5)
+            clean_axes(axes3)
+            fig3.tight_layout()
+            fig3.show()
 
         if induction_lap == 0:
             start_time = context.down_t[0]

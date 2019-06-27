@@ -1,80 +1,57 @@
 bounds:
-  rMC_peak: !!python/tuple
-  - 0.001
-  - 1.
-  rMC_th: !!python/tuple
-  - 0.001
-  - 1.
-  rCM_th1: !!python/tuple
-  - 0.001
-  - 1.
-  rCM_peak1: !!python/tuple
-  - 0.001
-  - 1.
-  rCM_th2: !!python/tuple
-  - 0.01
-  - 1.
-  rCM_peak2: !!python/tuple
-  - 0.001
-  - 1.
-  rCM_min2: !!python/tuple
-  - 0.01
-  - 1.
   rMC0: !!python/tuple
-  - 0.1
+  - 0.01
   - 10.
   rCM0: !!python/tuple
-  - 0.1
+  - 0.01
   - 10.
-  local_signal_rise: !!python/tuple
+  pot_signal_rise: !!python/tuple
   - 5.
   - 200.
-  local_signal_decay: !!python/tuple
+  pot_signal_decay: !!python/tuple
   - 50.
-  - 4000.
+  - 2500.
+  depot_signal_rise: !!python/tuple
+  - 5.
+  - 200.
+  depot_signal_decay: !!python/tuple
+  - 50.
+  - 2500.
   global_signal_rise: !!python/tuple
   - 5.
   - 200.
   global_signal_decay: !!python/tuple
   - 50.
-  - 3000.
+  - 2500.
   peak_delta_weight: !!python/tuple
   - 1.5
   - 4.
 default_params:
 rel_bounds:
-- - local_signal_decay
+- - pot_signal_decay
   - '>'
   - 1.0
-  - local_signal_rise
+  - pot_signal_rise
+- - depot_signal_decay
+  - '>'
+  - 1.0
+  - depot_signal_rise
 - - global_signal_decay
   - '>'
   - 1.0
   - global_signal_rise
-- - local_signal_decay
+- - pot_signal_decay
   - '>'
   - 1.0
   - global_signal_decay
-- - rMC_peak
+- - depot_signal_decay
   - '>'
   - 1.0
-  - rMC_th
-- - rCM_peak1
+  - pot_signal_decay
+- - rMC0
   - '>'
   - 1.0
-  - rCM_th1
-- - rCM_peak2
-  - '>'
-  - 1.0
-  - rCM_th1
-- - rCM_th2
-  - '>'
-  - 1.0
-  - rCM_peak1
-- - rCM_th2
-  - '>'
-  - 1.0
-  - rCM_peak2
+  - rCM0
 feature_names:
 - spont_delta_amp
 - spont_delta_width
@@ -95,43 +72,39 @@ feature_names:
 - exp2_delta_min_loc
 - exp2_delta_min_val
 update_context:
-- - optimize_BTSP_CA1
+- - optimize_biBTSP_G
   - update_model_params
 get_features_stages:
-- source: optimize_BTSP_CA1
+- source: optimize_biBTSP_G
   get_args_static: get_args_static_signal_amplitudes
   compute_features: compute_features_signal_amplitudes
   filter_features: filter_features_signal_amplitudes
-- source: optimize_BTSP_CA1
+- source: optimize_biBTSP_G
   get_args_dynamic: get_args_dynamic_model_ramp
   compute_features: compute_features_model_ramp
   filter_features: filter_features_model_ramp
 get_objectives:
-  optimize_BTSP_CA1: get_objectives
+  optimize_biBTSP_G: get_objectives
 kwargs:
-  data_file_name: '20180411_BTSP2_CA1_data.hdf5'
+  data_file_name: 20190621_biBTSP_data_calibrated_input.hdf5
+  input_field_width: 90.  # cm
   verbose: 1
   min_delta_weight: -0.2
-  data_keys:
+  params_path: config/20190626_biBTSP_G_90cm_initial_params.yaml
 objective_names:
 - spont_residual_score
 - exp1_residual_score
 - exp2_residual_score
 - self_consistent_delta_residual_score
-optimization_title: bidirectional_BTSP
+optimization_title: biBTSP_G_90cm
 param_gen: PopulationAnnealing
 param_names:
-- rMC_peak
-- rMC_th
-- rCM_th1
-- rCM_peak1
-- rCM_th2
-- rCM_peak2
-- rCM_min2
 - rMC0
 - rCM0
-- local_signal_rise
-- local_signal_decay
+- pot_signal_rise
+- pot_signal_decay
+- depot_signal_rise
+- depot_signal_decay
 - global_signal_rise
 - global_signal_decay
 - peak_delta_weight
@@ -143,17 +116,12 @@ target_range:
   weights_smoothness: 0.01
 target_val:
 x0:
-  global_signal_decay: 288.194193
-  local_signal_rise: 16.685329
-  rMC_th: 0.460792
-  rMC_peak: 0.633983
-  global_signal_rise: 79.611702
-  peak_delta_weight: 2.821183
-  rCM_min2: 0.680773
-  local_signal_decay: 189.266337
-  rCM0: 1.991947
-  rMC0: 5.821269
-  rCM_th1: 0.291222
-  rCM_th2: 0.752179
-  rCM_peak1: 0.752179
-  rCM_peak2: 0.662633
+  global_signal_decay: 327.9013424874619
+  global_signal_rise: 33.10370285112559
+  peak_delta_weight: 3.8584356046894137
+  rCM0: 0.27166095889790975
+  rMC0: 1.0627627534180737
+  pot_signal_rise: 8.55238892503821
+  pot_signal_decay: 917.3782517534474
+  depot_signal_rise: 8.55238892503821
+  depot_signal_decay: 917.3792517534475

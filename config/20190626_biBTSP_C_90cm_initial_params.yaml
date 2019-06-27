@@ -1,0 +1,8 @@
+1:
+  global_signal_decay: 3.000893E+02
+  local_signal_rise: 1.125681E+02
+  rMC0: 7.407045E-01
+  peak_delta_weight: 3.681929E+00
+  local_signal_decay: 1.739002E+03
+  rCM0: 1.589147E-01
+  global_signal_rise: 1.578144E+02
