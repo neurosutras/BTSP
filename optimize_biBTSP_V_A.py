@@ -1107,7 +1107,6 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     this_axis.set_xlim(-0.5, xmax)
     this_axis.set_title('Plasticity signal kinetics', fontsize=mpl.rcParams['font.size'])
     this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-    this_axis.set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
 
     this_axis = fig.add_subplot(gs0[0, 3])
     axes.append(this_axis)
@@ -1264,7 +1263,6 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     axes[0][0].set_xlim(-0.5, xmax)
     axes[0][0].set_title('Plasticity signal kinetics', fontsize=mpl.rcParams['font.size'], pad=10.)
     axes[0][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-    axes[0][0].set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
 
     axes[0][1].set_xlabel('Normalized eligibility signal')
     axes[0][1].set_ylabel('Normalized rate')
