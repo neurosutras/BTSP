@@ -340,7 +340,7 @@ def get_triple_signal_filters(pot_signal_rise, pot_signal_decay, depot_signal_ri
         get_exp_rise_decay_filter(global_signal_rise, global_signal_decay, max_time_scale, dt)
     if plot:
         fig, axes = plt.subplots(1)
-        axes.plot(pot_signal_filter_t / 1000., pot_signal_filter / np.max(pot_signal_filter), color='r',
+        axes.plot(pot_signal_filter_t / 1000., pot_signal_filter / np.max(pot_signal_filter), color='c',
                   label='Potentiation eligibility signal filter')
         axes.plot(depot_signal_filter_t / 1000., depot_signal_filter / np.max(depot_signal_filter), color='r',
                   label='De-potentiation eligibility signal filter')

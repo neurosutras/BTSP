@@ -1,14 +1,14 @@
 1:
-  k_pot: 9.991864E+00
-  k_depot: 1.030430E-01
-  global_signal_rise: 1.199720E+02
-  global_signal_decay: 2.566589E+02
-  delta_peak_ramp_amp: 0.
-  pot_signal_rise: 1.995811E+02
-  pot_signal_decay: 4.546595E+02
-  depot_signal_rise: 1.995811E+02
-  depot_signal_decay: 4.547595E+02
-  r_pot_th: 3.160245E-01
-  r_pot_peak: 4.092345E-01
-  r_depot_th: 7.109480E-02
-  r_depot_peak: 7.443065E-01
+  delta_peak_ramp_amp: 1.494491E+00
+  depot_signal_decay: 2.241602E+03
+  depot_signal_rise: 1.025385E+02
+  global_signal_decay: 4.915293E+02
+  global_signal_rise: 3.227526E+01
+  k_depot: 2.964189E-01
+  k_pot: 2.903378E+00
+  pot_signal_decay: 9.998472E+02
+  pot_signal_rise: 6.066143E+01
+  r_depot_peak: 1.068193E-03
+  r_depot_th: 1.907175E-03
+  r_pot_peak: 7.503062E-02
+  r_pot_th: 1.327013E-01
