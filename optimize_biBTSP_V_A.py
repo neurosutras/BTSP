@@ -71,6 +71,8 @@ def init_context():
     else:
         context.weights_path_distance_threshold = float(context.weights_path_distance_threshold)
 
+    context.verbose = int(context.verbose)
+
     with h5py.File(context.data_file_path, 'r') as f:
         dt = f['defaults'].attrs['dt']  # ms
         input_field_peak_rate = f['defaults'].attrs['input_field_peak_rate']  # Hz
