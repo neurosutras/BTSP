@@ -660,7 +660,10 @@ def get_indexes_from_ramp_bounds_with_wrap(x, start, peak, end, min):
     else:
         min_index = len(x) - 1
     if start < peak:
-        start_index = np.where(x[:peak_index] <= start)[0][-1]
+        if start < x[0]:
+            start_index = 0
+        else:
+            start_index = np.where(x[:peak_index] <= start)[0][-1]
     else:
         start_index = peak_index + np.where(x[peak_index:] <= start)[0]
         if np.any(start_index):
@@ -730,7 +733,10 @@ def calculate_ramp_features(ramp, induction_loc, binned_x, interp_x, track_lengt
     extended_ramp = np.interp(extended_interp_x, extended_binned_x, extended_binned_ramp)
     interp_ramp = extended_ramp[len(default_interp_x):2 * len(default_interp_x)]
     baseline_indexes = np.where(interp_ramp <= np.percentile(interp_ramp, 10.))[0]
-    baseline = np.mean(interp_ramp[baseline_indexes])
+    if len(baseline_indexes) > 0:
+        baseline = np.mean(interp_ramp[baseline_indexes])
+    else:
+        baseline = np.min(interp_ramp)
     if offset:
         interp_ramp -= baseline
         extended_ramp -= baseline
@@ -784,9 +790,9 @@ def get_local_peak_shift(ramp, induction_loc, binned_x, interp_x, track_length, 
     order = int((tolerance / track_length) * len(interp_ramp))
 
     peak_indexes = signal.argrelmax(interp_ramp, order=order, mode='wrap')[0]
+    if not np.any(peak_indexes):
+        peak_indexes = np.array([np.argmax(interp_ramp)])
     peak_locs = default_interp_x[peak_indexes]
-    if not np.any(peak_locs):
-        return None, None
     peak_shifts = []
 
     for peak_loc in peak_locs:
@@ -868,15 +874,22 @@ def get_residual_score(delta_weights, target_ramp, ramp_x, input_x, interp_x, in
                peak_loc['model'], end_loc['model'], min_val['model'], min_loc['model']))
     sys.stdout.flush()
 
-    start_index, peak_index, end_index, min_index = \
+    peak_index, min_index = {}, {}
+    _, peak_index['target'], _, min_index['target'] = \
         get_indexes_from_ramp_bounds_with_wrap(ramp_x, start_loc['target'], peak_loc['target'], end_loc['target'],
                                                min_loc['target'])
+    _, peak_index['model'], _, min_index['model'] = \
+        get_indexes_from_ramp_bounds_with_wrap(ramp_x, start_loc['model'], peak_loc['model'], end_loc['model'],
+                                               min_loc['model'])
 
-    model_val_at_target_min_loc = model_ramp[min_index]
+    model_val_at_target_min_loc = model_ramp[min_index['target']]
+    target_val_at_model_min_loc = exp_ramp[min_index['model']]
     Err += ((model_val_at_target_min_loc - min_val['target']) / target_range['delta_min_val']) ** 2.
-    Err += ((min_val['model'] - min_val['target']) / target_range['delta_min_val']) ** 2.
-    model_val_at_target_peak_loc = model_ramp[peak_index]
+    Err += ((min_val['model'] - target_val_at_model_min_loc) / target_range['delta_min_val']) ** 2.
+    model_val_at_target_peak_loc = model_ramp[peak_index['target']]
+    target_val_at_model_peak_loc = exp_ramp[peak_index['model']]
     Err += ((model_val_at_target_peak_loc - ramp_amp['target']) / target_range['delta_peak_val']) ** 2.
+    Err += ((target_val_at_model_peak_loc - ramp_amp['model']) / target_range['delta_peak_val']) ** 2.
 
     for i in range(len(exp_ramp)):
         Err += ((exp_ramp[i] - model_ramp[i]) / target_range['residuals']) ** 2.

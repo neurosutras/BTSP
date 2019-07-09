@@ -655,12 +655,6 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
 
     target_ramp = context.exp_ramp['after']
 
-    """
-    prev_residual_score = 0.
-    for i in range(len(target_ramp)):
-        prev_residual_score += ((current_ramp[i] - target_ramp[i]) / context.target_range['residuals']) ** 2.
-    """
-
     if plot:
         fig, axes = plt.subplots()
         fig.suptitle('Induction: %i' % context.induction)
@@ -712,27 +706,6 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
         if plot:
             axes2[0].plot(context.binned_x, current_ramp)
         ramp_snapshots.append(current_ramp)
-
-        """
-        current_residual_score = 0.
-        for i in range(len(target_ramp)):
-            current_residual_score += ((current_ramp[i] - target_ramp[i]) / context.target_range['residuals']) ** 2.
-
-        if current_residual_score > 1.1 * prev_residual_score:
-            if context.verbose > 0:
-                print('optimize_biBTSP_%s: calculate_model_ramp: pid: %i; aborting - residual score not decreasing; '
-                      'induction: %i, lap: %i' % (BTSP_model_name, os.getpid(), context.induction, induction_lap + 1))
-            if plot:
-                axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-                clean_axes(axes)
-                clean_axes(axes2)
-                fig.tight_layout()
-                fig2.tight_layout()
-                fig.show()
-                fig2.show()
-            return dict()
-        prev_residual_score = current_residual_score
-        """
 
     if plot:
         axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
@@ -837,11 +810,26 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
                peak_loc['model'], end_loc['model'], min_val['model'], min_loc['model'], model_ramp_offset))
         sys.stdout.flush()
 
-    result['delta_amp'] = ramp_amp['model'] - ramp_amp['target']
+    peak_index, min_index = {}, {}
+    _, peak_index['target'], _, min_index['target'] = \
+        get_indexes_from_ramp_bounds_with_wrap(context.binned_x, start_loc['target'], peak_loc['target'],
+                                               end_loc['target'], min_loc['target'])
+    _, peak_index['model'], _, min_index['model'] = \
+        get_indexes_from_ramp_bounds_with_wrap(context.binned_x, start_loc['model'], peak_loc['model'],
+                                               end_loc['model'], min_loc['model'])
+
+    model_val_at_target_min_loc = model_ramp[min_index['target']]
+    target_val_at_model_min_loc = target_ramp[min_index['model']]
+    model_val_at_target_peak_loc = model_ramp[peak_index['target']]
+    target_val_at_model_peak_loc = target_ramp[peak_index['model']]
+
+    result['delta_val_at_target_peak'] = model_val_at_target_peak_loc - ramp_amp['target']
+    result['delta_val_at_model_peak'] = ramp_amp['model'] - target_val_at_model_peak_loc
     result['delta_width'] = ramp_width['model'] - ramp_width['target']
     result['delta_peak_shift'] = peak_shift['model'] - peak_shift['target']
     result['delta_asymmetry'] = ratio['model'] - ratio['target']
-    result['delta_min_val'] = min_val['model'] - min_val['target']
+    result['delta_val_at_target_min'] = model_val_at_target_min_loc - min_val['target']
+    result['delta_val_at_model_min'] = min_val['model'] - target_val_at_model_min_loc
 
     abs_delta_min_loc = abs(min_loc['model'] - min_loc['target'])
     if min_loc['model'] <= min_loc['target']:
@@ -950,6 +938,21 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             group.attrs['target_end_loc'] = end_loc['target']
             group.attrs['target_min_val'] = min_val['target']
             group.attrs['target_min_loc'] = min_loc['target']
+
+            print('debug: getting here')
+            print(type(ramp_amp['model']))
+            print(type(ramp_width['model']))
+            print(type(peak_shift['model']))
+            print(type(local_peak_loc['model']))
+            print(type(local_peak_shift['model']))
+            print(type(ratio['model']))
+            print(type(start_loc['model']))
+            print(type(peak_loc['model']))
+            print(type(end_loc['model']))
+            print(type(min_val['model']))
+            print(type(min_loc['model']))
+            sys.stdout.flush()
+
             group.attrs['model_ramp_amp'] = ramp_amp['model']
             group.attrs['model_ramp_width'] = ramp_width['model']
             group.attrs['model_peak_shift'] = peak_shift['model']
@@ -1012,9 +1015,9 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
         global_filter_t = group['global_filter_t'][:]
         global_filter = group['global_filter'][:]
         initial_weights = group['initial_weights'][:]
-        initial_exp_ramp = group['initial_exp_ramp'][:]
+        # initial_exp_ramp = group['initial_exp_ramp'][:]
         initial_ramp = group['initial_model_ramp'][:]
-        target_ramp = group['target_ramp'][:]
+        # target_ramp = group['target_ramp'][:]
         model_ramp = group['model_ramp'][:]
         ramp_snapshots = []
         for lap in range(len(group['ramp_snapshots'])):
@@ -1026,6 +1029,9 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
 
     import_data(cell_id, 2)
     update_source_contexts(x)
+
+    initial_exp_ramp = context.exp_ramp_raw['before']
+    target_ramp = context.exp_ramp_raw['after']
 
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
     local_signals = \
@@ -1380,8 +1386,9 @@ def filter_features_model_ramp(primitives, current_features, export=False):
     """
     features = {}
     groups = ['spont', 'exp1', 'exp2']
-    grouped_feature_names = ['delta_amp', 'delta_width', 'delta_peak_shift', 'delta_asymmetry', 'delta_min_loc',
-                             'delta_min_val', 'residual_score']
+    grouped_feature_names = ['delta_val_at_target_peak', 'delta_val_at_model_peak', 'delta_width', 'delta_peak_shift',
+                             'delta_asymmetry', 'delta_min_loc', 'delta_val_at_target_min', 'delta_val_at_model_min',
+                             'residual_score']
     feature_names = ['self_consistent_delta_residual_score']
     for this_result_dict in primitives:
         if not this_result_dict:
