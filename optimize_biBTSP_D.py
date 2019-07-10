@@ -938,21 +938,6 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             group.attrs['target_end_loc'] = end_loc['target']
             group.attrs['target_min_val'] = min_val['target']
             group.attrs['target_min_loc'] = min_loc['target']
-
-            print('debug: getting here')
-            print(type(ramp_amp['model']))
-            print(type(ramp_width['model']))
-            print(type(peak_shift['model']))
-            print(type(local_peak_loc['model']))
-            print(type(local_peak_shift['model']))
-            print(type(ratio['model']))
-            print(type(start_loc['model']))
-            print(type(peak_loc['model']))
-            print(type(end_loc['model']))
-            print(type(min_val['model']))
-            print(type(min_loc['model']))
-            sys.stdout.flush()
-
             group.attrs['model_ramp_amp'] = ramp_amp['model']
             group.attrs['model_ramp_width'] = ramp_width['model']
             group.attrs['model_peak_shift'] = peak_shift['model']
