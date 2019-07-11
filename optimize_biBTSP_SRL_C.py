@@ -4,40 +4,38 @@ plasticity to account for the width and amplitude of place fields in an experime
 includes:
 1) Silent cells converted to place cells by spontaneous plateaus
 2) Silent cells converted to place cells by experimentally induced plateaus
-3) Existing place cells that shift their place field locations after an experimentally induced plateau
+3) Place cells with pre-existing place fields that shift their place field locations after an experimentally induced
+plateau
 
 Features/assumptions of the phenomenological model:
 1) Synaptic weights in a silent cell are all = 1 prior to field induction 1. w(t0) = 1
-2) Activity at each synapse generates long duration 'local plasticity signals', or an 'eligibility traces' for
-synaptic plasticity.
+2) Activity at each synapse generates long duration 'local plasticity signals', or 'eligibility traces' for synaptic
+plasticity.
 3) Dendritic plateaus generate a long duration 'global plasticity signal', or a 'gating trace' for synaptic plasticity.
 4) Changes in weight at each synapse are integrated over periods of nonzero overlap between eligibility and gating
 signals, and updated once per lap.
 
-Features/assumptions of the bistable synapse model:
-1) Synaptic strength is equivalent to the number of AMPA-Rs at a synapse (quantal size). 
-2) Dendritic plateaus generate a global gating signal that mobilizes AMPA-Rs, allowing them to be either inserted or
-removed from synapses.
-3) Activity at each synapse generates a local plasticity signal that, in conjunction with the global gating signal,
-can activate a forward process to increase the number of AMPA-Rs stably incorporated into synapses.
-4) Activity at each synapse generates a local plasticity signal that, in conjunction with the global gating signal,
-can activate a reverse process to decrease the number of AMPA-Rs stably incorporated into synapses.
-5) AMPAR-s can be in 2 states (Markov-style kinetic scheme):
+Features/assumptions of synaptic resource-limited model B:
+1) Dendritic plateaus generate a global gating signal that provides a necessary cofactor required to convert plasticity
+eligibility signals at each synapse into either increases or decreases in synaptic strength.
+2) Activity at each synapse generates a local potentiation eligibility signal that, in conjunction with the global
+gating signal, can activate a forward process to increase synaptic strength.
+3) Activity at each synapse generates a local depression eligibility signal that, in conjunction with the global
+gating signal, can activate a reverse process to decrease synaptic strength.
+4) Synaptic resources can be in 2 states (Markov-style kinetic scheme):
 
-     rMC0 * global_signal * f_pot(local_signal)
-M (mobile) <----------------------> C (captured by a synapse)
-     rCM0 * global_signal * f_depot(local_signal)
+        k_pot * global_signal * f_pot(local_pot_signal)
+I (inactive) <------------------------------> A (active)
+        k_dep * global_signal * f_dep(local_dep_signal)
 
-6) At rest 100% of non-synaptic receptors are in state M, mobile and available for synaptic capture.
-7) global_signals are pooled across all cells and normalized to a peak value of 1.
-8) local_signals are pooled across all cells and normalized to a peak value of 1.
-9) f_pot represents the "sensitivity" of the forward process to the presence of the local_signal. The transformation
+5) global_signals are pooled across all cells and normalized to a peak value of 1.
+6) local_signals are pooled across all cells and normalized to a peak value of 1.
+7) f_pot represents the "sensitivity" of the forward process to the presence of the local_signal. The transformation
 f_pot has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
-10) f_depot represents the "sensitivity" of the reverse process to the presence of the local_signal. The transformation
-f_depot has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
+8) f_dep represents the "sensitivity" of the reverse process to the presence of the local_signal. The transformation
+f_dep has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
 
-biBTSP_D vs. biBTSP_orig: De-potentiation is restricted to a single sigmoid. Weights updated once per lap instead of
-once per time step. Relaxed constraints on sigmoid slope compared to original version.
+biBTSP_SRL_C: Dual eligibility signal filters. Sigmoidal f_pot and f_dep.
 """
 __author__ = 'milsteina'
 from BTSP_utils import *
@@ -48,7 +46,7 @@ import click
 context = Context()
 
 
-BTSP_model_name = 'D'
+BTSP_model_name = 'SRL_C'
 
 
 def config_worker():
@@ -94,6 +92,7 @@ def init_context():
         if 'input_field_width' not in context() or context.input_field_width is None:
             raise RuntimeError('optimize_biBTSP_%s: init context: missing required parameter: input_field_width' %
                                BTSP_model_name)
+        context.input_field_width = float(context.input_field_width)
         input_field_width_key = str(int(context.input_field_width))
         if 'calibrated_input' not in f or input_field_width_key not in f['calibrated_input']:
             raise RuntimeError('optimize_biBTSP_%s: init context: data for input_field_width: %.1f not found in the '
@@ -497,16 +496,20 @@ def compute_features_signal_amplitudes(x, cell_id=None, induction=None, export=F
               (os.getpid(), context.cell_id, context.induction, ', '.join('%.3E' % i for i in x)))
         sys.stdout.flush()
     start_time = time.time()
-    local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
-        get_dual_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
-                           context.global_signal_decay, context.down_dt, plot)
+    pot_signal_filter_t, pot_signal_filter, dep_signal_filter_t, dep_signal_filter, \
+    global_filter_t, global_filter = \
+        get_triple_signal_filters(context.pot_signal_rise, context.pot_signal_decay,
+                                  context.dep_signal_rise, context.dep_signal_decay,
+                                  context.global_signal_rise, context.global_signal_decay, context.down_dt, plot)
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
-    local_signals = get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt)
+    pot_signals = get_local_signal_population(pot_signal_filter, context.down_rate_maps, context.down_dt)
+    dep_signals = get_local_signal_population(dep_signal_filter, context.down_rate_maps, context.down_dt)
 
-    result = {'local_signal_peak': np.max(local_signals),
+    result = {'pot_signal_peak': np.max(pot_signals),
+              'dep_signal_peak': np.max(dep_signals),
               'global_signal_peak': np.max(global_signal)}
     if context.verbose > 1:
-        print('Process: %i: computing signal_amplitude features for cell_id: %i, induction: %i took %.1f s' % \
+        print('Process: %i: computing signal_amplitude features for cell_id: %i, induction: %i took %.1f s' %
               (os.getpid(), context.cell_id, context.induction, time.time() - start_time))
         sys.stdout.flush()
     return {cell_id: {induction: result}}
@@ -521,18 +524,23 @@ def filter_features_signal_amplitudes(primitives, current_features, export=False
     :param plot: bool
     :return: dict
     """
-    local_signal_peaks = []
+    pot_signal_peaks = []
+    dep_signal_peaks = []
     global_signal_peaks = []
     for this_dict in primitives:
         for cell_id in this_dict:
             for induction_id in this_dict[cell_id]:
                 global_signal_peaks.append(this_dict[cell_id][induction_id]['global_signal_peak'])
-                local_signal_peaks.append(this_dict[cell_id][induction_id]['local_signal_peak'])
+                pot_signal_peaks.append(this_dict[cell_id][induction_id]['pot_signal_peak'])
+                dep_signal_peaks.append(this_dict[cell_id][induction_id]['dep_signal_peak'])
     if plot:
         fig, axes = plt.subplots(1)
-        hist, edges = np.histogram(local_signal_peaks, bins=min(10, len(primitives)), density=True)
+        hist, edges = np.histogram(pot_signal_peaks, bins=min(10, len(primitives)), density=True)
         bin_width = edges[1] - edges[0]
-        axes.plot(edges[:-1] + bin_width / 2., hist * bin_width, c='r', label='Local eligibility signals')
+        axes.plot(edges[:-1] + bin_width / 2., hist * bin_width, c='c', label='Potentiation eligibility signals')
+        hist, edges = np.histogram(dep_signal_peaks, bins=min(10, len(primitives)), density=True)
+        bin_width = edges[1] - edges[0]
+        axes.plot(edges[:-1] + bin_width / 2., hist * bin_width, c='r', label='Depression eligibility signals')
         axes.set_xlabel('Peak local plasticity signal amplitudes (a.u.)')
         axes.set_ylabel('Probability')
         axes.set_title('Local signal amplitude distribution')
@@ -551,41 +559,52 @@ def filter_features_signal_amplitudes(primitives, current_features, export=False
         clean_axes(axes)
         fig.tight_layout()
         fig.show()
-    signal_amplitude_features = {'local_signal_max': np.max(local_signal_peaks),
+    signal_amplitude_features = {'pot_signal_max': np.max(pot_signal_peaks),
+                                 'dep_signal_max': np.max(pot_signal_peaks),
                                  'global_signal_max': np.max(global_signal_peaks)
                                  }
     if context.verbose > 1:
-        print('Process: %i: signal_amplitude features; local_signal_max: %.2E, global_signal_max: %.2E' %
-              (os.getpid(), signal_amplitude_features['local_signal_max'],
-               signal_amplitude_features['global_signal_max']))
+        print('Process: %i: signal_amplitude features; pot_signal_max: %.2E, dep_signal_max: %.2E, '
+              'global_signal_max: %.2E' % (os.getpid(), signal_amplitude_features['pot_signal_max'],
+                                           signal_amplitude_features['dep_signal_max'],
+                                           signal_amplitude_features['global_signal_max']))
     return signal_amplitude_features
 
 
-def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export=False, plot=False):
+def calculate_model_ramp(pot_signal_peak=None, dep_signal_peak=None, global_signal_peak=None, export=False,
+                         plot=False):
     """
 
-    :param local_signal_peak: float
+    :param pot_signal_peak: float
+    :param dep_signal_peak: float
     :param global_signal_peak: float
     :param export: bool
     :param plot: bool
     :return: dict
     """
-    local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
-        get_dual_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
-                           context.global_signal_decay, context.down_dt, plot)
+    pot_signal_filter_t, pot_signal_filter, dep_signal_filter_t, dep_signal_filter, \
+    global_filter_t, global_filter = \
+        get_triple_signal_filters(context.pot_signal_rise, context.pot_signal_decay,
+                                  context.dep_signal_rise, context.dep_signal_decay,
+                                  context.global_signal_rise, context.global_signal_decay, context.down_dt, plot)
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
-    local_signals = \
-        np.divide(get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt),
-                  local_signal_peak)
+    pot_signals = \
+        np.divide(get_local_signal_population(pot_signal_filter, context.down_rate_maps, context.down_dt),
+                  pot_signal_peak)
+    dep_signals = \
+        np.divide(get_local_signal_population(dep_signal_filter, context.down_rate_maps, context.down_dt),
+                  dep_signal_peak)
 
     signal_xrange = np.linspace(0., 1., 10000)
-    pot_rate = np.vectorize(scaled_single_sigmoid(context.rMC_th, context.rMC_th + context.rMC_peak, signal_xrange))
-    depot_rate = np.vectorize(scaled_single_sigmoid(context.rCM_th, context.rCM_th + context.rCM_peak, signal_xrange))
+    pot_rate = np.vectorize(
+        scaled_single_sigmoid(context.f_pot_th, context.f_pot_th + context.f_pot_peak, signal_xrange))
+    dep_rate = np.vectorize(
+        scaled_single_sigmoid(context.f_dep_th, context.f_dep_th + context.f_dep_peak, signal_xrange))
     if plot:
         fig, axes = plt.subplots(1)
-        depot_scale = context.rCM0 / context.rMC0
+        dep_scale = context.k_dep / context.k_pot
         axes.plot(signal_xrange, pot_rate(signal_xrange), label='Potentiation rate')
-        axes.plot(signal_xrange, depot_rate(signal_xrange) * depot_scale, label='De-potentiation rate')
+        axes.plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, label='Depression rate')
         axes.set_xlabel('Normalized eligibility signal amplitude (a.u.)')
         axes.set_ylabel('Normalized rate')
         axes.set_title('Plasticity signal transformations')
@@ -650,8 +669,8 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     delta_weights_snapshots = [initial_delta_weights]
     current_ramp = initial_ramp
     ramp_snapshots = [current_ramp]
-    initial_weights = np.divide(np.add(initial_delta_weights, 1.), peak_weight)
-    current_weights = np.array(initial_weights)
+    initial_normalized_weights = np.divide(np.add(initial_delta_weights, 1.), peak_weight)
+    current_normalized_weights = np.array(initial_normalized_weights)
 
     target_ramp = context.exp_ramp['after']
 
@@ -681,22 +700,22 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             stop_time = context.induction_start_times[induction_lap + 1]
         indexes = np.where((context.down_t >= start_time) & (context.down_t <= stop_time))
 
-        next_weights = []
-        for i, this_local_signal in enumerate(local_signals):
-            this_pot_rate = np.trapz(np.multiply(pot_rate(this_local_signal[indexes]), global_signal[indexes]),
+        next_normalized_weights = []
+        for i, (this_pot_signal, this_dep_signal) in enumerate(zip(pot_signals, dep_signals)):
+            this_pot_rate = np.trapz(np.multiply(pot_rate(this_pot_signal[indexes]), global_signal[indexes]),
                                      dx=context.down_dt / 1000.)
-            this_depot_rate = np.trapz(np.multiply(depot_rate(this_local_signal[indexes]), global_signal[indexes]),
+            this_dep_rate = np.trapz(np.multiply(dep_rate(this_dep_signal[indexes]), global_signal[indexes]),
                                        dx=context.down_dt / 1000.)
-            this_delta_weight = context.rMC0 * this_pot_rate * (1. - current_weights[i]) - \
-                                context.rCM0 * this_depot_rate * current_weights[i]
-            this_delta_weight = max(min(this_delta_weight, 1. - current_weights[i]), - current_weights[i])
-            next_weights.append(current_weights[i] + this_delta_weight)
+            this_normalized_delta_weight = context.k_pot * this_pot_rate * (1. - current_normalized_weights[i]) - \
+                                context.k_dep * this_dep_rate * current_normalized_weights[i]
+            this_next_normalized_weight = max(0., min(1., current_normalized_weights[i] + this_normalized_delta_weight))
+            next_normalized_weights.append(this_next_normalized_weight)
         if plot:
             axes2[1].plot(context.peak_locs,
-                          np.multiply(np.subtract(next_weights, current_weights), peak_weight),
+                          np.multiply(np.subtract(next_normalized_weights, current_normalized_weights), peak_weight),
                           label='Induction lap: %i' % (induction_lap + 1))
-        current_weights = np.array(next_weights)
-        current_delta_weights = np.subtract(np.multiply(current_weights, peak_weight), 1.)
+        current_normalized_weights = np.array(next_normalized_weights)
+        current_delta_weights = np.subtract(np.multiply(current_normalized_weights, peak_weight), 1.)
         delta_weights_snapshots.append(current_delta_weights)
         current_ramp, discard_ramp_offset = \
             get_model_ramp(current_delta_weights, ramp_x=context.binned_x, input_x=context.binned_x,
@@ -717,7 +736,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
         fig2.show()
 
     delta_weights = np.subtract(current_delta_weights, initial_delta_weights)
-    initial_weights = np.multiply(initial_weights, peak_weight)
+    initial_weights = np.multiply(initial_normalized_weights, peak_weight)
     final_weights = np.add(current_delta_weights, 1.)
 
     if context.induction == 1:
@@ -913,13 +932,16 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             group.create_dataset('global_signal', compression='gzip', data=global_signal)
             group.create_dataset('down_t', compression='gzip', data=context.down_t)
             group.create_dataset('pot_rate', compression='gzip', data=pot_rate(signal_xrange))
-            group.create_dataset('depot_rate', compression='gzip', data=depot_rate(signal_xrange))
+            group.create_dataset('dep_rate', compression='gzip', data=dep_rate(signal_xrange))
             group.create_dataset('param_array', compression='gzip', data=context.x_array)
-            group.create_dataset('local_signal_filter_t', compression='gzip', data=local_signal_filter_t)
-            group.create_dataset('local_signal_filter', compression='gzip', data=local_signal_filter)
+            group.create_dataset('pot_signal_filter_t', compression='gzip', data=pot_signal_filter_t)
+            group.create_dataset('pot_signal_filter', compression='gzip', data=pot_signal_filter)
+            group.create_dataset('dep_signal_filter_t', compression='gzip', data=dep_signal_filter_t)
+            group.create_dataset('dep_signal_filter', compression='gzip', data=dep_signal_filter)
             group.create_dataset('global_filter_t', compression='gzip', data=global_filter_t)
             group.create_dataset('global_filter', compression='gzip', data=global_filter)
-            group.attrs['local_signal_peak'] = local_signal_peak
+            group.attrs['pot_signal_peak'] = pot_signal_peak
+            group.attrs['dep_signal_peak'] = pot_signal_peak
             group.attrs['global_signal_peak'] = global_signal_peak
             group.attrs['mean_induction_start_loc'] = context.mean_induction_start_loc
             group.attrs['mean_induction_stop_loc'] = context.mean_induction_stop_loc
@@ -989,20 +1011,22 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     with h5py.File(model_file_path, 'r') as f:
         group = f['exported_data'][str(cell_id)]['2']['model_ramp_features']
         x = group['param_array'][:]
-        if 'local_signal_peak' not in group.attrs or 'global_signal_peak' not in group.attrs:
+        if 'pot_signal_peak' not in group.attrs or 'dep_signal_peak' not in group.attrs or \
+                'global_signal_peak' not in group.attrs:
             raise KeyError('plot_model_summary_figure: missing required attributes for cell_id: %i, '
                            'induction 2; from file: %s' % (cell_id, model_file_path))
         group = f['exported_data'][str(cell_id)]['2']['model_ramp_features']
-        local_signal_peak = group.attrs['local_signal_peak']
+        pot_signal_peak = group.attrs['pot_signal_peak']
+        dep_signal_peak = group.attrs['dep_signal_peak']
         global_signal_peak = group.attrs['global_signal_peak']
-        local_signal_filter_t = group['local_signal_filter_t'][:]
-        local_signal_filter = group['local_signal_filter'][:]
+        pot_signal_filter_t = group['pot_signal_filter_t'][:]
+        pot_signal_filter = group['pot_signal_filter'][:]
+        dep_signal_filter_t = group['dep_signal_filter_t'][:]
+        dep_signal_filter = group['dep_signal_filter'][:]
         global_filter_t = group['global_filter_t'][:]
         global_filter = group['global_filter'][:]
         initial_weights = group['initial_weights'][:]
-        # initial_exp_ramp = group['initial_exp_ramp'][:]
         initial_ramp = group['initial_model_ramp'][:]
-        # target_ramp = group['target_ramp'][:]
         model_ramp = group['model_ramp'][:]
         ramp_snapshots = []
         for lap in range(len(group['ramp_snapshots'])):
@@ -1019,13 +1043,16 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     target_ramp = context.exp_ramp_raw['after']
 
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
-    local_signals = \
-        np.divide(get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt),
-                  local_signal_peak)
+    pot_signals = \
+        np.divide(get_local_signal_population(pot_signal_filter, context.down_rate_maps, context.down_dt),
+                  pot_signal_peak)
+    dep_signals = \
+        np.divide(get_local_signal_population(dep_signal_filter, context.down_rate_maps, context.down_dt),
+                  dep_signal_peak)
 
     signal_xrange = np.linspace(0., 1., 10000)
-    pot_rate = np.vectorize(scaled_single_sigmoid(context.rMC_th, context.rMC_th + context.rMC_peak, signal_xrange))
-    depot_rate = np.vectorize(scaled_single_sigmoid(context.rCM_th, context.rCM_th + context.rCM_peak, signal_xrange))
+    pot_rate = np.vectorize(scaled_single_sigmoid(context.f_pot_th, context.f_pot_th + context.f_pot_peak, signal_xrange))
+    dep_rate = np.vectorize(scaled_single_sigmoid(context.f_dep_th, context.f_dep_th + context.f_dep_peak, signal_xrange))
 
     resolution = 10
     input_sample_indexes = np.arange(0, len(context.peak_locs), resolution)
@@ -1057,14 +1084,14 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
 
     relative_indexes = np.where((sample_time_delays > target_time_delay) &
                                 (final_weights[input_sample_indexes] < initial_weights[input_sample_indexes]))[0]
-    distant_depotentiating_indexes = input_sample_indexes[relative_indexes]
-    if np.any(distant_depotentiating_indexes):
-        relative_index = np.argmin(np.subtract(final_weights, initial_weights)[distant_depotentiating_indexes])
-        this_example_index = distant_depotentiating_indexes[relative_index]
+    distant_depressing_indexes = input_sample_indexes[relative_indexes]
+    if np.any(distant_depressing_indexes):
+        relative_index = np.argmin(np.subtract(final_weights, initial_weights)[distant_depressing_indexes])
+        this_example_index = distant_depressing_indexes[relative_index]
     else:
         relative_index = np.argmin(np.subtract(final_weights, initial_weights)[input_sample_indexes])
         this_example_index = input_sample_indexes[relative_index]
-    example_input_dict['De-potentiating input example'] = this_example_index
+    example_input_dict['Depressing input example'] = this_example_index
 
     import matplotlib as mpl
     mpl.rcParams['svg.fonttype'] = 'none'
@@ -1095,17 +1122,18 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     this_axis.set_xlim(0., context.track_length)
     bar_loc = ymax - 0.5
     this_axis.hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
-    # this_axis.set_title('Bidirectional BTSP model', fontsize=mpl.rcParams['font.size'])
     this_axis.legend(loc=(0.05, 0.95), frameon=False, framealpha=0.5, handlelength=1,
                      fontsize=mpl.rcParams['font.size'])
     this_axis.set_xticks(np.arange(0., context.track_length, 45.))
 
     this_axis = fig.add_subplot(gs0[0, 2])
     axes.append(this_axis)
-    xmax = max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.
+    xmax = max(5000., pot_signal_filter_t[-1], dep_signal_filter_t[-1], global_filter_t[-1]) / 1000.
     xmax = math.ceil(xmax)
-    this_axis.plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='lightgray',
-                   label='Synaptic\neligibility signal')
+    this_axis.plot(pot_signal_filter_t / 1000., pot_signal_filter / np.max(pot_signal_filter), color='c',
+                   label='Potentiation\neligibility signal')
+    this_axis.plot(dep_signal_filter_t / 1000., dep_signal_filter / np.max(dep_signal_filter), color='r',
+                   label='Depression\neligibility signal')
     this_axis.plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
                    label='Dendritic\ngating signal')
     this_axis.set_xlabel('Time (s)')
@@ -1117,9 +1145,9 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
 
     this_axis = fig.add_subplot(gs0[0, 3])
     axes.append(this_axis)
-    depot_scale = context.rCM0 / context.rMC0
+    dep_scale = context.k_dep / context.k_pot
     this_axis.plot(signal_xrange, pot_rate(signal_xrange), label='Potentiation', c='c')
-    this_axis.plot(signal_xrange, depot_rate(signal_xrange) * depot_scale, label='De-potentiation', c='r')
+    this_axis.plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, label='Depression', c='r')
     this_axis.set_xlabel('Normalized eligibility signal')
     this_axis.set_ylabel('Normalized rate')
     this_axis.set_ylim(0., this_axis.get_ylim()[1])
@@ -1206,7 +1234,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
             rate_map = np.array(context.input_rate_maps[i])
             rate_map *= weights[i] * context.ramp_scaling_factor
             ymax = max(ymax, np.max(rate_map))
-            this_axis.plot(context.binned_x, rate_map, c='lightgray', zorder=0, linewidth=0.75)  # , alpha=0.5)
+            this_axis.plot(context.binned_x, rate_map, c='gray', zorder=0, linewidth=0.75)  # , alpha=0.5)
         for i, (name, index) in enumerate(viewitems(example_input_dict)):
             rate_map = np.array(context.input_rate_maps[index])
             rate_map *= weights[index] * context.ramp_scaling_factor
@@ -1245,10 +1273,12 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     # New figures
 
     fig, axes = plt.subplots(2, 3, figsize=(12., 6.5))
-    xmax = max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.
+    xmax = max(5000., pot_signal_filter_t[-1], dep_signal_filter_t[-1], global_filter_t[-1]) / 1000.
     xmax = math.ceil(xmax)
-    axes[0][0].plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='darkgray',
-                    label='Synaptic\neligibility signal')
+    axes[0][0].plot(pot_signal_filter_t / 1000., pot_signal_filter / np.max(pot_signal_filter), color='c',
+                    label='Potentiation\neligibility signal')
+    axes[0][0].plot(dep_signal_filter_t / 1000., dep_signal_filter / np.max(dep_signal_filter), color='r',
+                    label='Depression\neligibility signal')
     axes[0][0].plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
                     label='Dendritic\ngating signal')
     axes[0][0].set_xlabel('Time (s)')
@@ -1261,12 +1291,14 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     axes[0][1].set_ylabel('Normalized rate')
     axes[0][1].set_title('Sigmoidal q$_{+}$, sigmoidal q$_{-}$', fontsize=mpl.rcParams['font.size'], pad=10.)
     axes[0][1].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='q$_{+}$ (Potentiation)')
-    axes[0][1].plot(signal_xrange, depot_rate(signal_xrange) * depot_scale, c='r', label='q$_{-}$ (De-potentiation)')
+    axes[0][1].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='q$_{-}$ (Depression)')
     axes[0][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
 
+    """
+    # TODO: convert to a 3D plot with a Time axis instead (like Shouval, Wang & Wittenberg, 2010)
     cmap = cm.jet
     for w in np.linspace(0., 1., 10):
-        net_delta_weight = pot_rate(signal_xrange) * (1. - w) - depot_rate(signal_xrange) * depot_scale * w
+        net_delta_weight = pot_rate(signal_xrange) * (1. - w) - dep_rate(signal_xrange) * dep_scale * w
         axes[0][2].plot(signal_xrange, net_delta_weight, c=cmap(w))
     axes[0][2].axhline(y=0., linestyle='--', c='grey')
     axes[0][2].set_xlabel('Normalized eligibility signal')
@@ -1276,6 +1308,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     sm.set_array([])
     cbar = fig.colorbar(sm, ax=axes[0][2])
     cbar.set_label('Initial synaptic weight\n(normalized)', rotation=270., labelpad=25.)
+    """
 
     bar_loc = max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.) * 0.95
     delta_weights = np.subtract(final_weights, initial_weights)
@@ -1296,7 +1329,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     axes[1][1].set_ylim([min(-1., np.min(model_ramp) - 1., np.min(target_ramp) - 1.),
                          max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.)])
     axes[1][2].set_ylim([-peak_weight, peak_weight * 1.1])
-    axes[1][1].set_title('Bistable synapse model', fontsize=mpl.rcParams['font.size'], pad=10.)
+    axes[1][1].set_title('Model fit', fontsize=mpl.rcParams['font.size'], pad=10.)
 
     axes[1][0].plot(context.binned_x, initial_exp_ramp, label='Before', c='k')
     axes[1][0].plot(context.binned_x, target_ramp, label='After', c='c')
@@ -1310,7 +1343,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     axes[1][0].set_title('Experimental data', fontsize=mpl.rcParams['font.size'], pad=10.)
 
     clean_axes(axes)
-    fig.suptitle('Bistable synapse model; cell: %i, induction: %i' % (cell_id, 2),
+    fig.suptitle('Synaptic resource-limited model C; cell: %i, induction: %i' % (cell_id, 2),
                  fontsize=mpl.rcParams['font.size'], x=0.02, ha='left')
     fig.tight_layout()
     plt.subplots_adjust(hspace=0.5, wspace=0.65, top=0.9)
@@ -1328,18 +1361,19 @@ def get_args_dynamic_model_ramp(x, features):
     :return: list of list
     """
     group_size = len(context.data_keys)
-    return [list(item) for item in zip(*context.data_keys)] + [[features['local_signal_max']] * group_size] + \
-           [[features['global_signal_max']] * group_size]
+    return [list(item) for item in zip(*context.data_keys)] + [[features['pot_signal_max']] * group_size] + \
+           [[features['dep_signal_max']] * group_size] + [[features['global_signal_max']] * group_size]
 
 
-def compute_features_model_ramp(x, cell_id=None, induction=None, local_signal_peak=None, global_signal_peak=None,
-                                export=False, plot=False):
+def compute_features_model_ramp(x, cell_id=None, induction=None, pot_signal_peak=None, dep_signal_peak=None,
+                                global_signal_peak=None, export=False, plot=False):
     """
 
     :param x: array
     :param cell_id: int
     :param induction: int
-    :param local_signal_peak: float
+    :param pot_signal_peak: float
+    :param dep_signal_peak: float
     :param global_signal_peak: float
     :param export: bool
     :param plot: bool
@@ -1352,8 +1386,8 @@ def compute_features_model_ramp(x, cell_id=None, induction=None, local_signal_pe
         print('Process: %i: computing model_ramp_features for cell_id: %i, induction: %i with x: %s' %
               (os.getpid(), context.cell_id, context.induction, ', '.join('%.3E' % i for i in x)))
         sys.stdout.flush()
-    result = calculate_model_ramp(local_signal_peak=local_signal_peak, global_signal_peak=global_signal_peak,
-                                  export=export, plot=plot)
+    result = calculate_model_ramp(pot_signal_peak=pot_signal_peak, dep_signal_peak=dep_signal_peak,
+                                  global_signal_peak=global_signal_peak, export=export, plot=plot)
     if context.disp:
         print('Process: %i: computing model_ramp_features for cell_id: %i, induction: %i took %.1f s' %
               (os.getpid(), context.cell_id, context.induction, time.time() - start_time))
@@ -1477,7 +1511,7 @@ def get_features_interactive(interface, x, plot=False):
 
 @click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True, ))
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/optimize_biBTSP_D_90cm_cli_config.yaml')
+              default='config/optimize_biBTSP_SRL_C_cli_config.yaml')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
 @click.option("--export-file-path", type=str, default=None)
@@ -1493,17 +1527,17 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
          plot_summary_figure, model_file_path):
     """
     To execute on a single process on one cell from the experimental dataset:
-    python -i optimize_biBTSP_D.py --cell_id=1 --plot --framework=serial --interactive
+    python -i optimize_biBTSP_SRL_C.py --cell_id=1 --plot --framework=serial --interactive
 
     To execute using MPI parallelism with 1 controller process and N - 1 worker processes:
-    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_D.py --cell_id=1 --plot --framework=mpi -interactive
+    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_SRL_C.py --cell_id=1 --plot --framework=mpi -interactive
 
     To optimize the models by running many instances in parallel:
     mpirun -n N python -m mpi4py.futures -m nested.optimize --config-file-path=$PATH_TO_CONFIG_FILE --disp --export \
         --cell_id=1 --framework=mpi --pop-size=200 --path-length=3 --max-iter=50 --label=cell1
 
     To plot results previously exported to a file on a single process:
-    python -i optimize_biBTSP_D.py --cell_id=1 --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
+    python -i optimize_biBTSP_SRL_C.py --cell_id=1 --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
         --framework=serial --interactive
 
     :param cli: contains unrecognized args as list of str
@@ -1523,6 +1557,14 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
     context.update(locals())
     kwargs = get_unknown_click_arg_dict(cli.args)
     context.disp = verbose > 0
+    if label is None:
+        if 'input_field_width' in kwargs:
+            label = '%scm' % str(int(float(kwargs['input_field_width'])))
+        if 'cell_id' in kwargs:
+            if label is None:
+                label = 'cell%i' % int(kwargs['cell_id'])
+            else:
+                label += '_cell%i' % int(kwargs['cell_id'])
 
     context.interface = get_parallel_interface(source_file=__file__, source_package=__package__, **kwargs)
     context.interface.start(disp=context.disp)
