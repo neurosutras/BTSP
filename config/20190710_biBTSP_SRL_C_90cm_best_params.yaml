@@ -1,0 +1,14 @@
+1:
+  dep_signal_decay: 2.357343E+03
+  dep_signal_rise: 4.926484E+01
+  global_signal_decay: 1.276048E+02
+  global_signal_rise: 9.072816E+01
+  peak_delta_weight: 2.672232E+00
+  pot_signal_decay: 6.294325E+02
+  pot_signal_rise: 5.263028E+00
+  k_dep: 2.123671E-01
+  f_dep_peak: 5.535318E-02
+  f_dep_th: 3.973144E-03
+  k_pot: 3.601357E+00
+  f_pot_peak: 8.910599E-01
+  f_pot_th: 2.815491E-02

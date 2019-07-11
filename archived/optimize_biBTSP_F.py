@@ -560,7 +560,7 @@ def filter_features_signal_amplitudes(primitives, current_features, export=False
         fig.tight_layout()
         fig.show()
     signal_amplitude_features = {'pot_signal_max': np.max(pot_signal_peaks),
-                                 'depot_signal_max': np.max(pot_signal_peaks),
+                                 'depot_signal_max': np.max(depot_signal_peaks),
                                  'global_signal_max': np.max(global_signal_peaks)
                                  }
     if context.verbose > 1:

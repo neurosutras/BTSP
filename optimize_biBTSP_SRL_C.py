@@ -560,7 +560,7 @@ def filter_features_signal_amplitudes(primitives, current_features, export=False
         fig.tight_layout()
         fig.show()
     signal_amplitude_features = {'pot_signal_max': np.max(pot_signal_peaks),
-                                 'dep_signal_max': np.max(pot_signal_peaks),
+                                 'dep_signal_max': np.max(dep_signal_peaks),
                                  'global_signal_max': np.max(global_signal_peaks)
                                  }
     if context.verbose > 1:
@@ -1607,6 +1607,8 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
                     merge_exported_data(temp_output_path_list, context.export_file_path, verbose=context.disp)
                     for temp_output_path in temp_output_path_list:
                         os.remove(temp_output_path)
+            print('params:')
+            pprint.pprint(x1_dict)
             print('features:')
             pprint.pprint({key: val for (key, val) in viewitems(features) if key in context.feature_names})
             print('objectives')

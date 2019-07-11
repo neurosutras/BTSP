@@ -874,7 +874,7 @@ def get_residual_score(delta_weights, target_ramp, ramp_x, input_x, interp_x, in
               ', end_loc: %.1f, min_val: %.1f, min_loc: %.1f' % \
               (ramp_amp['model'], ramp_width['model'], peak_shift['model'], ratio['model'], start_loc['model'],
                peak_loc['model'], end_loc['model'], min_val['model'], min_loc['model']))
-    sys.stdout.flush()
+        sys.stdout.flush()
 
     start_index, peak_index, end_index, min_index = \
         get_indexes_from_ramp_bounds_with_wrap(ramp_x, start_loc['target'], peak_loc['target'], end_loc['target'],
@@ -1163,11 +1163,12 @@ def get_delta_weights_LSA(target_ramp, ramp_x, input_x, interp_x, input_rate_map
         D[np.where(np.eye(*D.shape))] = s / (s ** 2. + beta ** 2.)
         input_matrix_inv = V.dot(D.conj().T).dot(U.conj().T)
         initial_delta_weights = exp_ramp.dot(input_matrix_inv)
-        if bounds is not None:
-            initial_delta_weights = np.maximum(np.minimum(initial_delta_weights, bounds[1]), bounds[0])
         initial_ramp = initial_delta_weights.dot(input_matrix)
         SVD_scaling_factor = np.max(exp_ramp) / np.max(initial_ramp)
         initial_delta_weights *= SVD_scaling_factor
+
+    if bounds is not None:
+        initial_delta_weights = np.maximum(np.minimum(initial_delta_weights, bounds[1]), bounds[0])
 
     initial_ramp = initial_delta_weights.dot(input_matrix)
 
@@ -1179,6 +1180,7 @@ def get_delta_weights_LSA(target_ramp, ramp_x, input_x, interp_x, input_rate_map
 
     if verbose > 1:
         print('get_delta_weights_LSA: process: %i; %s:' % (os.getpid(), label))
+        sys.stdout.flush()
     model_ramp, delta_weights, ramp_offset, residual_score = \
         get_residual_score(result.x, target_ramp, ramp_x, input_x, interp_x, input_rate_maps, ramp_scaling_factor,
                            induction_start_loc, track_length, target_range, bounds, allow_offset, impose_offset,

@@ -1569,6 +1569,8 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
                     merge_exported_data(temp_output_path_list, context.export_file_path, verbose=context.disp)
                     for temp_output_path in temp_output_path_list:
                         os.remove(temp_output_path)
+            print('params:')
+            pprint.pprint(x1_dict)
             print('features:')
             pprint.pprint({key: val for (key, val) in viewitems(features) if key in context.feature_names})
             print('objectives')
