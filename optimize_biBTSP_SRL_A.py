@@ -504,7 +504,7 @@ def compute_features_signal_amplitudes(x, cell_id=None, induction=None, export=F
     result = {'local_signal_peak': np.max(local_signals),
               'global_signal_peak': np.max(global_signal)}
     if context.verbose > 1:
-        print('Process: %i: computing signal_amplitude features for cell_id: %i, induction: %i took %.1f s' % \
+        print('Process: %i: computing signal_amplitude features for cell_id: %i, induction: %i took %.1f s' %
               (os.getpid(), context.cell_id, context.induction, time.time() - start_time))
         sys.stdout.flush()
     return {cell_id: {induction: result}}
@@ -583,8 +583,8 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     if plot:
         fig, axes = plt.subplots(1)
         dep_scale = context.k_dep / context.k_pot
-        axes.plot(signal_xrange, pot_rate(signal_xrange), label='Potentiation rate')
-        axes.plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, label='Depression rate')
+        axes.plot(signal_xrange, pot_rate(signal_xrange), c='c', label='Potentiation rate')
+        axes.plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='Depression rate')
         axes.set_xlabel('Normalized eligibility signal amplitude (a.u.)')
         axes.set_ylabel('Normalized rate')
         axes.set_title('Plasticity signal transformations')
@@ -846,7 +846,8 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
         bar_loc = max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.) * 0.95
         fig, axes = plt.subplots(2)
         axes[1].plot(context.peak_locs, delta_weights)
-        axes[1].hlines(peak_weight * 1.05, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
+        axes[1].hlines(context.peak_delta_weight * 1.05, xmin=context.mean_induction_start_loc,
+                       xmax=context.mean_induction_stop_loc)
         axes[0].plot(context.binned_x, target_ramp, label='Experiment')
         axes[0].plot(context.binned_x, model_ramp, label='Model')
         axes[0].hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
@@ -857,7 +858,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
         axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
         axes[0].set_ylim([min(-1., np.min(model_ramp) - 1., np.min(target_ramp) - 1.),
                           max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.)])
-        axes[1].set_ylim([-peak_weight, peak_weight * 1.1])
+        axes[1].set_ylim([-context.peak_delta_weight * 1.05, context.peak_delta_weight * 1.1])
         clean_axes(axes)
         fig.suptitle('Cell_id: %i, Induction: %i' % (context.cell_id, context.induction))
         fig.tight_layout()
@@ -1100,7 +1101,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     axes.append(this_axis)
     xmax = max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.
     xmax = math.ceil(xmax)
-    this_axis.plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='lightgray',
+    this_axis.plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='gray',
                    label='Synaptic\neligibility signal')
     this_axis.plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
                    label='Dendritic\ngating signal')
@@ -1243,7 +1244,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     fig, axes = plt.subplots(2, 3, figsize=(12., 6.5))
     xmax = max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.
     xmax = math.ceil(xmax)
-    axes[0][0].plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='darkgray',
+    axes[0][0].plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='gray',
                     label='Synaptic\neligibility signal')
     axes[0][0].plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
                     label='Dendritic\ngating signal')
@@ -1570,7 +1571,7 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
                     for temp_output_path in temp_output_path_list:
                         os.remove(temp_output_path)
             print('params:')
-            pprint.pprint(x1_dict)
+            pprint.pprint(dict(zip(context.param_names, x1_array)))
             print('features:')
             pprint.pprint({key: val for (key, val) in viewitems(features) if key in context.feature_names})
             print('objectives')

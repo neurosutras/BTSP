@@ -1,0 +1,12 @@
+1:
+  delta_peak_ramp_amp: 3.295016E+00
+  global_signal_decay: 5.117370E+02
+  global_signal_rise: 5.805183E+01
+  k_dep: 2.577449E-01
+  k_pot: 2.691966E+00
+  local_signal_decay: 1.501610E+03
+  local_signal_rise: 7.840152E+00
+  f_dep_peak: 1.526457E-03
+  f_dep_th: 1.000023E-03
+  f_pot_peak: 3.882245E-02
+  f_pot_th: 1.593557E-01

@@ -1,0 +1,151 @@
+bounds:
+  k_pot: !!python/tuple
+  - 0.1
+  - 10.
+  k_dep: !!python/tuple
+  - 0.1
+  - 10.
+  f_pot_th: !!python/tuple
+  - 0.001
+  - 1.
+  f_pot_peak: !!python/tuple
+  - 0.001
+  - 1.
+  f_dep_th: !!python/tuple
+  - 0.001
+  - 1.
+  f_dep_peak: !!python/tuple
+  - 0.001
+  - 1.
+  pot_signal_rise: !!python/tuple
+  - 5.
+  - 200.
+  pot_signal_decay: !!python/tuple
+  - 50.
+  - 2500.
+  dep_signal_rise: !!python/tuple
+  - 5.
+  - 200.
+  dep_signal_decay: !!python/tuple
+  - 50.
+  - 2500.
+  global_signal_rise: !!python/tuple
+  - 5.
+  - 200.
+  global_signal_decay: !!python/tuple
+  - 50.
+  - 2500.
+  delta_peak_ramp_amp: !!python/tuple
+  - 0.
+  - 10.
+rel_bounds:
+- - pot_signal_decay
+  - '>'
+  - 1.0
+  - pot_signal_rise
+- - dep_signal_decay
+  - '>'
+  - 1.0
+  - dep_signal_rise
+- - global_signal_decay
+  - '>'
+  - 1.0
+  - global_signal_rise
+- - pot_signal_decay
+  - '>'
+  - 1.0
+  - global_signal_decay
+- - dep_signal_decay
+  - '>'
+  - 1.0
+  - pot_signal_decay
+- - k_pot
+  - '>'
+  - 1.0
+  - k_dep
+feature_names:
+- spont_delta_val_at_target_peak
+- spont_delta_val_at_model_peak
+- spont_delta_width
+- spont_delta_peak_shift
+- spont_delta_asymmetry
+- spont_delta_min_loc
+- spont_delta_val_at_target_min
+- spont_delta_val_at_model_min
+- exp1_delta_val_at_target_peak
+- exp1_delta_val_at_model_peak
+- exp1_delta_width
+- exp1_delta_peak_shift
+- exp1_delta_asymmetry
+- exp1_delta_min_loc
+- exp1_delta_val_at_target_min
+- exp1_delta_val_at_model_min
+- exp2_delta_val_at_target_peak
+- exp2_delta_val_at_model_peak
+- exp2_delta_width
+- exp2_delta_peak_shift
+- exp2_delta_asymmetry
+- exp2_delta_min_loc
+- exp2_delta_val_at_target_min
+- exp2_delta_val_at_model_min
+update_context:
+- - optimize_biBTSP_VD_C
+  - update_model_params
+get_features_stages:
+- source: optimize_biBTSP_VD_C
+  get_args_static: get_args_static_signal_amplitudes
+  compute_features: compute_features_signal_amplitudes
+  filter_features: filter_features_signal_amplitudes
+- source: optimize_biBTSP_VD_C
+  get_args_dynamic: get_args_dynamic_model_ramp
+  compute_features: compute_features_model_ramp
+  filter_features: filter_features_model_ramp
+get_objectives:
+  optimize_biBTSP_VD_C: get_objectives
+kwargs:
+  data_file_name: 20190711_biBTSP_data_calibrated_input.hdf5
+  input_field_width: 90.  # cm
+  verbose: 1
+  min_delta_weight: -0.2
+objective_names:
+- spont_residual_score
+- exp1_residual_score
+- exp2_residual_score
+- self_consistent_delta_residual_score
+optimization_title: biBTSP_VD_C
+param_gen: PopulationAnnealing
+param_names:
+- k_pot
+- k_dep
+- f_pot_th
+- f_pot_peak
+- f_dep_th
+- f_dep_peak
+- pot_signal_rise
+- pot_signal_decay
+- dep_signal_rise
+- dep_signal_decay
+- global_signal_rise
+- global_signal_decay
+- delta_peak_ramp_amp
+target_range:
+  ramp_offset: 0.01
+  delta_min_val: 0.01
+  delta_peak_val: 0.01
+  residuals: 0.1
+  weights_smoothness: 0.005
+target_val:
+x0:
+  delta_peak_ramp_amp: 3.607289E-01
+  dep_signal_decay: 1.935807E+03
+  dep_signal_rise: 6.821245E+01
+  global_signal_decay: 3.888131E+02
+  global_signal_rise: 2.587820E+01
+  k_dep: 3.115927E-01
+  k_pot: 2.404152E+00
+  pot_signal_decay: 6.840142E+02
+  pot_signal_rise: 7.296395E+00
+  f_dep_peak: 1.800609E-03
+  f_dep_th: 1.162973E-03
+  f_pot_peak: 1.450855E-01
+  f_pot_th: 2.331767E-02
