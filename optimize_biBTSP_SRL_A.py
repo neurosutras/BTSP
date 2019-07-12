@@ -491,7 +491,7 @@ def compute_features_signal_amplitudes(x, cell_id=None, induction=None, export=F
     import_data(cell_id, induction)
     update_source_contexts(x, context)
     if context.verbose > 1:
-        print('Process: %i: computing signal_amplitude features for cell_id: %i, induction: %i with x: %s' % \
+        print('Process: %i: computing signal_amplitude features for cell_id: %i, induction: %i with x: %s' %
               (os.getpid(), context.cell_id, context.induction, ', '.join('%.3E' % i for i in x)))
         sys.stdout.flush()
     start_time = time.time()
@@ -613,7 +613,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
                                           bounds=(context.min_delta_weight, context.peak_delta_weight),
                                           initial_delta_weights=initial_delta_weights, verbose=context.verbose)
                 if context.verbose > 1:
-                    print('Process: %i; re-computed initial weights: cell_id: %i, before induction: %i,' \
+                    print('Process: %i; re-computed initial weights: cell_id: %i, before induction: %i,'
                           ' ramp_offset: %.3f' % (os.getpid(), context.cell_id, context.induction, initial_ramp_offset))
             else:
                 initial_ramp = context.LSA_ramp['before']
@@ -639,7 +639,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
                                       initial_delta_weights=initial_delta_weights, allow_offset=allow_offset,
                                       verbose=context.verbose)
             if context.verbose > 1:
-                print('Process: %i; re-computed initial weights: cell_id: %i, before induction: %i, ' \
+                print('Process: %i; re-computed initial weights: cell_id: %i, before induction: %i, '
                       'ramp_offset: %.3f' % (os.getpid(), context.cell_id, context.induction, initial_ramp_offset))
         else:
             initial_ramp = context.LSA_ramp['before']
@@ -687,7 +687,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             this_dep_rate = np.trapz(np.multiply(dep_rate(this_local_signal[indexes]), global_signal[indexes]),
                                        dx=context.down_dt / 1000.)
             this_normalized_delta_weight = context.k_pot * this_pot_rate * (1. - current_normalized_weights[i]) - \
-                                context.k_dep * this_dep_rate * current_normalized_weights[i]
+                                           context.k_dep * this_dep_rate * current_normalized_weights[i]
             this_next_normalized_weight = max(0., min(1., current_normalized_weights[i] + this_normalized_delta_weight))
             next_normalized_weights.append(this_next_normalized_weight)
         if plot:
@@ -755,7 +755,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
                                       initial_delta_weights=LSA_delta_weights, allow_offset=allow_offset,
                                       impose_offset=initial_ramp_offset, verbose=context.verbose)
             if context.verbose > 1:
-                print('Process: %i; re-computed LSA weights: cell_id: %i, after induction: %i, ramp_offset: %.3f' % \
+                print('Process: %i; re-computed LSA weights: cell_id: %i, after induction: %i, ramp_offset: %.3f' %
                       (os.getpid(), context.cell_id, context.induction, LSA_ramp_offset))
         else:
             LSA_ramp, LSA_delta_weights, LSA_ramp_offset, LSA_residual_score = \
@@ -794,17 +794,17 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
 
     if context.verbose > 0:
         print('Process: %i; cell: %i; induction: %i:' % (os.getpid(), context.cell_id, context.induction))
-        print('exp: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f, ' \
-              'end_loc: %.1f, min_val: %.1f, min_loc: %.1f' % \
+        print('exp: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f, '
+              'end_loc: %.1f, min_val: %.1f, min_loc: %.1f' %
               (ramp_amp['target'], ramp_width['target'], peak_shift['target'], ratio['target'], start_loc['target'],
                peak_loc['target'], end_loc['target'], min_val['target'], min_loc['target']))
         if LSA_ramp is not None:
-            print('LSA: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, ' \
-                  'peak_loc: %.1f, end_loc: %.1f, min_val: %.1f, min_loc: %.1f, ramp_offset: %.3f' % \
+            print('LSA: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, ' 
+                  'peak_loc: %.1f, end_loc: %.1f, min_val: %.1f, min_loc: %.1f, ramp_offset: %.3f' %
                   (ramp_amp['LSA'], ramp_width['LSA'], peak_shift['LSA'], ratio['LSA'], start_loc['LSA'],
                    peak_loc['LSA'], end_loc['LSA'], min_val['LSA'], min_loc['LSA'], LSA_ramp_offset))
-        print('model: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f' \
-              ', end_loc: %.1f, min_val: %.1f, min_loc: %.1f, ramp_offset: %.3f' % \
+        print('model: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f' 
+              ', end_loc: %.1f, min_val: %.1f, min_loc: %.1f, ramp_offset: %.3f' %
               (ramp_amp['model'], ramp_width['model'], peak_shift['model'], ratio['model'], start_loc['model'],
                peak_loc['model'], end_loc['model'], min_val['model'], min_loc['model'], model_ramp_offset))
         sys.stdout.flush()
@@ -1528,6 +1528,8 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
                 label = 'cell%i' % int(kwargs['cell_id'])
             else:
                 label += '_cell%i' % int(kwargs['cell_id'])
+    if 'cell_id' in kwargs and 'x0_key' not in kwargs:
+        kwargs['x0_key'] = kwargs['cell_id']
 
     context.interface = get_parallel_interface(source_file=__file__, source_package=__package__, **kwargs)
     context.interface.start(disp=context.disp)
@@ -1537,48 +1539,29 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
                                 disp=context.disp, interface=context.interface, verbose=verbose, plot=plot, **kwargs)
 
     if plot_summary_figure:
+        if 'cell_id' not in kwargs:
+            raise RuntimeError('optimize_biBTSP_%s: missing required parameter: cell_id' % BTSP_model_name)
         context.interface.execute(plot_model_summary_figure, int(context.kwargs['cell_id']), model_file_path)
-    else:
-        x1_array = context.x0_array
-        if 'params_path' in context.kwargs and os.path.isfile(context.kwargs['params_path']):
-            param_source_dict = read_from_yaml(context.kwargs['params_path'])
-            if 'cell_id' in context.kwargs:
-                if int(context.kwargs['cell_id']) in param_source_dict:
-                    x1_dict = param_source_dict[int(context.kwargs['cell_id'])]
-                    x1_array = param_dict_to_array(x1_dict, context.param_names)
-                elif 'all' in param_source_dict:
-                    x1_dict = param_source_dict['all']
-                    x1_array = param_dict_to_array(x1_dict, context.param_names)
-                else:
-                    print('optimize_biBTSP_%s: problem loading params for cell_id: %s from params_path: %s' %
-                          (BTSP_model_name, kwargs['params_path'], context.kwargs['cell_id']))
-            elif 'all' in param_source_dict:
-                x1_dict = param_source_dict['all']
-                x1_array = param_dict_to_array(x1_dict, context.param_names)
-            else:
-                raise RuntimeError('optimize_biBTSP_%s: problem loading params from params_path: %s' %
-                                   (BTSP_model_name, context.kwargs['params_path']))
-
-        if not debug:
-            features = get_features_interactive(context.interface, x1_array, plot=plot)
-            features, objectives = context.interface.execute(get_objectives, features, context.export)
-            if export:
-                temp_output_path_list = [temp_output_path for temp_output_path in
-                                         context.interface.get('context.temp_output_path') if
-                                         os.path.isfile(temp_output_path)]
-                if len(temp_output_path_list) > 0:
-                    merge_exported_data(temp_output_path_list, context.export_file_path, verbose=context.disp)
-                    for temp_output_path in temp_output_path_list:
-                        os.remove(temp_output_path)
-            print('params:')
-            pprint.pprint(dict(zip(context.param_names, x1_array)))
-            print('features:')
-            pprint.pprint({key: val for (key, val) in viewitems(features) if key in context.feature_names})
-            print('objectives')
-            pprint.pprint({key: val for (key, val) in viewitems(objectives) if key in context.objective_names})
-            sys.stdout.flush()
-            if plot:
-                context.interface.apply(plt.show)
+    elif not debug:
+        features = get_features_interactive(context.interface, context.x0_array, plot=plot)
+        features, objectives = context.interface.execute(get_objectives, features, context.export)
+        if export:
+            temp_output_path_list = [temp_output_path for temp_output_path in
+                                     context.interface.get('context.temp_output_path') if
+                                     os.path.isfile(temp_output_path)]
+            if len(temp_output_path_list) > 0:
+                merge_exported_data(temp_output_path_list, context.export_file_path, verbose=context.disp)
+                for temp_output_path in temp_output_path_list:
+                    os.remove(temp_output_path)
+        print('params:')
+        pprint.pprint(dict(zip(context.param_names, context.x0_array)))
+        print('features:')
+        pprint.pprint({key: val for (key, val) in viewitems(features) if key in context.feature_names})
+        print('objectives')
+        pprint.pprint({key: val for (key, val) in viewitems(objectives) if key in context.objective_names})
+        sys.stdout.flush()
+        if plot:
+            context.interface.apply(plt.show)
 
     if context.interactive:
         context.update(locals())
