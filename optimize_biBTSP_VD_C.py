@@ -1287,12 +1287,23 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
     axes[0][0].set_title('Plasticity signal kinetics', fontsize=mpl.rcParams['font.size'], pad=10.)
     axes[0][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
 
-    axes[0][1].set_xlabel('Normalized eligibility signal')
-    axes[0][1].set_ylabel('Normalized rate')
-    axes[0][1].set_title('Sigmoidal q$_{+}$, sigmoidal q$_{-}$', fontsize=mpl.rcParams['font.size'], pad=10.)
-    axes[0][1].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='q$_{+}$ (Potentiation)')
-    axes[0][1].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='q$_{-}$ (Depression)')
-    axes[0][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
+    voltage_range = np.linspace(0., 1., 10000)
+    axes[0][1].plot(voltage_range, pot_phi(voltage_range), c='c', label='Potentiation')
+    axes[0][1].plot(voltage_range, dep_phi(voltage_range), c='r', label='Depression')
+    axes[0][1].plot(voltage_range, np.zeros_like(voltage_range), linestyle='--', c='grey')
+    axes[0][1].set_xlabel('Normalized voltage')
+    axes[0][1].set_ylabel('Modulation factor')
+    axes[0][1].set_xlim(0., 1.)
+    axes[0][1].set_title('Linear voltage-dependent modulation\nof synaptic eligibility',
+                         fontsize=mpl.rcParams['font.size'], pad=10.)
+    axes[0][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+
+    axes[0][2].set_xlabel('Normalized eligibility signal')
+    axes[0][2].set_ylabel('Normalized rate')
+    axes[0][2].set_title('Sigmoidal q$_{+}$, sigmoidal q$_{-}$', fontsize=mpl.rcParams['font.size'], pad=10.)
+    axes[0][2].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='q$_{+}$ (Potentiation)')
+    axes[0][2].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='q$_{-}$ (Depression)')
+    axes[0][2].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
 
     bar_loc = max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.) * 0.95
     delta_weights = np.subtract(final_weights, initial_weights)

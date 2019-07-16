@@ -7,7 +7,7 @@ sbatch <<EOT
 #SBATCH -J $JOB_NAME
 #SBATCH -o /global/cscratch1/sd/aaronmil/BTSP/logs/"$JOB_NAME".%j.o
 #SBATCH -e /global/cscratch1/sd/aaronmil/BTSP/logs/"$JOB_NAME".%j.e
-#SBATCH -q regular
+#SBATCH -q premium
 #SBATCH -N $2
 #SBATCH -L SCRATCH
 #SBATCH -C haswell
