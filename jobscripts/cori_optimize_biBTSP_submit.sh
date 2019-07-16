@@ -9,5 +9,5 @@ done
 
 for i in 15 18 4 5 7 9;  # 1
 do
-    bash jobscripts/cori_optimize_biBTSP_D_90cm_cli.sh $i 13 $2 $3
+    bash jobscripts/cori_optimize_biBTSP_cli.sh $i 13 $2 $3
 done
