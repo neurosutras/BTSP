@@ -82,6 +82,8 @@ def init_context():
         generic_dx = f['defaults'].attrs['generic_dx']  # cm
         if 'default_run_vel' not in context() or context.default_run_vel is None:
             default_run_vel = f['defaults'].attrs['default_run_vel']  # cm/s
+        else:
+            context.default_run_vel = float(context.default_run_vel)
         generic_position_dt = f['defaults'].attrs['generic_position_dt']  # ms
         default_interp_dx = f['defaults'].attrs['default_interp_dx']  # cm
         binned_x = f['defaults']['binned_x'][:]
