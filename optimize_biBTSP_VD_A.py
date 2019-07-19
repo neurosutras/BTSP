@@ -1480,7 +1480,7 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
     python -i optimize_biBTSP_VD_A.py --cell_id=1 --plot --framework=serial --interactive
 
     To execute using MPI parallelism with 1 controller process and N - 1 worker processes:
-    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_VD_A.py --cell_id=1 --plot --framework=mpi -interactive
+    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_VD_A.py --cell_id=1 --plot --framework=mpi --interactive
 
     To optimize the models by running many instances in parallel:
     mpirun -n N python -m mpi4py.futures -m nested.optimize --config-file-path=$PATH_TO_CONFIG_FILE --disp --export \

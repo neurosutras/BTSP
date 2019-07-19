@@ -1,43 +1,34 @@
 bounds:
-  rMC_peak: !!python/tuple
+  f_pot_peak: !!python/tuple
   - 0.001
   - 1.
-  rMC_th: !!python/tuple
+  f_pot_th: !!python/tuple
   - 0.001
   - 1.
-  rCM_th1: !!python/tuple
+  f_dep_th: !!python/tuple
   - 0.001
   - 1.
-  rCM_peak1: !!python/tuple
+  f_dep_peak: !!python/tuple
   - 0.001
   - 1.
-  rCM_th2: !!python/tuple
+  k_pot: !!python/tuple
   - 0.01
-  - 1.
-  rCM_peak2: !!python/tuple
-  - 0.001
-  - 1.
-  rCM_min2: !!python/tuple
-  - 0.01
-  - 1.
-  rMC0: !!python/tuple
-  - 0.1
   - 10.
-  rCM0: !!python/tuple
-  - 0.1
+  k_dep: !!python/tuple
+  - 0.01
   - 10.
   local_signal_rise: !!python/tuple
   - 5.
   - 200.
   local_signal_decay: !!python/tuple
-  - 100.
-  - 1500.
+  - 50.
+  - 2500.
   global_signal_rise: !!python/tuple
   - 5.
   - 200.
   global_signal_decay: !!python/tuple
-  - 100.
-  - 1500.
+  - 50.
+  - 2500.
   peak_delta_weight: !!python/tuple
   - 1.5
   - 4.
@@ -55,74 +46,64 @@ rel_bounds:
   - '>'
   - 1.0
   - global_signal_decay
-- - rMC_peak
+- - k_pot
   - '>'
   - 1.0
-  - rMC_th
-- - rCM_peak1
-  - '>'
-  - 1.0
-  - rCM_th1
-- - rCM_peak2
-  - '>'
-  - 1.0
-  - rCM_th1
-- - rCM_th2
-  - '>'
-  - 1.0
-  - rCM_peak1
-- - rCM_th2
-  - '>'
-  - 1.0
-  - rCM_peak2
+  - k_dep
 feature_names:
-- induction1_peak_val
-- induction1_peak_shift
-- induction1_min_val
-- induction1_ramp_width
-- induction2_null_peak_val
-- induction2_null_peak_shift
-- induction2_null_min_val
-- induction2_null_ramp_width
-- induction2_shift_peak_val
-- induction2_shift_peak_shift
-- induction2_shift_delta_peak_val_initial
-- induction2_shift_min_val
-- induction2_shift_ramp_width
+- induction1_delta_val_at_target_peak
+- induction1_delta_val_at_model_peak
+- induction1_delta_width
+- induction1_delta_peak_shift
+- induction1_delta_asymmetry
+- induction1_delta_min_loc
+- induction1_delta_val_at_target_min
+- induction1_delta_val_at_model_min
+- induction2_delta_val_at_target_peak
+- induction2_delta_val_at_model_peak
+- induction2_delta_width
+- induction2_delta_peak_shift
+- induction2_delta_asymmetry
+- induction2_delta_min_loc
+- induction2_delta_val_at_target_min
+- induction2_delta_val_at_model_min
 update_context:
-- - optimize_BTSP_CA1_synthetic
+- - optimize_biBTSP_synthetic
   - update_model_params
 get_features_stages:
-- source: optimize_BTSP_CA1_synthetic
+- source: optimize_biBTSP_synthetic
   get_args_static: get_args_static_model_ramp
   compute_features: compute_features_model_ramp
   filter_features: filter_features_model_ramp
 get_objectives:
-  optimize_BTSP_CA1_synthetic: get_objectives
+  optimize_biBTSP_synthetic: get_objectives
 kwargs:
+  data_file_name: 20190711_biBTSP_data_calibrated_input.hdf5
+  input_field_width: 90.  # cm
   verbose: 1
-  min_delta_weight: 0.
-  ramp_scaling_factor: 0.002956
-  induction_locs:
-    '1': 130.
-    '2_null': 130.
-    '2_shift': 10.
+  min_delta_weight: -0.2
+  induction_loc:
+    '1': 90.
+    '2': 0.
+  target_peak_weight: 3.
+  target_peak_shift_1: -10.
+  target_peak_shift_2: 0.
+  target_peak_val_1: 8.
+  target_peak_val_2: 8.
+  target_min_val_2: 3.
 objective_names:
-- induction1_ramp_residual_score
-- induction2_null_ramp_residual_score
-- induction2_shift_ramp_feature_score
-optimization_title: bidirectional_BTSP_synthetic
+- induction1_residual_score
+- induction2_residual_score
+- self_consistent_delta_residual_score
+optimization_title: biBTSP_synthetic
 param_gen: PopulationAnnealing
 param_names:
-- rMC_peak
-- rMC_th
-- rCM_th1
-- rCM_peak1
-- rCM_th2
-- rCM_peak2
-- rCM_min2
-- rMC0
-- rCM0
+- f_pot_peak
+- f_pot_th
+- f_dep_th
+- f_dep_peak
+- k_pot
+- k_dep
 - local_signal_rise
 - local_signal_decay
 - global_signal_rise
@@ -130,31 +111,20 @@ param_names:
 - peak_delta_weight
 target_range:
   ramp_offset: 0.01
-  peak_loc: 0.01
-  peak_val: 0.01
-  min_val: 0.01
-  residuals: 0.1
-  weights_smoothness: 0.005
   delta_min_val: 0.01
   delta_peak_val: 0.01
+  residuals: 0.1
+  weights_smoothness: 0.005
 target_val:
-  peak_shift_1: -10.
-  peak_shift_2: 0.
-  peak_val_1: 8.
-  peak_val_2: 8.
-  delta_peak_val_1: -4.
 x0:
-  global_signal_decay: 1.001524E+02
-  local_signal_rise: 8.536373E+01
-  rMC0: 2.536076E+00
-  rMC_th: 5.158179E-01
-  rMC_peak: 9.238480E-01
-  global_signal_rise: 1.524528E+01
-  peak_delta_weight: 2.413031E+00
-  rCM0: 9.286024E-01
-  local_signal_decay: 1.073788E+03
-  rCM_min2: 2.336212E-01
-  rCM_th1: 8.968046E-02
-  rCM_th2: 9.791894E-01
-  rCM_peak1: 3.890336E-01
-  rCM_peak2: 4.902626E-01
+  global_signal_decay: 4.489167E+02
+  global_signal_rise: 1.739352E+02
+  local_signal_decay: 1.250320E+03
+  local_signal_rise: 6.298970E+01
+  peak_delta_weight: 3.699263E+00
+  k_dep: 1.347899E-01
+  f_dep_peak: 8.584021E-03
+  f_dep_th: 2.411664E-03
+  k_pot: 4.834452E-01
+  f_pot_peak: 6.474074E-02
+  f_pot_th: 1.767498E-01

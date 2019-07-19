@@ -687,7 +687,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             this_pot_rate = np.trapz(np.multiply(pot_rate(this_local_signal[indexes]), global_signal[indexes]),
                                      dx=context.down_dt / 1000.)
             this_dep_rate = np.trapz(np.multiply(dep_rate(this_local_signal[indexes]), global_signal[indexes]),
-                                       dx=context.down_dt / 1000.)
+                                     dx=context.down_dt / 1000.)
             this_normalized_delta_weight = context.k_pot * this_pot_rate * (1. - current_normalized_weights[i]) - \
                                            context.k_dep * this_dep_rate * current_normalized_weights[i]
             this_next_normalized_weight = max(0., min(1., current_normalized_weights[i] + this_normalized_delta_weight))
@@ -1497,7 +1497,7 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
     python -i optimize_biBTSP_SRL_B.py --cell_id=1 --plot --framework=serial --interactive
 
     To execute using MPI parallelism with 1 controller process and N - 1 worker processes:
-    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_SRL_B.py --cell_id=1 --plot --framework=mpi -interactive
+    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_SRL_B.py --cell_id=1 --plot --framework=mpi --interactive
 
     To optimize the models by running many instances in parallel:
     mpirun -n N python -m mpi4py.futures -m nested.optimize --config-file-path=$PATH_TO_CONFIG_FILE --disp --export \

@@ -285,7 +285,7 @@ def get_exp_rise_decay_filter(rise, decay, max_time_scale, dt):
 
 
 def get_dual_signal_filters(local_signal_rise, local_signal_decay, global_signal_rise, global_signal_decay, dt,
-                       plot=False):
+                            plot=False):
     """
     :param local_signal_rise: float
     :param local_signal_decay: float
@@ -929,7 +929,8 @@ def get_initial_target_ramp_and_scaling_factor(ramp_x, input_x, interp_x, num_in
     :param input_field_peak_rate: float
     :param input_field_width: float
     :param track_length: float
-    :param target_weights_width: float  (legacy target ramp width is 108 cm (90 * 1.2), to produce a firing field of width 90)
+    :param target_weights_width: float  (legacy target ramp width is 108 cm (90 * 1.2),
+                                        to produce a firing field of width 90)
     :param target_peak_delta_weight: float
     :param target_peak_ramp_amp: float (mV)
     :param plot: bool
@@ -1218,3 +1219,47 @@ def get_delta_weights_LSA(target_ramp, ramp_x, input_x, interp_x, input_rate_map
         fig.show()
 
     return model_ramp, delta_weights, ramp_offset, residual_score
+
+
+def get_target_synthetic_ramp(induction_loc, ramp_x, track_length, target_peak_val=8., target_min_val=0.,
+                              target_asymmetry=1.8, target_peak_shift=-10., target_ramp_width=187., plot=False):
+    """
+    :param induction_loc: float
+    :param ramp_x: array (spatial resolution of ramp)
+    :param track_length: float
+    :param target_peak_val: float
+    :param target_min_val: float
+    :param target_asymmetry: float
+    :param target_peak_shift: float
+    :param target_ramp_width: float
+    :param plot: bool
+    :return: array
+    """
+    peak_loc = induction_loc + target_peak_shift
+    amp = target_peak_val - target_min_val
+    extended_x = np.concatenate([ramp_x - track_length, ramp_x, ramp_x + track_length])
+    left_width = target_asymmetry / (1. + target_asymmetry) * target_ramp_width + target_peak_shift
+    right_width = 1. / (1. + target_asymmetry) * target_ramp_width - target_peak_shift
+    left_sigma = 2. * left_width / 3. / np.sqrt(2.)
+    right_sigma = 2. * right_width / 3. / np.sqrt(2.)
+    left_waveform = amp * np.exp(-((extended_x - peak_loc) / left_sigma) ** 2.)
+    right_waveform = amp * np.exp(-((extended_x - peak_loc) / right_sigma) ** 2.)
+    peak_index = np.argmax(left_waveform)
+    waveform = np.array(left_waveform)
+    waveform[peak_index + 1:] = right_waveform[peak_index + 1:]
+    waveform = wrap_around_and_compress(waveform, ramp_x)
+
+    waveform -= np.min(waveform)
+    waveform /= np.max(waveform)
+    waveform *= amp
+    waveform += target_min_val
+
+    if plot:
+        fig, axes = plt.subplots()
+        axes.plot(ramp_x, waveform)
+        axes.set_ylabel('Ramp amplitude (mV)')
+        axes.set_xlabel('Location (cm)')
+        clean_axes(axes)
+        fig.show()
+
+    return waveform
