@@ -1022,7 +1022,12 @@ def compute_features_model_ramp(x, induction=None, export=False, plot=False):
         print('Process: %i: computing model_ramp features for induction: %s with x: %s' % \
               (os.getpid(), induction, ', '.join('%.3E' % i for i in x)))
         sys.stdout.flush()
-    result = calculate_model_ramp(export=export, plot=plot)
+    try:
+        result = calculate_model_ramp(export=export, plot=plot)
+    except Exception as e:
+        traceback.print_exc()
+        sys.stdout.flush()
+        raise e
     if context.disp:
         print('Process: %i: computing model_ramp features for induction: %s took %.1f s' % \
               (os.getpid(), induction, time.time() - start_time))
