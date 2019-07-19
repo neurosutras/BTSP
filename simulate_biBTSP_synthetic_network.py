@@ -1180,12 +1180,12 @@ def main(config_file_path, trial, output_dir, export, export_file_path, label, v
     Utilizes nested.parallel for parallel map. Requires mpi4py and NEURON.
 
     Execute with N processes:
-    mpirun -n N python simulate_biBTSP_synthetic_population.py --config-file-path=$PATH_TO_CONFIG_FILE --simulate \
+    mpirun -n N python simulate_biBTSP_synthetic_network.py --config-file-path=$PATH_TO_CONFIG_FILE --simulate \
         --export
 
     or interactively:
 
-    mpirun -n N python -i simulate_biBTSP_synthetic_population.py --config-file-path=$PATH_TO_CONFIG_FILE --simulate \
+    mpirun -n N python -i simulate_biBTSP_synthetic_network.py --config-file-path=$PATH_TO_CONFIG_FILE --simulate \
         --interactive
 
     :param config_file_path: str (path)

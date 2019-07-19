@@ -82,6 +82,7 @@ kwargs:
   input_field_width: 90.  # cm
   verbose: 1
   min_delta_weight: -0.2
+  default_run_vel: 30.
   induction_loc:
     '1': 90.
     '2': 0.

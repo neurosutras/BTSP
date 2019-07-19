@@ -80,7 +80,8 @@ def init_context():
         track_length = f['defaults'].attrs['track_length']  # cm
         binned_dx = f['defaults'].attrs['binned_dx']  # cm
         generic_dx = f['defaults'].attrs['generic_dx']  # cm
-        default_run_vel = f['defaults'].attrs['default_run_vel']  # cm/s
+        if 'default_run_vel' not in context() or context.default_run_vel is None:
+            default_run_vel = f['defaults'].attrs['default_run_vel']  # cm/s
         generic_position_dt = f['defaults'].attrs['generic_position_dt']  # ms
         default_interp_dx = f['defaults'].attrs['default_interp_dx']  # cm
         binned_x = f['defaults']['binned_x'][:]
@@ -639,8 +640,8 @@ def calculate_model_ramp(export=False, plot=False):
     if weights_path_distance_exceeds_threshold(delta_weights_snapshots, context.weights_path_distance_threshold):
         if context.verbose > 0:
             print('optimize_biBTSP_%s: calculate_model_ramp: pid: %i; aborting - excessive fluctuations in weights '
-                  'across laps; cell_id: %i, induction: %i' %
-                  (BTSP_model_name, os.getpid(), context.cell_id, context.induction))
+                  'across laps; induction: %i' %
+                  (BTSP_model_name, os.getpid(), context.induction))
         return dict()
 
     return {context.induction: result}
