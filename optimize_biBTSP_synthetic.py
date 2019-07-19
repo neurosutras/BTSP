@@ -208,7 +208,13 @@ def load_data(induction):
             target_ramp_1 = context.data_cache[1].target_ramp['after']
             delta_weights_1 = context.data_cache[1].LSA_weights['after']
         else:
-            target_ramp_1 = get_target_synthetic_ramp(this_induction_loc, ramp_x=context.binned_x,
+            induction_loc_1 = context.induction_loc['1']
+            induction_stop_index_1 = np.where(context.default_interp_x >= induction_loc_1)[0][0] + \
+                                     int(context.induction_dur / context.dt)
+
+            induction_stop_loc_1 = context.default_interp_x[induction_stop_index_1]
+
+            target_ramp_1 = get_target_synthetic_ramp(induction_loc_1, ramp_x=context.binned_x,
                                                       track_length=context.track_length,
                                                       target_peak_val=context.target_peak_val_1, target_min_val=0.,
                                                       target_asymmetry=1.8,
@@ -218,8 +224,7 @@ def load_data(induction):
                 get_delta_weights_LSA(target_ramp_1, ramp_x=context.binned_x, input_x=context.binned_x,
                                       interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
                                       peak_locs=context.peak_locs, ramp_scaling_factor=context.ramp_scaling_factor,
-                                      induction_start_loc=induction_context.mean_induction_start_loc,
-                                      induction_stop_loc=induction_context.mean_induction_stop_loc,
+                                      induction_start_loc=induction_loc_1, induction_stop_loc=induction_stop_loc_1,
                                       track_length=context.track_length, target_range=context.target_range,
                                       bounds=(context.min_delta_weight, context.target_peak_weight),
                                       verbose=context.verbose)
@@ -599,8 +604,8 @@ def calculate_model_ramp(export=False, plot=False):
             group.attrs['mean_induction_stop_loc'] = context.mean_induction_stop_loc
             group.attrs['induction_start_times'] = context.induction_start_times
             group.attrs['induction_stop_times'] = context.induction_stop_times
-            group.attrs['track_start_times'] = context.track_start_times
-            group.attrs['track_stop_times'] = context.track_stop_times
+            # group.attrs['track_start_times'] = context.track_start_times
+            # group.attrs['track_stop_times'] = context.track_stop_times
             group.attrs['target_ramp_amp'] = ramp_amp['target']
             group.attrs['target_ramp_width'] = ramp_width['target']
             group.attrs['target_peak_shift'] = peak_shift['target']
@@ -704,12 +709,9 @@ def plot_model_summary_figure(model_file_path=None):
     example_input_dict = {}
 
     sample_time_delays = []
-    mean_induction_start_time_index = np.where(context.mean_position > context.mean_induction_start_loc)[0][0]
-    mean_induction_start_time = context.mean_t[mean_induction_start_time_index]
     for index in input_sample_indexes:
         this_peak_loc = context.peak_locs[index]
-        this_time_index = np.where(context.mean_position > this_peak_loc)[0][0]
-        this_delay = (this_peak_loc - context.mean_induction_start_loc) / context.defaul_run_vel / 1000.
+        this_delay = (this_peak_loc - context.mean_induction_start_loc) / context.default_run_vel / 1000.
         sample_time_delays.append(this_delay)
     sample_time_delays = np.abs(sample_time_delays)
 
@@ -977,7 +979,7 @@ def plot_model_summary_figure(model_file_path=None):
     axes[1][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
     axes[1][0].set_ylim([min(-1., np.min(model_ramp) - 1., np.min(target_ramp) - 1.),
                          max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.)])
-    axes[1][0].set_title('Experimental data', fontsize=mpl.rcParams['font.size'], pad=10.)
+    axes[1][0].set_title('Target (synthetic data)', fontsize=mpl.rcParams['font.size'], pad=10.)
 
     clean_axes(axes)
     fig.suptitle('Synaptic resource-limited model B; synthetic data, induction: %i' % 2,
