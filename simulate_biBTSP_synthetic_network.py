@@ -57,25 +57,51 @@ def init_context():
     """
 
     """
+    if context.data_file_path is None or not os.path.isfile(context.data_file_path):
+        raise IOError('simulate_biBTSP_synthetic_network: init_context: invalid data_file_path: %s' %
+                      context.data_file_path)
+
+    context.verbose = int(context.verbose)
+    if 'plot' not in context():
+        context.plot = False
+
     context.update(context.x0)
-    dt = 10.  # ms
-    input_field_width = 90.  # cm
-    input_field_peak_rate = 40.  # Hz
-    num_inputs = 200
-    track_length = 187.  # cm
-    default_run_vel = 25.  # cm/s
 
-    binned_dx = track_length / 100.  # cm
-    binned_x = np.linspace(0., track_length, 100, endpoint=False) + binned_dx / 2.
+    with h5py.File(context.data_file_path, 'r') as f:
+        dt = f['defaults'].attrs['dt']  # ms
+        input_field_peak_rate = f['defaults'].attrs['input_field_peak_rate']  # Hz
+        num_inputs = f['defaults'].attrs['num_inputs']
+        track_length = f['defaults'].attrs['track_length']  # cm
+        binned_dx = f['defaults'].attrs['binned_dx']  # cm
+        generic_dx = f['defaults'].attrs['generic_dx']  # cm
+        if 'default_run_vel' not in context() or context.default_run_vel is None:
+            default_run_vel = f['defaults'].attrs['default_run_vel']  # cm/s
+        else:
+            context.default_run_vel = float(context.default_run_vel)
+        generic_position_dt = f['defaults'].attrs['generic_position_dt']  # ms
+        default_interp_dx = f['defaults'].attrs['default_interp_dx']  # cm
+        binned_x = f['defaults']['binned_x'][:]
+        generic_x = f['defaults']['generic_x'][:]
+        generic_t = f['defaults']['generic_t'][:]
+        default_interp_t = f['defaults']['default_interp_t'][:]
+        default_interp_x = f['defaults']['default_interp_x'][:]
+        extended_x = f['defaults']['extended_x'][:]
 
-    num_steps = int(track_length / default_run_vel / dt * 1000.)
-    default_x = np.linspace(0., track_length, num_steps, endpoint=False)
-    default_t = np.linspace(0., num_steps * dt, num_steps, endpoint=False)
+        if 'input_field_width' not in context() or context.input_field_width is None:
+            raise RuntimeError('simulate_biBTSP_synthetic_network: init context: missing required parameter: '
+                               'input_field_width')
+        context.input_field_width = float(context.input_field_width)
+        input_field_width_key = str(int(context.input_field_width))
+        if 'calibrated_input' not in f or input_field_width_key not in f['calibrated_input']:
+            raise RuntimeError('simulate_biBTSP_synthetic_network: init context: data for input_field_width: %.1f not found in the '
+                               'provided data_file_path: %s' %
+                               (float(context.input_field_width), context.data_file_path))
+        input_field_width = f['calibrated_input'][input_field_width_key].attrs['input_field_width']  # cm
+        input_rate_maps, peak_locs = \
+            generate_spatial_rate_maps(binned_x, num_inputs, input_field_peak_rate, input_field_width, track_length)
+        ramp_scaling_factor = f['calibrated_input'][input_field_width_key].attrs['ramp_scaling_factor']
 
-    input_rate_maps, peak_locs = \
-        generate_spatial_rate_maps(binned_x, num_inputs, input_field_peak_rate, input_field_width, track_length)
-
-    sm = StateMachine(dt=dt)
+    down_dt = 10.  # ms, to speed up optimization
 
     num_cells = context.num_cells
     initial_fraction_active = context.initial_fraction_active
@@ -83,151 +109,131 @@ def init_context():
     basal_target_representation_density = context.basal_target_representation_density
     reward_target_representation_density = context.reward_target_representation_density
 
-    num_baseline_laps = context.num_baseline_laps
-    num_assay_laps = context.num_assay_laps
-    num_reward_laps = context.num_reward_laps
     initial_induction_dur = 300.  # ms
     pause_dur = 500.  # ms
     reward_dur = 500.  # ms
     plateau_dur = 300.  # ms
-    peak_basal_prob_new_recruitment = context.peak_basal_prob_new_recruitment
-    peak_reward_prob_new_recruitment = context.peak_reward_prob_new_recruitment
-    peak_basal_plateau_prob_per_lap = context.peak_basal_plateau_prob_per_lap
-    peak_reward_plateau_prob_per_lap = context.peak_reward_plateau_prob_per_lap
+    peak_basal_plateau_prob_per_dt = \
+        context.peak_basal_plateau_prob_per_lap / len(default_interp_t)
+    peak_reward_plateau_prob_per_dt = \
+        context.peak_reward_plateau_prob_per_lap / int(reward_dur / dt)
 
     context.update(locals())
 
-    if context.reward_locs is None:
-        context.reward_locs = {}
-    reward_stop_locs = {}
-    for induction in context.reward_locs:
-        reward_stop_index = np.where(default_x >= context.reward_locs[induction])[0][0] + \
-                            int(reward_dur / dt)
-        reward_stop_locs[induction] = default_x[reward_stop_index]
+    lap_start_times = [-len(default_interp_t) * dt, 0.]
+    position = np.append(np.add(default_interp_x, -track_length), default_interp_x)
+    t = np.append(np.add(default_interp_t, -len(default_interp_t) * dt), default_interp_t)
+    running_position = track_length
+    running_t = len(default_interp_t) * dt
+    num_laps = 2
 
-    num_laps = 2 + num_baseline_laps + (num_assay_laps + num_reward_laps) * len(context.reward_locs)
-    reward_lap_indexes = {}
-    start_lap = 1 + num_baseline_laps
-    for induction in context.reward_locs:
-        end_lap = start_lap + num_reward_laps
-        reward_lap_indexes[induction] = list(range(start_lap, end_lap))
-        start_lap += num_reward_laps + num_assay_laps
-
-    reward_start_indexes, reward_stop_indexes = defaultdict(list), defaultdict(list)
-    position = np.array([])
-    t = np.array([])
-    reward = np.array([])
-    running_t = -len(default_t) * dt
-    running_position = -track_length
-    lap_edge_indexes = []
-    for lap in range(num_laps):
-        prev_len = len(t)
-        lap_edge_indexes.append(prev_len)
-        position = np.append(position, np.add(default_x, running_position))
-        t = np.append(t, np.add(default_t, running_t))
-        reward = np.append(reward, np.zeros_like(default_t))
-        running_position += track_length
-        running_t += len(default_t) * dt
-        for induction in context.reward_locs:
-            if lap in reward_lap_indexes[induction]:
-                start_index = prev_len + np.where(default_x >= context.reward_locs[induction])[0][0]
-                reward_start_indexes[induction].append(start_index)
-                stop_index = start_index + int(reward_dur / dt)
-                reward_stop_indexes[induction].append(stop_index)
-                reward[start_index:stop_index] = 1.
-    lap_edge_indexes.append(len(t))
-
-    for induction in context.reward_locs:
-        reward_start_indexes[induction] = np.array(reward_start_indexes[induction])
-        reward_stop_indexes[induction] = np.array(reward_stop_indexes[induction])
+    reward_start_times = [None]
+    for track_phase in context.track_phases:
+        if track_phase['lap_type'] == 'reward':
+            reward_loc = float(track_phase['reward_loc'])
+        else:
+            reward_loc = None
+        for i in range(int(track_phase['num_laps'])):
+            prev_len = len(t)
+            lap_start_times.append(running_t)
+            if reward_loc is not None:
+                this_reward_start_index = np.where(default_interp_x >= reward_loc)[0]
+                if len(this_reward_start_index) == 0:
+                    raise RuntimeError('simulate_biBTSP_synthetic_network: invalid reward_loc: %.1f' % reward_loc)
+                this_reward_start_index = len(t) - len(default_interp_t) + this_reward_start_index[0]
+                reward_start_times.append(t[this_reward_start_index])
+            else:
+                reward_start_times.append(None)
+            position = np.append(position, np.add(default_interp_x, running_position))
+            t = np.append(t, np.add(default_interp_t, running_t))
+            running_position += track_length
+            running_t += len(default_interp_t) * dt
+            num_laps += 1
+    reward_start_times.append(None)
 
     complete_rate_maps = []
 
     for this_rate_map in input_rate_maps:
-        interp_rate_map = np.interp(default_x, binned_x, this_rate_map, period=track_length)
+        interp_rate_map = np.interp(default_interp_x, binned_x, this_rate_map, period=track_length)
         this_complete_rate_map = np.array([])
         for lap in range(num_laps):
             this_complete_rate_map = np.append(this_complete_rate_map, interp_rate_map)
         complete_rate_maps.append(this_complete_rate_map)
 
+    down_t = np.arange(t[0], t[-1] + down_dt / 2., down_dt)
+    down_rate_maps = []
+    for rate_map in complete_rate_maps:
+        this_down_rate_map = np.interp(down_t, t, rate_map)
+        down_rate_maps.append(this_down_rate_map)
+
     context.update(locals())
 
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
         get_dual_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
-                                context.global_signal_decay, dt)
-
-    local_signals = get_local_signal_population(complete_rate_maps, local_signal_filter, dt)
+                                context.global_signal_decay, context.down_dt)
+    local_signals = get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt)
     local_signal_peak = np.max(local_signals)
     local_signals /= local_signal_peak
+    down_plateau_len = int(plateau_dur / down_dt)
+    example_gate_len = max(down_plateau_len, 2 * len(global_filter_t))
+    example_induction_gate = np.zeros(example_gate_len)
+    example_induction_gate[:down_plateau_len] = 1.
+    example_global_signal = get_global_signal(example_induction_gate, global_filter)
+    global_signal_peak = np.max(example_global_signal)
 
     signal_xrange = np.linspace(0., 1., 10000)
-    pot_rate = np.vectorize(scaled_single_sigmoid(context.rMC_th, context.rMC_peak, signal_xrange))
-    depot_rate = np.vectorize(scaled_double_sigmoid_orig(context.rCM_th1, context.rCM_peak1, context.rCM_th2,
-                                                         context.rCM_peak2, signal_xrange, y_end=context.rCM_min2))
+    pot_rate = np.vectorize(scaled_single_sigmoid(
+        context.f_pot_th, context.f_pot_th + context.f_pot_peak, signal_xrange))
+    dep_rate = np.vectorize(scaled_single_sigmoid(
+        context.f_dep_th, context.f_dep_th + context.f_dep_peak, signal_xrange))
 
-    target_initial_ramp = get_target_synthetic_ramp(-context.target_peak_shift,
-                                                    target_peak_shift=context.target_peak_shift,
-                                                    target_peak_val=context.initial_ramp_peak_val)
     target_initial_induction_loc = -context.target_peak_shift
-    target_initial_induction_stop_loc = target_initial_induction_loc + initial_induction_dur / 1000. * default_run_vel
-    initial_ramp, initial_delta_weights, discard_ramp_offset, discard_residual_score = \
-        get_delta_weights_LSA(target_initial_ramp, input_rate_maps, target_initial_induction_loc,
-                              target_initial_induction_stop_loc,
-                              bounds=(context.min_delta_weight, context.peak_delta_weight), verbose=context.verbose)
+    target_initial_induction_stop_loc = target_initial_induction_loc + \
+                                        initial_induction_dur / 1000. * context.default_run_vel
+    target_initial_ramp = \
+        get_target_synthetic_ramp(target_initial_induction_loc, ramp_x=context.binned_x,
+                                  track_length=context.track_length, target_peak_val=context.initial_ramp_peak_val,
+                                  target_min_val=0., target_asymmetry=1.8, target_peak_shift=context.target_peak_shift,
+                                  target_ramp_width=187.)
+    max_ramp_population_sum = np.mean(target_initial_ramp) * num_cells
 
-    max_ramp_population_sum = np.mean(initial_ramp) * num_cells
+    initial_weights_population = [np.ones_like(peak_locs) for _ in range(num_cells)]
 
-    initial_weights_population = []
     if initial_active_cells > 0:
         d_peak_indexes = int(len(peak_locs) / initial_active_cells)
         initial_peak_indexes = np.linspace(0, len(peak_locs), initial_active_cells, dtype=int, endpoint=False) + \
                                int(d_peak_indexes / 2)
-    for i in range(num_cells):
-        if i < initial_active_cells:
+        _, initial_delta_weights, _, _ = \
+            get_delta_weights_LSA(target_initial_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
+                                  interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
+                                  peak_locs=context.peak_locs, ramp_scaling_factor=context.ramp_scaling_factor,
+                                  induction_start_loc=target_initial_induction_loc,
+                                  induction_stop_loc=target_initial_induction_stop_loc,
+                                  track_length=context.track_length, target_range=context.target_range,
+                                  bounds=(context.min_delta_weight, context.peak_delta_weight),
+                                  verbose=context.verbose, plot=context.plot)
+        for i in range(initial_active_cells):
             roll_indexes = initial_peak_indexes[i]
             this_weights = np.add(np.roll(initial_delta_weights, roll_indexes), 1.)
-            initial_weights_population.append(this_weights)
-        else:
-            initial_weights_population.append(np.ones_like(peak_locs))
+            initial_weights_population[i] = this_weights
 
     ramp_xscale = np.linspace(0., 10., 10000)
-    basal_plateau_prob_f = scaled_single_sigmoid(0., 4., ramp_xscale, ylim=[peak_basal_prob_new_recruitment, 1.])
-    basal_plateau_prob_f = np.vectorize(basal_plateau_prob_f)
-    reward_plateau_prob_f = scaled_single_sigmoid(0., 4., ramp_xscale, ylim=[peak_reward_prob_new_recruitment, 1.])
-    reward_plateau_prob_f = np.vectorize(reward_plateau_prob_f)
+    plateau_prob_ramp_sensitivity_f = scaled_single_sigmoid(0., 4., ramp_xscale)
 
-    interp_target_ramp = np.interp(default_x, binned_x, target_initial_ramp, period=track_length)
-    basal_target_plateau_prob = basal_plateau_prob_f(interp_target_ramp)
-    basal_plateau_prob_norm_factor = 1. / np.sum(basal_target_plateau_prob)
-    reward_target_plateau_prob = reward_plateau_prob_f(interp_target_ramp)
-    reward_occupancy_per_lap = default_run_vel * reward_dur / 1000. / track_length
-    reward_plateau_prob_norm_factor = 1. / np.sum(reward_target_plateau_prob) / reward_occupancy_per_lap
-
-    """
-    basal_plateau_modulation_f = lambda this_representation_density: \
-        max(0., peak_basal_plateau_prob_per_lap *
-            (1. - this_representation_density / basal_target_representation_density))
-    
-    reward_plateau_modulation_f = lambda this_representation_density, this_reward: \
-        max(0., this_reward * peak_reward_plateau_prob_per_lap *
-            (1. - this_representation_density / reward_target_representation_density))
-    """
     basal_representation_xscale = np.linspace(0., basal_target_representation_density, 10000)
-    basal_plateau_modulation_f = \
+    basal_plateau_prob_f = \
         scaled_single_sigmoid(basal_target_representation_density, basal_target_representation_density / 2.,
-                              basal_representation_xscale, ylim=[context.peak_basal_plateau_prob_per_lap, 0.])
-    basal_plateau_modulation_f = np.vectorize(basal_plateau_modulation_f)
+                              basal_representation_xscale, ylim=[peak_basal_plateau_prob_per_dt, 0.])
+    basal_plateau_prob_f = np.vectorize(basal_plateau_prob_f)
 
     reward_representation_xscale = np.linspace(0., reward_target_representation_density, 10000)
     reward_delta_representation_density = reward_target_representation_density - basal_target_representation_density
-    reward_plateau_modulation_f = lambda this_representation_density, this_reward: \
-        this_reward * \
-        scaled_single_sigmoid(
-            reward_target_representation_density,
-            basal_target_representation_density / 2. + reward_delta_representation_density,
-            reward_representation_xscale,
-            ylim=[context.peak_reward_plateau_prob_per_lap, 0.])(this_representation_density)
-    reward_plateau_modulation_f = np.vectorize(reward_plateau_modulation_f)
+    reward_plateau_prob_f = \
+        scaled_single_sigmoid(reward_target_representation_density,
+                              basal_target_representation_density / 2. + reward_delta_representation_density,
+                              reward_representation_xscale,
+                              ylim=[peak_reward_plateau_prob_per_dt, 0.])
+    reward_plateau_prob_f = np.vectorize(reward_plateau_prob_f)
     context.update(locals())
 
 
@@ -310,7 +316,7 @@ def calculate_weight_dynamics(cell_index, lap, initial_weights, initial_ramp, in
 
     weights_history = np.array(weights_history)
 
-    next_global_signal = global_signal[len(context.default_t):]
+    next_global_signal = global_signal[len(context.default_interp_t):]
 
     if context.disp:
         print('Process: %i: calculating ramp for cell: %i, lap: %i took %.1f s' %
@@ -319,43 +325,133 @@ def calculate_weight_dynamics(cell_index, lap, initial_weights, initial_ramp, in
     return plateau_start_times, plateau_stop_times, next_global_signal, weights_history
 
 
+def get_ramp(weights):
+    """
+
+    :param weights: array
+    :return: array
+    """
+    delta_weights = np.subtract(weights, 1.)
+    ramp, _ = get_model_ramp(delta_weights, ramp_x=context.binned_x, input_x=context.binned_x,
+                             input_rate_maps=context.input_rate_maps,
+                             ramp_scaling_factor=context.ramp_scaling_factor)
+    return ramp
+
+
 def get_population_representation_density(ramp_population):
     """
 
     :param ramp_population: list of array (like binned_x)
-    :return: array (like default_t)
+    :return: array (like default_interp_t)
     """
     binned_ramp_population_sum = np.sum(ramp_population, axis=0)
-    ramp_population_sum = np.interp(context.default_x, context.binned_x, binned_ramp_population_sum,
+    ramp_population_sum = np.interp(context.default_interp_x, context.binned_x, binned_ramp_population_sum,
                                     period=context.track_length)
     population_representation_density = ramp_population_sum / context.max_ramp_population_sum
     return population_representation_density
 
 
-def get_plateau_probability_population(ramp_population, population_representation_density, current_reward):
+def get_plateau_probability(ramp, population_representation_density, prev_plateau_start_times, lap):
     """
 
-    :param ramp_population: list of array (like binned_x)
-    :param population_representation_density: array (like default_x)
-    :param current_reward: array (like default_x)
-    :return: list of array (like default_x)
+    :param ramp: array (like binned_x)
+    :param population_representation_density: array (like default_interp_x)
+    :param prev_plateau_start_times: list of float
+    :param lap: int
+    :return: array (like default_interp_x)
     """
-    basal_plateau_modulation_factor = context.basal_plateau_modulation_f(population_representation_density)
-    reward_plateau_modulation_factor = \
-        context.reward_plateau_modulation_f(population_representation_density, current_reward)
-    plateau_probability_population = []
-    for ramp in ramp_population:
-        interp_ramp = np.interp(context.default_x, context.binned_x, ramp, period=context.track_length)
-        plateau_prob = context.basal_plateau_prob_f(interp_ramp) * context.basal_plateau_prob_norm_factor * \
-                       basal_plateau_modulation_factor
-        reward_plateau_prob = context.reward_plateau_prob_f(interp_ramp) * context.reward_plateau_prob_norm_factor * \
-                              reward_plateau_modulation_factor
-        plateau_prob += reward_plateau_prob
-        plateau_probability_population.append(plateau_prob)
-    return plateau_probability_population
+    t_start_time = context.lap_start_times[lap]
+    this_t = np.add(np.append(context.default_interp_t,
+                              context.default_interp_t + len(context.default_interp_t) * context.dt),
+                    t_start_time)
+    interp_ramp = np.interp(context.default_interp_x, context.binned_x, ramp)
+    interp_ramp = np.append(interp_ramp, interp_ramp)
+    this_rep_density = np.append(population_representation_density, population_representation_density)
+    plateau_prob_ramp_modulation = context.plateau_prob_ramp_sensitivity_f(interp_ramp)
+    plateau_prob = context.basal_plateau_prob_f(this_rep_density) * \
+                   (1. + context.basal_plateau_prob_ramp_sensitivity * plateau_prob_ramp_modulation)
+    if context.reward_start_times[lap] is not None:
+        this_reward_start_time = context.reward_start_times[lap]
+        this_reward_stop_time = this_reward_start_time + context.reward_dur
+        reward_indexes = np.where((this_t >= this_reward_start_time) & (this_t < this_reward_stop_time))
+        plateau_prob[reward_indexes] = \
+            context.reward_plateau_prob_f(this_rep_density[reward_indexes]) * \
+            (1. + context.reward_plateau_prob_ramp_sensitivity * plateau_prob_ramp_modulation[reward_indexes])
+    for this_plateau_start_time in prev_plateau_start_times:
+        this_plateau_stop_time = this_plateau_start_time + context.plateau_dur + context.pause_dur
+        if this_plateau_stop_time > t_start_time:
+            plateau_indexes = np.where((this_t >= this_plateau_start_time) & (this_t < this_plateau_stop_time))
+            plateau_prob[plateau_indexes] = 0.
+    plt.plot(this_t, plateau_prob)
+    plt.show()
+    return plateau_prob
 
 
-def calculate_population_dynamics(export=False, plot=False):
+def get_plateau_times(plateau_prob, lap, cell_id):
+    """
+
+    :param plateau_prob: array
+    :param lap: int
+    :return: list of float
+    """
+    seed = context.seed_offset + 1e8 * context.trial + 1e6 * lap + cell_id
+    local_random = random.Random()
+    local_random.seed(seed)
+
+    t_start_time = context.lap_start_times[lap]
+    this_t = np.add(np.append(context.default_interp_t,
+                              context.default_interp_t + len(context.default_interp_t) * context.dt),
+                    t_start_time)
+
+    plateau_len = int(context.plateau_dur / context.dt)
+    pause_len = int(context.pause_dur / context.dt)
+    plateau_start_times = []
+    i = 0
+    while i < len(this_t):
+        if plateau_prob[i] > 0. and local_random.random() < plateau_prob[i]:
+            plateau_start_times.append(this_t[i])
+            i += plateau_len + pause_len
+        else:
+            i += 1
+    return plateau_start_times
+
+
+def simulate_network(export=False, plot=False):
+    """
+
+    :param export: bool
+    :param plot: bool
+    :return: dict
+    """
+    current_weights_population = context.initial_weights_population
+    ramp_pop_history = []
+    pop_rep_density_history = []
+    prev_plateau_start_times = [[] for _ in range(context.num_cells)]
+    plateau_start_times_history = [prev_plateau_start_times]
+    for lap in range(1, context.num_laps - 1):
+        current_ramp_population = context.interface.map(get_ramp, current_weights_population)
+        ramp_pop_history.append(current_ramp_population)
+        current_pop_representation_density = \
+            get_population_representation_density(current_ramp_population)
+        pop_rep_density_history.append(current_pop_representation_density)
+        sequences = [current_ramp_population] + [[current_pop_representation_density] * context.num_cells] + \
+                    [prev_plateau_start_times] + [[lap] * context.num_cells]
+        pop_plateau_probability = context.interface.map(get_plateau_probability, *sequences)
+        sequences = [pop_plateau_probability] + [[lap] * context.num_cells] + [list(range(context.num_cells))]
+        plateau_start_times = context.interface.map(get_plateau_times, *sequences)
+        plateau_start_times_history.append(plateau_start_times)
+        sequences = [current_weights_population] + [plateau_start_times] + [[lap] * context.num_cells]
+        current_weights_population = context.interface.map(update_weights, *sequences)
+        prev_plateau_start_times = plateau_start_times
+    current_ramp_population = context.interface.map(get_ramp, current_weights_population)
+    ramp_pop_history.append(current_ramp_population)
+    current_pop_representation_density = \
+        get_population_representation_density(current_ramp_population)
+    pop_rep_density_history.append(current_pop_representation_density)
+    plateau_start_times_history.append([[] for _ in range(context.num_cells)])
+
+
+def simulate_network_orig(export=False, plot=False):
     """
 
     :param export: bool
@@ -381,7 +477,7 @@ def calculate_population_dynamics(export=False, plot=False):
     weights_snapshots.append(current_weights_population)
     current_ramp_population = list(map(get_model_ramp, current_weights_population))
     ramp_snapshots.append(current_ramp_population)
-    initial_global_signal_population = [np.zeros_like(context.default_t)] * group_size
+    initial_global_signal_population = [np.zeros_like(context.default_interp_t)] * group_size
 
     for lap in range(1, context.num_laps - 1):
         lap_start_index, lap_end_index = context.lap_edge_indexes[lap], context.lap_edge_indexes[lap + 1]
@@ -432,7 +528,7 @@ def calculate_population_dynamics(export=False, plot=False):
 
     if plot:
         plot_population_history_snapshots(ramp_snapshots, population_representation_density_history, reward_locs_array,
-                                          context.binned_x, context.default_x, context.track_length,
+                                          context.binned_x, context.default_interp_x, context.track_length,
                                           context.num_baseline_laps, context.num_assay_laps, context.num_reward_laps)
 
     plateau_start_times_array = []
@@ -451,7 +547,7 @@ def calculate_population_dynamics(export=False, plot=False):
                 group = f[shared_context_key]
                 group.create_dataset('peak_locs', compression='gzip', data=context.peak_locs)
                 group.create_dataset('binned_x', compression='gzip', data=context.binned_x)
-                group.create_dataset('default_x', compression='gzip', data=context.default_x)
+                group.create_dataset('default_interp_x', compression='gzip', data=context.default_interp_x)
                 group.create_dataset('input_rate_maps', compression='gzip', data=np.array(context.input_rate_maps))
                 group.attrs['track_length'] = context.track_length
                 group.attrs['dt'] = context.dt
@@ -503,7 +599,7 @@ def calculate_population_dynamics(export=False, plot=False):
 
 
 def plot_population_history_snapshots(ramp_snapshots, population_representation_density_history, reward_locs_array,
-                                      binned_x, default_x, track_length, num_baseline_laps, num_assay_laps,
+                                      binned_x, default_interp_x, track_length, num_baseline_laps, num_assay_laps,
                                       num_reward_laps, trial):
     """
 
@@ -511,7 +607,7 @@ def plot_population_history_snapshots(ramp_snapshots, population_representation_
     :param population_representation_density_history: 2D array
     :param reward_locs_array: array
     :param binned_x: array
-    :param default_x: array
+    :param default_interp_x: array
     :param track_length: float
     :param num_baseline_laps: int
     :param num_assay_laps: int
@@ -608,7 +704,7 @@ def plot_population_history_snapshots(ramp_snapshots, population_representation_
     for lap, lap_label in zip(snapshot_laps, lap_labels):
         this_population_representation_density = population_representation_density_history[lap]
         this_peak_locs_hist = peak_locs_histogram_history[lap]
-        axes1.plot(default_x, this_population_representation_density, label=lap_label)
+        axes1.plot(default_interp_x, this_population_representation_density, label=lap_label)
         axes2.plot(edges[:-1] + bin_width / 2., this_peak_locs_hist, label=lap_label)
     axes1.set_xlabel('Position (cm)')
     axes1.set_xticks(np.arange(0., track_length, 45.))
@@ -643,7 +739,7 @@ def plot_population_history_snapshots(ramp_snapshots, population_representation_
         sorted_subindexes = np.argsort(this_peak_locs[valid_indexes])
         this_sorted_ramps = []
         for cell in this_indexes[valid_indexes][sorted_subindexes]:
-            ramp = np.interp(default_x, binned_x, ramp_snapshots[lap][cell])
+            ramp = np.interp(default_interp_x, binned_x, ramp_snapshots[lap][cell])
             this_sorted_ramps.append(ramp)
         sorted_normalized_ramp_snapshots.append(this_sorted_ramps)
         hm = axes[i + start_col].imshow(this_sorted_ramps, extent=(0., track_length, len(this_sorted_ramps), 0),
@@ -696,20 +792,20 @@ def plot_population_history_snapshots(ramp_snapshots, population_representation_
     plt.show()
 
 
-def analyze_simulation_output(file_path):
+def plot_model_summary_figure(file_path):
     """
 
     :param file_path: str (path)
     """
     if not os.path.isfile(file_path):
-        raise IOError('analyze_simulation_output: invalid file path: %s' % file_path)
+        raise IOError('plot_model_summary_figure: invalid file path: %s' % file_path)
     exported_data_key = 'BTSP_population_history'
     with h5py.File(file_path, 'r') as f:
         if 'shared_context' not in f or exported_data_key not in f or 'enumerated' not in f[exported_data_key].attrs \
                 or not f[exported_data_key].attrs['enumerated']:
-            raise KeyError('analyze_simulation_output: invalid file contents at path: %s' % file_path)
+            raise KeyError('plot_model_summary_figure: invalid file contents at path: %s' % file_path)
         binned_x = f['shared_context']['binned_x'][:]
-        default_x = f['shared_context']['default_x'][:]
+        default_interp_x = f['shared_context']['default_interp_x'][:]
         track_length = f['shared_context'].attrs['track_length']
         num_groups = len(f[exported_data_key])
         for i in range(num_groups):
@@ -723,7 +819,7 @@ def analyze_simulation_output(file_path):
             num_reward_laps = group.attrs['num_reward_laps']
             trial = group.attrs['trial']
             plot_population_history_snapshots(ramp_snapshots, population_representation_density_history,
-                                              reward_locs_array, binned_x, default_x, track_length, num_baseline_laps,
+                                              reward_locs_array, binned_x, default_interp_x, track_length, num_baseline_laps,
                                               num_assay_laps, num_reward_laps, trial)
 
 
@@ -743,10 +839,14 @@ def plot_plateau_modulation():
     col_width = 3.15
     col_height = 4
     fig6, axes6 = plt.subplots(1, max_cols, figsize=[max_cols * col_width, col_height])
-    axes6[0].plot(context.basal_representation_xscale,
-                  context.basal_plateau_modulation_f(context.basal_representation_xscale), label='No reward', c='k')
-    axes6[0].plot(context.reward_representation_xscale,
-                  context.reward_plateau_modulation_f(context.reward_representation_xscale, 1.), label='Reward', c='r')
+    norm_basal_plateau_prob = context.basal_plateau_prob_f(context.basal_representation_xscale)
+    norm_basal_plateau_prob /= np.max(norm_basal_plateau_prob)
+    norm_basal_plateau_prob *= context.peak_basal_plateau_prob_per_lap
+    norm_reward_plateau_prob = context.reward_plateau_prob_f(context.reward_representation_xscale)
+    norm_reward_plateau_prob /= np.max(norm_reward_plateau_prob)
+    norm_reward_plateau_prob *= context.peak_reward_plateau_prob_per_lap
+    axes6[0].plot(context.basal_representation_xscale, norm_basal_plateau_prob, label='No reward', c='k')
+    axes6[0].plot(context.reward_representation_xscale, norm_reward_plateau_prob, label='Reward', c='r')
     axes6[0].set_xticks([i * 0.25 for i in range(6)])
     axes6[0].set_xlim(0., 1.25)
     axes6[0].set_ylim(0., axes6[0].get_ylim()[1])
@@ -756,16 +856,13 @@ def plot_plateau_modulation():
     axes6[0].set_title('Modulation of plateau probability\nby feedback inhibition and reward',
                        fontsize=mpl.rcParams['font.size'], y=1.025)
 
-    normalized_basal_plateau_prob = context.basal_plateau_prob_f(context.ramp_xscale) * \
-                                    context.basal_plateau_prob_norm_factor
-    normalized_basal_plateau_prob /= np.max(normalized_basal_plateau_prob)
-    normalized_reward_plateau_prob = context.reward_plateau_prob_f(context.ramp_xscale) * \
-                                     context.reward_plateau_prob_norm_factor
-    normalized_reward_plateau_prob /= np.max(normalized_reward_plateau_prob)
-    # axes6[1].plot(context.ramp_xscale, normalized_basal_plateau_prob, label='No reward', c='k')
-    axes6[1].plot(context.ramp_xscale, normalized_reward_plateau_prob, c='k')  # , label='Reward', c='r')
+    plateau_prob_ramp_modulation = context.plateau_prob_ramp_sensitivity_f(context.ramp_xscale)
+    axes6[1].plot(context.ramp_xscale, plateau_prob_ramp_modulation * context.basal_plateau_prob_ramp_sensitivity + 1.,
+                  label='No reward', c='k')
+    axes6[1].plot(context.ramp_xscale, plateau_prob_ramp_modulation * context.reward_plateau_prob_ramp_sensitivity + 1.,
+                  label='Reward', c='r')
     axes6[1].set_xlim(0., 10.)
-    axes6[1].set_ylim(0., 1.)
+    # axes6[1].set_ylim(0., 1.)
     axes6[1].set_xlabel('Ramp amplitude (mV)')
     axes6[1].set_ylabel('Normalized plateau probability')
     axes6[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
@@ -792,7 +889,7 @@ def plot_plateau_modulation():
 @click.option("--plot-summary-figure", is_flag=True)
 @click.option("--model-file-path", type=str, default=None)
 @click.pass_context
-def main(config_file_path, trial, output_dir, export, export_file_path, label, verbose, plot, interactive, debug,
+def main(cli, config_file_path, trial, output_dir, export, export_file_path, label, verbose, plot, interactive, debug,
          plot_summary_figure, model_file_path):
     """
     To execute on a single process:
@@ -829,19 +926,20 @@ def main(config_file_path, trial, output_dir, export, export_file_path, label, v
     context.interface = get_parallel_interface(source_file=__file__, source_package=__package__, **kwargs)
     context.interface.start(disp=context.disp)
     context.interface.ensure_controller()
-    config_optimize_interactive(__file__, config_file_path=config_file_path, output_dir=output_dir,
-                                export=export, export_file_path=export_file_path, label=label,
-                                disp=context.disp, interface=context.interface, verbose=verbose, plot=plot, **kwargs)
-    if plot:
-        context.execute(plot_plateau_modulation)
+    config_parallel_interface(__file__, config_file_path=config_file_path, output_dir=output_dir, export=export,
+                              export_file_path=export_file_path, label=label, disp=context.disp,
+                              interface=context.interface, verbose=verbose, plot=plot, **kwargs)
+    if not context.interface.controller_is_worker:
+        print('getting here')
+        config_worker()
     if plot_summary_figure:
-        context.interface.execute(plot_model_summary_figure, model_file_path)
+        plot_model_summary_figure(model_file_path)
     elif not debug:
-        plateau_start_times_population, plateau_stop_times_population, weights_population_full_history, \
-        plateau_probability_history, weights_snapshots, ramp_snapshots = \
-            calculate_population_dynamics(context.interface, export, plot)
+        simulate_network(export, plot)
     if plot:
         context.interface.apply(plt.show)
+        plot_plateau_modulation()
+        plt.show()
 
     if context.interactive:
         context.update(locals())

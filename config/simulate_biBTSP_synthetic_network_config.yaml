@@ -1,40 +1,41 @@
-min_delta_weight: 0.
-ramp_scaling_factor: 0.002956
-global_signal_peak: 0.9259394464
+data_file_name: 20190711_biBTSP_data_calibrated_input.hdf5
+input_field_width: 90.  # cm
+min_delta_weight: -0.2
+global_signal_peak: 0.9259394464  # how was this determined?
 initial_ramp_peak_val: 8.
 target_peak_shift: -10.
 num_cells: 400
-initial_fraction_active: 0.75
+initial_fraction_active: 0.5
 basal_target_representation_density: 0.75
 reward_target_representation_density: 1.25
-num_baseline_laps: 5
-num_assay_laps: 5
-num_reward_laps: 10
-peak_basal_plateau_prob_per_lap: 0.5
-peak_reward_plateau_prob_per_lap: 0.5
-peak_basal_prob_new_recruitment: 0.75
-peak_reward_prob_new_recruitment: 0.05
-reward_locs:
-  1: 45.  # 30.
-  2: 90. # 90.
+track_phases:
+  - lap_type: explore
+    num_laps: 10
+  - lap_type: reward
+    reward_loc: 90.
+    num_laps: 10
+  - lap_type: explore
+    num_laps: 5
+peak_basal_plateau_prob_per_lap: 0.25
+peak_reward_plateau_prob_per_lap: 0.25
+basal_plateau_prob_ramp_sensitivity: 0.25
+reward_plateau_prob_ramp_sensitivity: 0.5
 seed_offset: 90000000000
 target_range:
-  residuals: 0.1
-  weights_smoothness: 0.005
+  ramp_offset: 0.01
   delta_min_val: 0.01
   delta_peak_val: 0.01
+  residuals: 0.1
+  weights_smoothness: 0.005
 x0:
-  global_signal_decay: 1.001524E+02
-  local_signal_rise: 8.536373E+01
-  rMC0: 2.536076E+00
-  rMC_th: 5.158179E-01
-  rMC_peak: 9.238480E-01
-  global_signal_rise: 1.524528E+01
-  peak_delta_weight: 2.413031E+00
-  rCM0: 9.286024E-01
-  local_signal_decay: 1.073788E+03
-  rCM_min2: 2.336212E-01
-  rCM_th1: 8.968046E-02
-  rCM_th2: 9.791894E-01
-  rCM_peak1: 3.890336E-01
-  rCM_peak2: 4.902626E-01
+  global_signal_decay: 4.489167E+02
+  global_signal_rise: 1.739352E+02
+  local_signal_decay: 1.250320E+03
+  local_signal_rise: 6.298970E+01
+  peak_delta_weight: 3.699263E+00
+  k_dep: 1.347899E-01
+  f_dep_peak: 8.584021E-03
+  f_dep_th: 2.411664E-03
+  k_pot: 4.834452E-01
+  f_pot_peak: 6.474074E-02
+  f_pot_th: 1.767498E-01

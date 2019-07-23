@@ -230,7 +230,7 @@ def load_data(induction):
                                       induction_start_loc=induction_loc_1, induction_stop_loc=induction_stop_loc_1,
                                       track_length=context.track_length, target_range=context.target_range,
                                       bounds=(context.min_delta_weight, context.target_peak_weight),
-                                      verbose=context.verbose)
+                                      verbose=context.verbose, plot=context.plot)
         if induction == 1:
             induction_context.target_ramp['before'] = np.zeros_like(context.binned_x)
             induction_context.LSA_weights['before'] = np.zeros_like(context.peak_locs)
@@ -244,7 +244,7 @@ def load_data(induction):
                                                       target_peak_val=context.target_peak_val_2,
                                                       target_min_val=context.target_min_val_2, target_asymmetry=1.8,
                                                       target_peak_shift=context.target_peak_shift_2,
-                                                      target_ramp_width=187., plot=context.plot)
+                                                      target_ramp_width=187.)
             induction_context.target_ramp['after'], induction_context.LSA_weights['after'], _, _ = \
                 get_delta_weights_LSA(target_ramp_2, ramp_x=context.binned_x, input_x=context.binned_x,
                                       interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
@@ -253,7 +253,7 @@ def load_data(induction):
                                       induction_stop_loc=induction_context.mean_induction_stop_loc,
                                       track_length=context.track_length, target_range=context.target_range,
                                       bounds=(context.min_delta_weight, context.target_peak_weight),
-                                      verbose=context.verbose)
+                                      verbose=context.verbose, plot=context.plot)
         context.data_cache[induction] = induction_context
     context.update(induction_context())
 
@@ -1196,6 +1196,7 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
     if plot_summary_figure:
         context.interface.execute(plot_model_summary_figure, model_file_path)
     elif not debug:
+        context.x0_array = [4.993E-01, 1.032E-01, 6.791E-02, 4.672E-02, 1.525E+00, 1.239E+00, 1.317E+02, 8.392E+02, 4.589E+01, 5.499E+02, 2.640E+00]
         features = get_features_interactive(context.interface, context.x0_array, plot=plot)
         features, objectives = context.interface.execute(get_objectives, features, context.export)
         if export:
