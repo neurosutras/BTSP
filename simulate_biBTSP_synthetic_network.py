@@ -237,94 +237,6 @@ def init_context():
     context.update(locals())
 
 
-def calculate_weight_dynamics(cell_index, lap, initial_weights, initial_ramp, initial_global_signal,
-                              initial_plateau_prob, last_plateau_stop_time):
-    """
-
-    :param cell_index: int
-    :param lap: int
-    :param initial_weights: array
-    :param initial_ramp: array
-    :param initial_global_signal: array
-    :param initial_plateau_prob: array
-    :param last_plateau_stop_time: float
-    :return: array
-    """
-    start_time = time.time()
-    cell_index = int(cell_index)
-    lap = int(lap)
-    seed = context.seed_offset + 1e8 * context.trial + 1e6 * lap + cell_index
-    local_random = random.Random()
-    local_random.seed(seed)
-
-    lap_start_index, lap_end_index = context.lap_edge_indexes[lap], context.lap_edge_indexes[lap + 1]
-    # compute convolution of induction gate and global signal filter for this and next lap
-    # if there is no next lap, the carryover signal array will be empty
-    if len(context.lap_edge_indexes) > lap + 2:
-        next_lap_end_index = context.lap_edge_indexes[lap + 2]
-    else:
-        next_lap_end_index = context.lap_edge_indexes[lap + 1]
-    this_lap_t = context.t[lap_start_index:lap_end_index]
-    this_epoch_t = context.t[lap_start_index:next_lap_end_index]
-
-    plateau_start_times = []
-    plateau_stop_times = []
-    induction_gate = np.zeros_like(this_epoch_t)
-
-    plateau_len = int(context.plateau_dur / context.dt)
-    pause_len = int(context.pause_dur / context.dt)
-
-    if last_plateau_stop_time > this_lap_t[0]:
-        start_index = np.where(this_lap_t > last_plateau_stop_time)[0][0]
-        induction_gate[:start_index] = 1.
-        start_index += pause_len
-    else:
-        start_index = 0
-
-    plateau_prob = np.array(initial_plateau_prob)
-    for j in range(start_index, len(this_lap_t)):
-        this_t = this_lap_t[j]
-        if plateau_prob[j] > 0. and local_random.random() < plateau_prob[j]:
-            plateau_start_times.append(this_t)
-            plateau_stop_times.append(this_t + context.plateau_dur)
-            induction_gate[j:j + plateau_len] = 1.
-            plateau_prob[j:j + plateau_len + pause_len] = 0.
-
-    global_signal = get_global_signal(induction_gate, context.global_filter)
-    global_signal /= context.global_signal_peak
-    global_signal[:len(initial_global_signal)] += initial_global_signal
-
-    peak_weight = context.peak_delta_weight + 1.
-    norm_initial_weights = np.divide(initial_weights, peak_weight)
-    weights_history = []
-    if len(plateau_start_times) > 0:
-        for i in range(len(context.peak_locs)):
-            # normalize total number of receptors
-            this_initial_weight = norm_initial_weights[i]
-            available = 1. - this_initial_weight
-            context.sm.update_states({'M': available, 'C': this_initial_weight})
-            local_signal = context.local_signals[i][lap_start_index:next_lap_end_index]
-            context.sm.update_rates(
-                {'M': {'C': context.rMC0 * np.multiply(context.pot_rate(local_signal), global_signal)},
-                 'C': {'M': context.rCM0 * np.multiply(context.depot_rate(local_signal), global_signal)}})
-            context.sm.reset()
-            context.sm.run()
-            weights_history.append(context.sm.states_history['C'] * peak_weight)
-    else:
-        weights_history = \
-            [np.append(np.ones_like(this_epoch_t), 1.) * initial_weight for initial_weight in initial_weights]
-
-    weights_history = np.array(weights_history)
-
-    next_global_signal = global_signal[len(context.default_interp_t):]
-
-    if context.disp:
-        print('Process: %i: calculating ramp for cell: %i, lap: %i took %.1f s' %
-              (os.getpid(), cell_index, lap, time.time() - start_time))
-
-    return plateau_start_times, plateau_stop_times, next_global_signal, weights_history
-
-
 def get_ramp(weights):
     """
 
@@ -364,26 +276,29 @@ def get_plateau_probability(ramp, population_representation_density, prev_platea
     this_t = np.add(np.append(context.default_interp_t,
                               context.default_interp_t + len(context.default_interp_t) * context.dt),
                     t_start_time)
-    interp_ramp = np.interp(context.default_interp_x, context.binned_x, ramp)
+    interp_ramp = np.interp(context.default_interp_x, context.binned_x, ramp, period=context.track_length)
     interp_ramp = np.append(interp_ramp, interp_ramp)
     this_rep_density = np.append(population_representation_density, population_representation_density)
-    plateau_prob_ramp_modulation = context.plateau_prob_ramp_sensitivity_f(interp_ramp)
-    plateau_prob = context.basal_plateau_prob_f(this_rep_density) * \
-                   (1. + context.basal_plateau_prob_ramp_sensitivity * plateau_prob_ramp_modulation)
+    plateau_prob_ramp_modulation = np.maximum(np.minimum(context.plateau_prob_ramp_sensitivity_f(interp_ramp), 1.), 0.)
+    plateau_prob = np.maximum(np.minimum(context.basal_plateau_prob_f(this_rep_density), 1.), 0.)
+    plateau_prob *= (1. + context.basal_plateau_prob_ramp_sensitivity * plateau_prob_ramp_modulation)
     if context.reward_start_times[lap] is not None:
         this_reward_start_time = context.reward_start_times[lap]
         this_reward_stop_time = this_reward_start_time + context.reward_dur
         reward_indexes = np.where((this_t >= this_reward_start_time) & (this_t < this_reward_stop_time))
-        plateau_prob[reward_indexes] = \
-            context.reward_plateau_prob_f(this_rep_density[reward_indexes]) * \
+        reward_plateau_prob = \
+            np.maximum(np.minimum(context.reward_plateau_prob_f(this_rep_density[reward_indexes]), 1.), 0.)
+        reward_plateau_prob *= \
             (1. + context.reward_plateau_prob_ramp_sensitivity * plateau_prob_ramp_modulation[reward_indexes])
+        plateau_prob[reward_indexes] = reward_plateau_prob
+
     for this_plateau_start_time in prev_plateau_start_times:
         this_plateau_stop_time = this_plateau_start_time + context.plateau_dur + context.pause_dur
         if this_plateau_stop_time > t_start_time:
             plateau_indexes = np.where((this_t >= this_plateau_start_time) & (this_t < this_plateau_stop_time))
             plateau_prob[plateau_indexes] = 0.
-    plt.plot(this_t, plateau_prob)
-    plt.show()
+    # plt.plot(this_t, plateau_prob)
+    # plt.show()
     return plateau_prob
 
 
@@ -394,7 +309,7 @@ def get_plateau_times(plateau_prob, lap, cell_id):
     :param lap: int
     :return: list of float
     """
-    seed = context.seed_offset + 1e8 * context.trial + 1e6 * lap + cell_id
+    seed = context.seed_offset + 1e8 * int(context.trial) + 1e6 * lap + cell_id
     local_random = random.Random()
     local_random.seed(seed)
 
@@ -416,6 +331,56 @@ def get_plateau_times(plateau_prob, lap, cell_id):
     return plateau_start_times
 
 
+def update_weights(current_weights, plateau_start_times, lap):
+    """
+
+    :param current_weights: array
+    :param plateau_start_times: list of float
+    :param lap: int
+    :return: array
+    """
+    t_start_time = context.lap_start_times[lap]
+    this_t = np.add(np.append(context.default_interp_t,
+                              context.default_interp_t + len(context.default_interp_t) * context.dt),
+                    t_start_time)
+    plateau_len = int(context.plateau_dur / context.dt)
+    if len(plateau_start_times) == 0:
+        return current_weights
+    induction_gate = np.zeros_like(this_t)
+    for plateau_start_time in plateau_start_times:
+        start_index = np.where(this_t >= plateau_start_time)[0][0]
+        induction_gate[start_index:start_index+plateau_len] = 1.
+    this_down_t = np.arange(this_t[0], this_t[-1] + context.down_dt/2., context.down_dt)
+    down_induction_gate = np.interp(this_down_t, this_t, induction_gate)
+    global_signal = np.minimum(get_global_signal(down_induction_gate, context.global_filter),
+                               context.global_signal_peak)
+    global_signal /= context.global_signal_peak
+    local_signals = context.local_signals
+    pot_rate = context.pot_rate
+    dep_rate = context.dep_rate
+
+    peak_weight = context.peak_delta_weight + 1.
+    current_normalized_weights = np.divide(current_weights, peak_weight)
+
+    start_index = np.where(context.down_t >= t_start_time)[0][0]
+    stop_index = start_index + len(this_down_t)
+
+    next_normalized_weights = []
+    for i, this_local_signal in enumerate(local_signals):
+        this_pot_rate = np.trapz(np.multiply(pot_rate(this_local_signal[start_index:stop_index]), global_signal),
+                                 dx=context.down_dt / 1000.)
+        this_dep_rate = np.trapz(np.multiply(dep_rate(this_local_signal[start_index:stop_index]), global_signal),
+                                 dx=context.down_dt / 1000.)
+        this_normalized_delta_weight = context.k_pot * this_pot_rate * (1. - current_normalized_weights[i]) - \
+                                       context.k_dep * this_dep_rate * current_normalized_weights[i]
+        this_next_normalized_weight = max(0., min(1., current_normalized_weights[i] + this_normalized_delta_weight))
+        next_normalized_weights.append(this_next_normalized_weight)
+
+    next_weights = np.multiply(next_normalized_weights, peak_weight)
+
+    return next_weights
+
+
 def simulate_network(export=False, plot=False):
     """
 
@@ -423,6 +388,7 @@ def simulate_network(export=False, plot=False):
     :param plot: bool
     :return: dict
     """
+    start_time = time.time()
     current_weights_population = context.initial_weights_population
     ramp_pop_history = []
     pop_rep_density_history = []
@@ -434,21 +400,32 @@ def simulate_network(export=False, plot=False):
         current_pop_representation_density = \
             get_population_representation_density(current_ramp_population)
         pop_rep_density_history.append(current_pop_representation_density)
+
         sequences = [current_ramp_population] + [[current_pop_representation_density] * context.num_cells] + \
                     [prev_plateau_start_times] + [[lap] * context.num_cells]
         pop_plateau_probability = context.interface.map(get_plateau_probability, *sequences)
+
         sequences = [pop_plateau_probability] + [[lap] * context.num_cells] + [list(range(context.num_cells))]
         plateau_start_times = context.interface.map(get_plateau_times, *sequences)
         plateau_start_times_history.append(plateau_start_times)
+
         sequences = [current_weights_population] + [plateau_start_times] + [[lap] * context.num_cells]
         current_weights_population = context.interface.map(update_weights, *sequences)
         prev_plateau_start_times = plateau_start_times
+
     current_ramp_population = context.interface.map(get_ramp, current_weights_population)
     ramp_pop_history.append(current_ramp_population)
     current_pop_representation_density = \
         get_population_representation_density(current_ramp_population)
     pop_rep_density_history.append(current_pop_representation_density)
     plateau_start_times_history.append([[] for _ in range(context.num_cells)])
+
+    if context.disp:
+        print('Process: %i: simulating network took %.1f s' % (os.getpid(), time.time() - start_time))
+        sys.stdout.flush()
+
+    if plot:
+        plot_network_history(ramp_pop_history, pop_rep_density_history)
 
 
 def simulate_network_orig(export=False, plot=False):
@@ -527,7 +504,7 @@ def simulate_network_orig(export=False, plot=False):
     reward_locs_array = [context.reward_locs[induction] for induction in context.reward_locs]
 
     if plot:
-        plot_population_history_snapshots(ramp_snapshots, population_representation_density_history, reward_locs_array,
+        plot_network_history(ramp_snapshots, population_representation_density_history, reward_locs_array,
                                           context.binned_x, context.default_interp_x, context.track_length,
                                           context.num_baseline_laps, context.num_assay_laps, context.num_reward_laps)
 
@@ -575,7 +552,7 @@ def simulate_network_orig(export=False, plot=False):
             group.attrs['peak_basal_plateau_prob_per_lap'] = context.peak_basal_plateau_prob_per_lap
             group.attrs['peak_reward_plateau_prob_per_lap'] = context.peak_reward_plateau_prob_per_lap
             group.attrs['random_seed_offset'] = context.seed_offset
-            group.attrs['trial'] = context.trial
+            group.attrs['trial'] = int(context.trial)
             group.create_dataset('t', compression='gzip', data=context.t)
             group.create_dataset('position', compression='gzip', data=context.position)
             group.create_dataset('reward', compression='gzip', data=context.reward)
@@ -598,21 +575,11 @@ def simulate_network_orig(export=False, plot=False):
            plateau_probability_history, weights_snapshots, ramp_snapshots
 
 
-def plot_population_history_snapshots(ramp_snapshots, population_representation_density_history, reward_locs_array,
-                                      binned_x, default_interp_x, track_length, num_baseline_laps, num_assay_laps,
-                                      num_reward_laps, trial):
+def plot_network_history(ramp_pop_history, pop_rep_density_history):
     """
 
-    :param ramp_snapshots: 3D array
-    :param population_representation_density_history: 2D array
-    :param reward_locs_array: array
-    :param binned_x: array
-    :param default_interp_x: array
-    :param track_length: float
-    :param num_baseline_laps: int
-    :param num_assay_laps: int
-    :param num_reward_laps: int
-    :param trial: int
+    :param ramp_pop_history: 3D array
+    :param pop_rep_density_history: 2D array
     """
     import matplotlib as mpl
     mpl.rcParams['svg.fonttype'] = 'none'
@@ -622,6 +589,26 @@ def plot_population_history_snapshots(ramp_snapshots, population_representation_
     mpl.rcParams['axes.titlepad'] = 2.
     mpl.rcParams['mathtext.default'] = 'regular'
 
+    for lap in [0, context.num_laps - 2]:
+        ramp_pop = ramp_pop_history[lap]
+        cell_indexes = list(range(len(ramp_pop)))
+        max_index = []
+        for ramp in ramp_pop:
+            max_index.append(np.argmax(ramp))
+        sorted_cell_indexes = [cell_index for (_, cell_index) in sorted(zip(max_index, cell_indexes))]
+        sorted_ramp_pop = [ramp_pop[i] for i in sorted_cell_indexes]
+        fig = plt.figure()
+        plt.imshow(sorted_ramp_pop)
+        plt.title(lap)
+        fig.show()
+    fig = plt.figure()
+    for lap, pop_rep_density in enumerate(pop_rep_density_history):
+        plt.plot(context.default_interp_x, pop_rep_density)
+    fig.show()
+
+    context.update(locals())
+
+    """
     snapshot_laps = [0, num_baseline_laps]
     summary_laps = [0]
     if len(reward_locs_array) > 0:
@@ -788,7 +775,7 @@ def plot_population_history_snapshots(ramp_snapshots, population_representation_
     fig3.tight_layout(w_pad=0.8)
 
     context.update(locals())
-
+    """
     plt.show()
 
 
@@ -817,8 +804,8 @@ def plot_model_summary_figure(file_path):
             num_baseline_laps = group.attrs['num_baseline_laps']
             num_assay_laps = group.attrs['num_assay_laps']
             num_reward_laps = group.attrs['num_reward_laps']
-            trial = group.attrs['trial']
-            plot_population_history_snapshots(ramp_snapshots, population_representation_density_history,
+            trial = int(group.attrs['trial'])
+            plot_network_history(ramp_snapshots, population_representation_density_history,
                                               reward_locs_array, binned_x, default_interp_x, track_length, num_baseline_laps,
                                               num_assay_laps, num_reward_laps, trial)
 
@@ -930,7 +917,6 @@ def main(cli, config_file_path, trial, output_dir, export, export_file_path, lab
                               export_file_path=export_file_path, label=label, disp=context.disp,
                               interface=context.interface, verbose=verbose, plot=plot, **kwargs)
     if not context.interface.controller_is_worker:
-        print('getting here')
         config_worker()
     if plot_summary_figure:
         plot_model_summary_figure(model_file_path)
