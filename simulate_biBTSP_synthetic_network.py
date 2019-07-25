@@ -218,7 +218,9 @@ def init_context():
             initial_weights_population[i] = this_weights
 
     ramp_xscale = np.linspace(0., 10., 10000)
-    plateau_prob_ramp_sensitivity_f = scaled_single_sigmoid(0., 4., ramp_xscale)
+    # plateau_prob_ramp_sensitivity_f = scaled_single_sigmoid(0., 4., ramp_xscale)
+    plateau_prob_ramp_sensitivity_f = lambda x: x / 10.
+    plateau_prob_ramp_sensitivity_f = np.vectorize(plateau_prob_ramp_sensitivity_f)
 
     basal_representation_xscale = np.linspace(0., basal_target_representation_density, 10000)
     basal_plateau_prob_f = \
@@ -297,8 +299,7 @@ def get_plateau_probability(ramp, population_representation_density, prev_platea
         if this_plateau_stop_time > t_start_time:
             plateau_indexes = np.where((this_t >= this_plateau_start_time) & (this_t < this_plateau_stop_time))
             plateau_prob[plateau_indexes] = 0.
-    # plt.plot(this_t, plateau_prob)
-    # plt.show()
+
     return plateau_prob
 
 
@@ -390,11 +391,14 @@ def simulate_network(export=False, plot=False):
     """
     start_time = time.time()
     current_weights_population = context.initial_weights_population
+    weights_pop_history = []
     ramp_pop_history = []
     pop_rep_density_history = []
     prev_plateau_start_times = [[] for _ in range(context.num_cells)]
     plateau_start_times_history = [prev_plateau_start_times]
+
     for lap in range(1, context.num_laps - 1):
+        weights_pop_history.append(current_weights_population)
         current_ramp_population = context.interface.map(get_ramp, current_weights_population)
         ramp_pop_history.append(current_ramp_population)
         current_pop_representation_density = \
@@ -413,6 +417,7 @@ def simulate_network(export=False, plot=False):
         current_weights_population = context.interface.map(update_weights, *sequences)
         prev_plateau_start_times = plateau_start_times
 
+    weights_pop_history.append(current_weights_population)
     current_ramp_population = context.interface.map(get_ramp, current_weights_population)
     ramp_pop_history.append(current_ramp_population)
     current_pop_representation_density = \
@@ -420,159 +425,58 @@ def simulate_network(export=False, plot=False):
     pop_rep_density_history.append(current_pop_representation_density)
     plateau_start_times_history.append([[] for _ in range(context.num_cells)])
 
+    context.update(locals())
+
     if context.disp:
-        print('Process: %i: simulating network took %.1f s' % (os.getpid(), time.time() - start_time))
+        print('simulate_biBTSP_synthetic_network: Process: %i: simulating network took %.1f s' %
+              (os.getpid(), time.time() - start_time))
         sys.stdout.flush()
 
     if plot:
         plot_network_history(ramp_pop_history, pop_rep_density_history)
 
-
-def simulate_network_orig(export=False, plot=False):
-    """
-
-    :param export: bool
-    :param plot: bool
-    :return: dict
-    """
-    start_time = time.time()
-    cell_indexes = list(range(len(context.initial_weights_population)))
-    if 'debug' in context() and context.debug:
-        cell_indexes = cell_indexes[::int(len(context.initial_weights_population) / context.interface.num_workers)]
-        cell_indexes = cell_indexes[:context.interface.num_workers]
-        print('cell_indexes: %s' % cell_indexes)
-    group_size = len(cell_indexes)
-
-    plateau_start_times_population = defaultdict(list)
-    plateau_stop_times_population = defaultdict(list)
-    weights_population_full_history = []
-    plateau_probability_history = []
-    population_representation_density_history = []
-    weights_snapshots = []
-    ramp_snapshots = []
-    current_weights_population = np.array(context.initial_weights_population)[cell_indexes]
-    weights_snapshots.append(current_weights_population)
-    current_ramp_population = list(map(get_model_ramp, current_weights_population))
-    ramp_snapshots.append(current_ramp_population)
-    initial_global_signal_population = [np.zeros_like(context.default_interp_t)] * group_size
-
-    for lap in range(1, context.num_laps - 1):
-        lap_start_index, lap_end_index = context.lap_edge_indexes[lap], context.lap_edge_indexes[lap + 1]
-        current_reward = context.reward[lap_start_index:lap_end_index]
-        population_representation_density = get_population_representation_density(current_ramp_population)
-        population_representation_density_history.append(population_representation_density)
-        current_plateau_probability_population = \
-            get_plateau_probability_population(current_ramp_population, population_representation_density,
-                                               current_reward)
-        last_plateau_stop_times = []
-        for cell_index in cell_indexes:
-            if cell_index in plateau_stop_times_population and len(plateau_stop_times_population[cell_index]) > 0:
-                last_plateau_stop_times.append(plateau_stop_times_population[cell_index][-1])
-            else:
-                last_plateau_stop_times.append(0.)
-
-        result = context.interface.map(calculate_weight_dynamics, cell_indexes,
-                                       [lap] * group_size, current_weights_population, current_ramp_population,
-                                       initial_global_signal_population,
-                                       current_plateau_probability_population,
-                                       last_plateau_stop_times)
-        this_plateau_start_times_population, this_plateau_stop_times_population, initial_global_signal_population, \
-        this_weights_population_history = list(zip(*result))
-        weights_population_full_history.append(np.array(this_weights_population_history))
-        plateau_probability_history.append(current_plateau_probability_population)
-        for cell_index, this_plateau_start_times, this_plateau_stop_times in \
-                zip(cell_indexes, this_plateau_start_times_population, this_plateau_stop_times_population):
-            plateau_start_times_population[cell_index].extend(this_plateau_start_times)
-            plateau_stop_times_population[cell_index].extend(this_plateau_stop_times)
-        current_weights_population = []
-        for this_weights_history in this_weights_population_history:
-            current_weights_population.append(this_weights_history[:, -1])
-        weights_snapshots.append(current_weights_population)
-        current_ramp_population = list(map(get_model_ramp, current_weights_population))
-        ramp_snapshots.append(current_ramp_population)
-
-    population_representation_density = get_population_representation_density(current_ramp_population)
-    population_representation_density_history.append(population_representation_density)
-    population_representation_density_history = np.array(population_representation_density_history)
-    weights_population_full_history = np.array(weights_population_full_history)
-    weights_snapshots = np.array(ramp_snapshots)
-    ramp_snapshots = np.array(ramp_snapshots)
-
-    if context.disp:
-        print('Process: %i: calculating ramp population took %.1f s' % (os.getpid(), time.time() - start_time))
-
-    reward_locs_array = [context.reward_locs[induction] for induction in context.reward_locs]
-
-    if plot:
-        plot_network_history(ramp_snapshots, population_representation_density_history, reward_locs_array,
-                                          context.binned_x, context.default_interp_x, context.track_length,
-                                          context.num_baseline_laps, context.num_assay_laps, context.num_reward_laps)
-
-    plateau_start_times_array = []
-    plateau_stop_times_array = []
-    plateau_times_cell_indexes = []
-    for cell_index, this_plateau_start_times in viewitems(plateau_start_times_population):
-        plateau_start_times_array.extend(this_plateau_start_times)
-        plateau_stop_times_array.extend(plateau_start_times_population[cell_index])
-        plateau_times_cell_indexes.extend([cell_index] * len(this_plateau_start_times))
-
     if export:
         with h5py.File(context.export_file_path, 'a') as f:
-            shared_context_key = 'shared_context'
-            if shared_context_key not in f:
-                f.create_group(shared_context_key)
-                group = f[shared_context_key]
-                group.create_dataset('peak_locs', compression='gzip', data=context.peak_locs)
-                group.create_dataset('binned_x', compression='gzip', data=context.binned_x)
-                group.create_dataset('default_interp_x', compression='gzip', data=context.default_interp_x)
-                group.create_dataset('input_rate_maps', compression='gzip', data=np.array(context.input_rate_maps))
-                group.attrs['track_length'] = context.track_length
-                group.attrs['dt'] = context.dt
-            exported_data_key = 'BTSP_population_history'
-            if exported_data_key not in f:
-                f.create_group(exported_data_key)
-                f[exported_data_key].attrs['enumerated'] = True
-            group_id = str(len(f[exported_data_key]))
-            f[exported_data_key].create_group(group_id)
-            group = f[exported_data_key][group_id]
-            group.attrs['num_baseline_laps'] = context.num_baseline_laps
-            group.attrs['num_assay_laps'] = context.num_assay_laps
-            group.attrs['num_reward_laps'] = context.num_reward_laps
-            group.attrs['plateau_dur'] = context.plateau_dur
-            group.attrs['reward_dur'] = context.reward_dur
-            group.attrs['reward_locs_array'] = reward_locs_array
-            group.attrs['ramp_scaling_factor'] = context.ramp_scaling_factor
-            group.attrs['num_cells'] = context.num_cells
+            exported_data_key = 'biBTSP_synthetic_network_history'
+            if exported_data_key in f:
+                raise RuntimeError('simulate_biBTSP_synthetic_network: data has already been exported to '
+                                   'export_file_path: %s' % context.export_file_path)
+            group = f.create_group(exported_data_key)
+            group.attrs['enumerated'] = False
+            set_h5py_attr(group.attrs, 'data_file_name', context.data_file_name)
+            set_h5py_attr(group.attrs, 'config_file_path', context.config_file_path)
+            group.attrs['input_field_width'] = context.input_field_width
+            group.attrs['min_delta_weight'] = context.min_delta_weight
+            group.attrs['initial_ramp_peak_val'] = context.initial_ramp_peak_val
+            group.attrs['target_peak_shift'] = context.target_peak_shift
+            group.attrs['num_cells'] = int(context.num_cells)
             group.attrs['initial_fraction_active'] = context.initial_fraction_active
-            group.attrs['initial_active_cells'] = context.initial_active_cells
             group.attrs['basal_target_representation_density'] = context.basal_target_representation_density
             group.attrs['reward_target_representation_density'] = context.reward_target_representation_density
-            group.attrs['peak_basal_prob_new_recruitment'] = context.peak_basal_prob_new_recruitment
-            group.attrs['peak_reward_prob_new_recruitment'] = context.peak_reward_prob_new_recruitment
             group.attrs['peak_basal_plateau_prob_per_lap'] = context.peak_basal_plateau_prob_per_lap
             group.attrs['peak_reward_plateau_prob_per_lap'] = context.peak_reward_plateau_prob_per_lap
-            group.attrs['random_seed_offset'] = context.seed_offset
+            group.attrs['basal_plateau_prob_ramp_sensitivity'] = context.basal_plateau_prob_ramp_sensitivity
+            group.attrs['reward_plateau_prob_ramp_sensitivity'] = context.reward_plateau_prob_ramp_sensitivity
+            group.attrs['seed_offset'] = int(context.seed_offset)
             group.attrs['trial'] = int(context.trial)
-            group.create_dataset('t', compression='gzip', data=context.t)
-            group.create_dataset('position', compression='gzip', data=context.position)
-            group.create_dataset('reward', compression='gzip', data=context.reward)
-            group.create_dataset('plateau_times_cell_indexes', compression='gzip', data=plateau_times_cell_indexes)
-            group.create_dataset('plateau_start_times_array', compression='gzip', data=plateau_start_times_array)
-            group.create_dataset('plateau_stop_times_array', compression='gzip', data=plateau_stop_times_array)
-            group.create_dataset('weights_population_full_history', compression='gzip',
-                                 data=weights_population_full_history)
-            group.create_dataset('plateau_probability_history', compression='gzip',
-                                 data=plateau_probability_history)
-            group.create_dataset('population_representation_density_history', compression='gzip',
-                                 data=population_representation_density_history)
-            group.create_dataset('weights_snapshots', compression='gzip', data=weights_snapshots)
-            group.create_dataset('ramp_snapshots', compression='gzip', data=ramp_snapshots)
-        if context.disp:
-            print('Process: %i: exported weights population history data to file: %s' %
-                  (os.getpid(), context.export_file_path))
 
-    return plateau_start_times_population, plateau_stop_times_population, weights_population_full_history, \
-           plateau_probability_history, weights_snapshots, ramp_snapshots
+            group.create_dataset('weights_pop_history', compression='gzip', data=np.array(weights_pop_history))
+            group.create_dataset('ramp_pop_history', compression='gzip', data=np.array(ramp_pop_history))
+            group.create_dataset('pop_rep_density_history', compression='gzip', data=np.array(pop_rep_density_history))
+            group = group.create_group('plateau_start_times_history')
+            for i, lap_plateau_start_times in enumerate(plateau_start_times_history):
+                if np.any([len(plateau_start_times) > 0 for plateau_start_times in lap_plateau_start_times]):
+                    lap_key = str(i)
+                    group.create_group(lap_key)
+                    for cell_id, plateau_start_times in enumerate(lap_plateau_start_times):
+                        if len(plateau_start_times) > 0:
+                            group[lap_key].create_dataset(str(cell_id), compression='gzip',
+                                                          data=np.array(plateau_start_times))
+
+        if context.disp:
+            print('simulate_biBTSP_synthetic_network: Process: %i: exported data to file: %s' %
+                  (os.getpid(), context.export_file_path))
+            sys.stdout.flush()
 
 
 def plot_network_history(ramp_pop_history, pop_rep_density_history):
@@ -588,25 +492,95 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
     mpl.rcParams['text.usetex'] = False
     mpl.rcParams['axes.titlepad'] = 2.
     mpl.rcParams['mathtext.default'] = 'regular'
+    
+    track_phase_summary = [(0, 0, 'Before')]
+    lap_num = 0
+    for track_phase in context.track_phases:
+        this_num_laps = int(track_phase['num_laps'])
+        start_lap = lap_num + 1
+        lap_num += this_num_laps
+        end_lap = lap_num
+        if track_phase['lap_type'] == 'reward':
+            label = 'After reward at %i cm (laps %i: %i)' % \
+                    (int(track_phase['reward_loc']), start_lap, end_lap)
+        else:
+            label = 'After run (laps %i: %i)' % (start_lap, end_lap)
+        track_phase_summary.append((start_lap, end_lap, label))
 
-    for lap in [0, context.num_laps - 2]:
-        ramp_pop = ramp_pop_history[lap]
+    prev_sorted_cell_indexes = None
+    for start_lap, end_lap, label in track_phase_summary:
+        ramp_pop = ramp_pop_history[end_lap]
         cell_indexes = list(range(len(ramp_pop)))
         max_index = []
         for ramp in ramp_pop:
             max_index.append(np.argmax(ramp))
+        fig, axes = plt.subplots(1, 3)
         sorted_cell_indexes = [cell_index for (_, cell_index) in sorted(zip(max_index, cell_indexes))]
-        sorted_ramp_pop = [ramp_pop[i] for i in sorted_cell_indexes]
-        fig = plt.figure()
-        plt.imshow(sorted_ramp_pop)
-        plt.title(lap)
+        modulated_cell_indexes = []
+        nonmodulated_cell_indexes = []
+        modulated_ramp_pop = []
+        nonmodulated_ramp_pop = []
+        for i in sorted_cell_indexes:
+            this_ramp = ramp_pop[i]
+            if np.max(this_ramp) - np.min(this_ramp) > 2.:
+                modulated_ramp_pop.append(this_ramp)
+                modulated_cell_indexes.append(i)
+            else:
+                nonmodulated_ramp_pop.append(this_ramp)
+                nonmodulated_cell_indexes.append(i)
+        sorted_ramp_pop = modulated_ramp_pop + nonmodulated_ramp_pop
+        X, Y = np.meshgrid(context.binned_x, range(len(sorted_ramp_pop)))
+        hm = axes[1].pcolor(X, Y, sorted_ramp_pop)
+        cb = plt.colorbar(hm, ax=axes[1])
+        cb.ax.set_ylabel('Ramp amplitude (mV)', rotation=270, fontsize=mpl.rcParams['font.size'])
+        cb.ax.get_yaxis().labelpad = 15
+        axes[1].set_ylim(len(sorted_ramp_pop) - 1, 0)
+        axes[1].set_ylabel('Sorted cell #', fontsize=mpl.rcParams['font.size'])
+        axes[1].set_xlabel('Location (cm)', fontsize=mpl.rcParams['font.size'])
+        axes[1].set_title('Sorted by lap %i' % end_lap)
+        if len(modulated_ramp_pop) > 0:
+            X, Y = np.meshgrid(context.binned_x, range(len(modulated_ramp_pop)))
+            hm = axes[2].pcolor(X, Y, modulated_ramp_pop)
+            cb = plt.colorbar(hm, ax=axes[2])
+            cb.ax.set_ylabel('Ramp amplitude (mV)', rotation=270, fontsize=mpl.rcParams['font.size'])
+            cb.ax.get_yaxis().labelpad = 15
+            axes[2].set_ylim(len(modulated_ramp_pop) - 1, 0)
+            axes[2].set_ylabel('Sorted cell #', fontsize=mpl.rcParams['font.size'])
+            axes[2].set_xlabel('Location (cm)', fontsize=mpl.rcParams['font.size'])
+            axes[2].set_title('Sorted by lap %i' % end_lap)
+        if prev_sorted_cell_indexes is not None:
+            prev_sorted_ramp_pop = [ramp_pop[i] for i in prev_sorted_cell_indexes]
+            X, Y = np.meshgrid(context.binned_x, range(len(prev_sorted_ramp_pop)))
+            hm = axes[0].pcolor(X, Y, prev_sorted_ramp_pop)
+            cb = plt.colorbar(hm, ax=axes[0])
+            cb.ax.set_ylabel('Ramp amplitude (mV)', rotation=270, fontsize=mpl.rcParams['font.size'])
+            cb.ax.get_yaxis().labelpad = 15
+            axes[0].set_ylim(len(prev_sorted_ramp_pop) - 1, 0)
+            axes[0].set_ylabel('Sorted cell #', fontsize=mpl.rcParams['font.size'])
+            axes[0].set_xlabel('Location (cm)', fontsize=mpl.rcParams['font.size'])
+            axes[0].set_title('Sorted by lap %i' % (start_lap - 1))
+        fig.suptitle(label, fontsize=mpl.rcParams['font.size'])
+        prev_sorted_cell_indexes = modulated_cell_indexes + nonmodulated_cell_indexes
+        clean_axes(axes)
         fig.show()
-    fig = plt.figure()
-    for lap, pop_rep_density in enumerate(pop_rep_density_history):
-        plt.plot(context.default_interp_x, pop_rep_density)
-    fig.show()
 
-    context.update(locals())
+    fig, axes = plt.subplots(1, 2)
+    for lap, pop_rep_density in enumerate(pop_rep_density_history):
+        axes[0].plot(context.default_interp_x, pop_rep_density)
+    axes[0].set_ylabel('Normalized population activity')
+    axes[0].set_xlabel('Location (cm)')
+
+    X, Y = np.meshgrid(context.default_interp_x, range(len(pop_rep_density_history)))
+    hm = axes[1].pcolor(X, Y, pop_rep_density_history)
+    cb = plt.colorbar(hm, ax=axes[1])
+    cb.ax.set_ylabel('Normalized population activity', rotation=270)
+    cb.ax.get_yaxis().labelpad = 15
+    axes[1].set_ylim(len(pop_rep_density_history) - 1, 0)
+    axes[1].set_ylabel('Lap #')
+    axes[1].set_xlabel('Location (cm)')
+    fig.suptitle('Summed population activity')
+    clean_axes(axes)
+    fig.show()
 
     """
     snapshot_laps = [0, num_baseline_laps]
@@ -776,38 +750,53 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
 
     context.update(locals())
     """
-    plt.show()
 
 
-def plot_model_summary_figure(file_path):
+def plot_model_summary(model_file_path):
     """
 
-    :param file_path: str (path)
+    :param model_file_path: str (path)
     """
-    if not os.path.isfile(file_path):
-        raise IOError('plot_model_summary_figure: invalid file path: %s' % file_path)
-    exported_data_key = 'BTSP_population_history'
-    with h5py.File(file_path, 'r') as f:
-        if 'shared_context' not in f or exported_data_key not in f or 'enumerated' not in f[exported_data_key].attrs \
-                or not f[exported_data_key].attrs['enumerated']:
-            raise KeyError('plot_model_summary_figure: invalid file contents at path: %s' % file_path)
-        binned_x = f['shared_context']['binned_x'][:]
-        default_interp_x = f['shared_context']['default_interp_x'][:]
-        track_length = f['shared_context'].attrs['track_length']
-        num_groups = len(f[exported_data_key])
-        for i in range(num_groups):
-            group_id = str(i)
-            group = f[exported_data_key][group_id]
-            reward_locs_array = group.attrs['reward_locs_array']
-            ramp_snapshots = group['ramp_snapshots'][:]
-            population_representation_density_history = group['population_representation_density_history'][:]
-            num_baseline_laps = group.attrs['num_baseline_laps']
-            num_assay_laps = group.attrs['num_assay_laps']
-            num_reward_laps = group.attrs['num_reward_laps']
-            trial = int(group.attrs['trial'])
-            plot_network_history(ramp_snapshots, population_representation_density_history,
-                                              reward_locs_array, binned_x, default_interp_x, track_length, num_baseline_laps,
-                                              num_assay_laps, num_reward_laps, trial)
+    if not os.path.isfile(model_file_path):
+        raise IOError('plot_model_summary: invalid model_file_path: %s' % model_file_path)
+    exported_data_key = 'biBTSP_synthetic_network_history'
+    with h5py.File(model_file_path, 'r') as f:
+        if exported_data_key not in f:
+            raise KeyError('plot_model_summary: invalid file contents at path: %s' % model_file_path)
+        group = f[exported_data_key]
+        loaded_config_file_path = get_h5py_attr(group.attrs, 'config_file_path')
+        loaded_seed_offset = group.attrs['seed_offset']
+        loaded_trial = group.attrs['trial']
+        loaded_num_cells = group.attrs['num_cells']
+        if not all([loaded_config_file_path == context.config_file_path,
+                    loaded_seed_offset == int(context.seed_offset),
+                    loaded_trial == int(context.trial),
+                    loaded_num_cells == int(context.num_cells)]):
+            raise RuntimeError('simulate_biBTSP_synethic_network: plot_model_summary: configuration loaded from '
+                               'config_file_path: %s is inconsistent with data loaded from model_file_path: %s' %
+                               (context.config_file_path, model_file_path))
+        weights_pop_history = group['weights_pop_history'][:]
+        ramp_pop_history = group['ramp_pop_history'][:]
+        pop_rep_density_history = group['pop_rep_density_history'][:]
+        plateau_start_times_history = []
+        group = group['plateau_start_times_history']
+        num_laps = len(pop_rep_density_history)
+        for i in range(num_laps):
+            lap_key = str(i)
+            if lap_key in group:
+                lap_plateau_start_times = []
+                for cell_id in range(loaded_num_cells):
+                    cell_key = str(cell_id)
+                    if cell_key in group[lap_key]:
+                        lap_plateau_start_times.append(group[lap_key][cell_key][:])
+                    else:
+                        lap_plateau_start_times.append([])
+            else:
+                lap_plateau_start_times = [[] for _ in range(loaded_num_cells)]
+            plateau_start_times_history.append(lap_plateau_start_times)
+
+    plot_network_history(ramp_pop_history, pop_rep_density_history)
+    context.update(locals())
 
 
 def plot_plateau_modulation():
@@ -858,7 +847,6 @@ def plot_plateau_modulation():
 
     clean_axes(axes6)
     fig6.tight_layout(w_pad=0.8)
-    plt.show()
 
 
 @click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True, ))
@@ -919,7 +907,8 @@ def main(cli, config_file_path, trial, output_dir, export, export_file_path, lab
     if not context.interface.controller_is_worker:
         config_worker()
     if plot_summary_figure:
-        plot_model_summary_figure(model_file_path)
+        plot_model_summary(model_file_path)
+        plot = True
     elif not debug:
         simulate_network(export, plot)
     if plot:

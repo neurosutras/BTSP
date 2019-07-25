@@ -118,14 +118,14 @@ target_range:
   weights_smoothness: 0.005
 target_val:
 x0:
-  global_signal_decay: 4.489167E+02
-  global_signal_rise: 1.739352E+02
-  local_signal_decay: 1.250320E+03
-  local_signal_rise: 6.298970E+01
-  peak_delta_weight: 3.699263E+00
-  k_dep: 1.347899E-01
-  f_dep_peak: 8.584021E-03
-  f_dep_th: 2.411664E-03
-  k_pot: 4.834452E-01
-  f_pot_peak: 6.474074E-02
-  f_pot_th: 1.767498E-01
+  f_dep_peak: 1.194999E-01
+  f_dep_th: 7.820899E-03
+  f_pot_peak: 9.828062E-01
+  f_pot_th: 5.262555E-01
+  global_signal_decay: 2.232987E+02
+  global_signal_rise: 3.183521E+01
+  k_dep: 3.498200E-01
+  k_pot: 1.172080E+00
+  local_signal_decay: 1.127795E+03
+  local_signal_rise: 1.597686E+02
+  peak_delta_weight: 2.400251E+00
