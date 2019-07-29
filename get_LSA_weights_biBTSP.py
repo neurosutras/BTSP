@@ -76,17 +76,11 @@ def main(cli, min_delta_weight, peak_delta_weight, input_field_width, calibratio
     context.interface.map(compute_LSA_weights, *sequences)
 
     if export:
-        temp_output_path_list = [temp_output_path for temp_output_path in
-                                 context.interface.get('context.temp_output_path') if
-                                 os.path.isfile(temp_output_path)]
-        if len(temp_output_path_list) > 0:
-            if export_file_name is not None:
-                export_file_path = data_dir + '/' + export_file_name
-            else:
-                export_file_path = data_dir + '/' + data_file_name
-            merge_exported_data(temp_output_path_list, export_file_path, verbose=verbose > 0)
-            for temp_output_path in temp_output_path_list:
-                os.remove(temp_output_path)
+        if export_file_name is not None:
+            export_file_path = data_dir + '/' + export_file_name
+        else:
+            export_file_path = data_dir + '/' + data_file_name
+        collect_and_merge_temp_output(context.interface, export_file_path, verbose=context.disp)
 
     if plot > 0:
         context.interface.apply(plt.show)

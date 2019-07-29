@@ -1546,13 +1546,7 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
         features = get_features_interactive(context.interface, context.x0_array, plot=plot)
         features, objectives = context.interface.execute(get_objectives, features, context.export)
         if export:
-            temp_output_path_list = [temp_output_path for temp_output_path in
-                                     context.interface.get('context.temp_output_path') if
-                                     os.path.isfile(temp_output_path)]
-            if len(temp_output_path_list) > 0:
-                merge_exported_data(temp_output_path_list, context.export_file_path, verbose=context.disp)
-                for temp_output_path in temp_output_path_list:
-                    os.remove(temp_output_path)
+            collect_and_merge_temp_output(context.interface, context.export_file_path, verbose=context.disp)
         print('params:')
         pprint.pprint(dict(zip(context.param_names, context.x0_array)))
         print('features:')
