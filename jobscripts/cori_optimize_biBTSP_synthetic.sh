@@ -18,8 +18,6 @@ set -x
 
 cd $HOME/BTSP
 
-source $HOME/.bash_profile_py3.ext
-
 srun -N 13 -n 416 -c 2 --cpu-bind=cores python -m mpi4py.futures -m nested.optimize \
     --config-file-path=config/optimize_biBTSP_synthetic_config.yaml --disp --output-dir=$SCRATCH/BTSP \
     --pop_size=200 --max_iter=50 --path_length=3 --disp --export --framework=mpi
