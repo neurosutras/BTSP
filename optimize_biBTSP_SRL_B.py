@@ -497,7 +497,7 @@ def compute_features_signal_amplitudes(x, cell_id=None, induction=None, export=F
     start_time = time.time()
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
         get_dual_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
-                           context.global_signal_decay, context.down_dt, plot)
+                                context.global_signal_decay, context.down_dt, plot)
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
     local_signals = get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt)
 
@@ -1353,8 +1353,18 @@ def compute_features_model_ramp(x, cell_id=None, induction=None, local_signal_pe
         print('Process: %i: computing model_ramp_features for cell_id: %i, induction: %i with x: %s' %
               (os.getpid(), context.cell_id, context.induction, ', '.join('%.3E' % i for i in x)))
         sys.stdout.flush()
-    result = calculate_model_ramp(local_signal_peak=local_signal_peak, global_signal_peak=global_signal_peak,
-                                  export=export, plot=plot)
+    try:
+        result = calculate_model_ramp(local_signal_peak=local_signal_peak, global_signal_peak=global_signal_peak,
+                                      export=export, plot=plot)
+    except Exception as e:
+        print('optimize_biBTSP_%s: compute_features_model_ramp: pid: %i; Exception was generated while evaluating '
+              'cell_id: %i, induction: %i with x:' %
+              (BTSP_model_name, os.getpid(), context.cell_id, context.induction))
+        pprint.pprint(x)
+        traceback.print_exc()
+        sys.stdout.flush()
+        raise e
+
     if context.disp:
         print('Process: %i: computing model_ramp_features for cell_id: %i, induction: %i took %.1f s' %
               (os.getpid(), context.cell_id, context.induction, time.time() - start_time))
