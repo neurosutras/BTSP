@@ -1361,7 +1361,7 @@ def compute_features_model_ramp(x, cell_id=None, induction=None, local_signal_pe
               'cell_id: %i, induction: %i with x:' %
               (BTSP_model_name, os.getpid(), context.cell_id, context.induction))
         pprint.pprint(x)
-        traceback.print_exc()
+        traceback.print_exc(file=sys.stdout)
         sys.stdout.flush()
         raise e
 

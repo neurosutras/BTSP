@@ -744,9 +744,17 @@ def calculate_ramp_features(ramp, induction_loc, binned_x, interp_x, track_lengt
     peak_val = extended_ramp[peak_index]
     peak_x = extended_interp_x[peak_index]
     start_index = np.where(extended_ramp[:peak_index] <=
-                           0.15 * (peak_val - baseline) + baseline)[0][-1]
+                           0.15 * (peak_val - baseline) + baseline)[0]
+    if len(start_index) > 0:
+        start_index = start_index[-1]
+    else:
+        start_index = np.where(interp_ramp == np.min(interp_ramp))[0][0] + len(interp_ramp)
     end_index = peak_index + np.where(extended_ramp[peak_index:] <= 0.15 *
-                                      (peak_val - baseline) + baseline)[0][0]
+                                      (peak_val - baseline) + baseline)[0]
+    if len(end_index) > 0:
+        end_index = end_index[0]
+    else:
+        end_index = np.where(interp_ramp == np.min(interp_ramp))[0][0] + len(interp_ramp)
     start_loc = float(start_index % len(default_interp_x)) / float(len(default_interp_x)) * track_length
     end_loc = float(end_index % len(default_interp_x)) / float(len(default_interp_x)) * track_length
     peak_loc = float(peak_index % len(default_interp_x)) / float(len(default_interp_x)) * track_length
