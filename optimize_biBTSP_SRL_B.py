@@ -727,20 +727,28 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
             allow_offset = False
         else:
             allow_offset = True
-
-    model_ramp, discard_delta_weights, model_ramp_offset, model_residual_score = \
-        get_residual_score(current_delta_weights, target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
-                           interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
-                           ramp_scaling_factor=context.ramp_scaling_factor,
-                           induction_loc=context.mean_induction_start_loc, track_length=context.track_length,
-                           target_range=context.target_range, allow_offset=allow_offset,
-                           impose_offset=initial_ramp_offset, full_output=True)
+    try:
+        model_ramp, discard_delta_weights, model_ramp_offset, model_residual_score = \
+            get_residual_score(current_delta_weights, target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
+                               interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
+                               ramp_scaling_factor=context.ramp_scaling_factor,
+                               induction_loc=context.mean_induction_start_loc, track_length=context.track_length,
+                               target_range=context.target_range, allow_offset=allow_offset,
+                               impose_offset=initial_ramp_offset, full_output=True)
+    except Exception as e:
+        print('optimize_biBTSP_%s: compute_features_model_ramp: pid: %i; Exception was generated while evaluating '
+              'cell_id: %i, induction: %i with x:' %
+              (BTSP_model_name, os.getpid(), context.cell_id, context.induction))
+        pprint.pprint(context.x_array)
+        pprint.pprint('current_ramp has np.nan: %s' % np.any(np.isnan(current_ramp)))
+        traceback.print_exc(file=sys.stdout)
+        sys.stdout.flush()
+        raise e
 
     if allow_offset and context.induction == 1:
         initial_ramp, discard_ramp_offset = subtract_baseline(initial_ramp, model_ramp_offset)
 
-    result = {}
-    result['residual_score'] = model_residual_score
+    result = {'residual_score': model_residual_score}
 
     if context.cell_id in context.allow_offset_cell_ids and context.induction == 1:
         LSA_delta_weights = context.LSA_weights['after']
@@ -1353,17 +1361,8 @@ def compute_features_model_ramp(x, cell_id=None, induction=None, local_signal_pe
         print('Process: %i: computing model_ramp_features for cell_id: %i, induction: %i with x: %s' %
               (os.getpid(), context.cell_id, context.induction, ', '.join('%.3E' % i for i in x)))
         sys.stdout.flush()
-    try:
-        result = calculate_model_ramp(local_signal_peak=local_signal_peak, global_signal_peak=global_signal_peak,
-                                      export=export, plot=plot)
-    except Exception as e:
-        print('optimize_biBTSP_%s: compute_features_model_ramp: pid: %i; Exception was generated while evaluating '
-              'cell_id: %i, induction: %i with x:' %
-              (BTSP_model_name, os.getpid(), context.cell_id, context.induction))
-        pprint.pprint(x)
-        traceback.print_exc(file=sys.stdout)
-        sys.stdout.flush()
-        raise e
+    result = calculate_model_ramp(local_signal_peak=local_signal_peak, global_signal_peak=global_signal_peak,
+                                  export=export, plot=plot)
 
     if context.disp:
         print('Process: %i: computing model_ramp_features for cell_id: %i, induction: %i took %.1f s' %
