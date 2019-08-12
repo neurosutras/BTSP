@@ -1,4 +1,4 @@
-from BTSP_utils import *
+from biBTSP_utils import *
 from nested.optimize_utils import *
 from scipy.stats import pearsonr
 from matplotlib import cm

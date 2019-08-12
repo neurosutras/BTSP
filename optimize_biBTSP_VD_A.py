@@ -38,7 +38,7 @@ dW/dt ~ k_pot * f_pot(L_pot) - k_dep * f_dep(L_dep)
 
 """
 __author__ = 'milsteina'
-from BTSP_utils import *
+from biBTSP_utils import *
 from nested.parallel import *
 from nested.optimize_utils import *
 import click

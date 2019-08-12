@@ -1,5 +1,5 @@
 __author__ = 'milsteina'
-from BTSP_utils import *
+from biBTSP_utils import *
 from nested.optimize_utils import *
 import matplotlib as mpl
 import matplotlib.gridspec as gridspec
@@ -25,25 +25,20 @@ context.param_labels = {'local_signal_rise': 'signal$_{eligibility}$ tau$_{rise}
                         'global_signal_rise': 'signal$_{gating}$ tau$_{rise}$ (ms)',
                         'global_signal_decay': 'signal$_{gating}$ tau$_{decay}$ (ms)',
                         'peak_delta_weight': 'weight$_{max}$',
-                        'rMC0': 'k$_{+}$ (Hz)',
-                        'rMC_th': 'th$_{+}$',
-                        'rMC_peak': 'slope$_{+}$',
-                        'rCM0': 'k$_{-}$ (Hz)',
-                        'rCM_th1': 'th$_{-,1}$',
-                        'rCM_peak1': 'slope$_{-,1}$',
-                        'rCM_th2': 'th$_{-,2}$',
-                        'rCM_peak2': 'slope$_{-,2}$',
-                        'rCM_min2': 'ymin$_{-}$',
-                        'rCM_th': 'th$_{-}$',
-                        'rCM_peak': 'slope$_{-}$',
+                        'k_pot': 'k$_{+}$ (Hz)',
+                        'f_pot_th': 'q$_{+} th$',
+                        'f_pot_peak': 'q$_{+} peak$',
+                        'k_dep': 'k$_{-}$ (Hz)',
+                        'f_dep_th': 'q$_{-}$ th',
+                        'f_dep_peak': 'q$_{-}$ peak'
                         }
 
 
 @click.command()
 @click.option("--param-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/20190225_biBTSP_D_best_params.yaml')
+              default='config/20190812_biBTSP_SRL_B_90cm_best_params.yaml')
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/optimize_biBTSP_D_90cm_cli_config.yaml')
+              default='config/optimize_biBTSP_SRL_B_cli_config.yaml')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--pcadim", type=int, default=4)
 @click.option("--export", is_flag=True)
@@ -71,8 +66,7 @@ def main(param_file_path, config_file_path, output_dir, pcadim, export, label):
         raise IOError('Invalid output_dir: %s' % output_dir)
     context.update(locals())
     plot_BTSP_model_param_cdfs(param_file_path, config_file_path, export, output_dir, label)
-    # plot_BTSP_model_param_PCA(param_file_path, pcadim, export, output_dir, label)
-
+    plot_BTSP_model_param_PCA(param_file_path, config_file_path, pcadim, export, output_dir, label)
 
 
 def plot_BTSP_model_param_cdfs(param_file_path, config_file_path, export=False, output_dir=None, label=None):
@@ -88,11 +82,9 @@ def plot_BTSP_model_param_cdfs(param_file_path, config_file_path, export=False, 
     params_by_cell = read_from_yaml(param_file_path)
     cell_keys = [key for key in params_by_cell if key not in ['all']]
     params = defaultdict(list)
-    ordered_param_keys =  ['local_signal_rise', 'local_signal_decay', 'global_signal_rise', 'global_signal_decay',
-                          'peak_delta_weight', 'rMC0', 'rMC_th', 'rMC_peak', 'rCM0', 'rCM_th1', 'rCM_peak1', 'rCM_th2',
-                          'rCM_peak2', 'rCM_min2']
-    bounds = read_from_yaml(config_file_path)['bounds']
-    ordered_param_keys = read_from_yaml(config_file_path)['param_names']
+    config_dict = read_from_yaml(config_file_path)
+    bounds = config_dict['bounds']
+    ordered_param_keys = config_dict['param_names']
 
     for cell in cell_keys:
         for param, val in viewitems(params_by_cell[cell]):
@@ -130,10 +122,12 @@ def plot_BTSP_model_param_cdfs(param_file_path, config_file_path, export=False, 
     plt.show()
 
 
-def plot_BTSP_model_param_PCA(param_file_path, pcadim=None, export=False, output_dir=None, label=None):
+def plot_BTSP_model_param_PCA(param_file_path, config_file_path, pcadim=None, export=False, output_dir=None,
+                              label=None):
     """
 
     :param param_file_path: str (path)
+    :param config_file_path: str (path)
     :param pcadim: int (number of pca components to plot)
     :param export: bool
     :param output_dir: str (dir)
@@ -141,23 +135,9 @@ def plot_BTSP_model_param_PCA(param_file_path, pcadim=None, export=False, output
     :return: dict
     """
     params_by_cell = read_from_yaml(param_file_path)
-    ordered_param_keys = ['local_signal_rise', 'local_signal_decay', 'global_signal_rise', 'global_signal_decay',
-                          'peak_delta_weight', 'rMC0', 'rMC_th', 'rMC_peak', 'rCM0', 'rCM_th1', 'rCM_peak1', 'rCM_th2',
-                          'rCM_peak2', 'rCM_min2']
-    param_labels = {'local_signal_rise': 'local signal tau$_{rise}$',
-                    'local_signal_decay': 'local signal tau$_{decay}$',
-                    'global_signal_rise': 'global signal tau$_{rise}$',
-                    'global_signal_decay': 'global signal tau$_{decay}$',
-                    'peak_delta_weight': 'weight$_{max}$',
-                    'rMC0': 'k$_{pot}$',
-                    'rMC_th': 'rate$_{pot}$ th$_{0}$',
-                    'rMC_peak': 'rate$_{pot}$ xpeak$_{0}$',
-                    'rCM0': u'k$_{de\u2011pot}$ (Hz)',
-                    'rCM_th1': u'rate$_{de\u2011pot}$ th$_{1}$',
-                    'rCM_peak1': u'rate$_{de\u2011pot}$ xpeak$_{1}$',
-                    'rCM_th2': u'rate$_{de\u2011pot}$ th$_{2}$',
-                    'rCM_peak2': u'rate$_{de\u2011pot}$ xpeak$_{2}$',
-                    'rCM_min2': u'rate$_{de\u2011pot}$ ymin$_{2}$'}
+    config_dict = read_from_yaml(config_file_path)
+    ordered_param_keys = config_dict['param_names']
+
     data = []
     for cell, param_dict in viewitems(params_by_cell):
         if cell not in ['all']:
@@ -183,7 +163,7 @@ def plot_BTSP_model_param_PCA(param_file_path, pcadim=None, export=False, output
 
     x = np.arange(len(ordered_param_keys) + 1)
     y = np.arange(len(ordered_param_keys) + 1)
-    labels = [param_labels[key] for key in ordered_param_keys]
+    labels = [context.param_labels[key] for key in ordered_param_keys]
     X, Y = np.meshgrid(x, y[::-1])
     fig, axes = plt.subplots(figsize=(12, 10))
     pc = axes.pcolor(X, Y, corr)

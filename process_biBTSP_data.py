@@ -1,5 +1,5 @@
 __author__ = 'Aaron D. Milstein'
-from BTSP_utils import *
+from biBTSP_utils import *
 import click
 import pandas as pd
 

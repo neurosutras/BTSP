@@ -1271,3 +1271,59 @@ def get_target_synthetic_ramp(induction_loc, ramp_x, track_length, target_peak_v
         fig.show()
 
     return waveform
+
+
+def merge_exported_biBTSP_model_output_files_from_yaml(yaml_file_path, label='all_cells_merged_exported_model_output',
+                                                       input_dir=None, output_dir=None, exclude=None, include=None,
+                                                       verbose=True):
+    """
+
+    :param yaml_file_path: str (path to file)
+    :param label: str
+    :param input_dir: str (path to dir)
+    :param output_dir: str (path to dir)
+    :param exclude: list of str
+    :param include: list of str
+    :param verbose: bool
+    """
+    from nested.optimize_utils import merge_exported_data
+    if not os.path.isfile(yaml_file_path):
+        raise Exception('merge_exported_biBTSP_model_output_files_from_yaml: missing yaml_file at specified path: '
+                        '%s' % yaml_file_path)
+    filename_dict = read_from_yaml(yaml_file_path)
+    if not len(filename_dict) > 0:
+        raise RuntimeError('merge_exported_biBTSP_model_output_files_from_yaml: no data exported; empty filename_dict '
+                           'loaded from path: %s' % yaml_file_path)
+    if label is None:
+        label = ''
+    else:
+        label = '_%s' % label
+    if input_dir is None:
+        input_prefix = ''
+    elif not os.path.isdir(input_dir):
+        raise RuntimeError('merge_exported_biBTSP_model_output_files_from_yaml: cannot find input_dir: %s' % input_dir)
+    else:
+        input_prefix = '%s/' % input_dir
+    if output_dir is None:
+        output_prefix = ''
+    elif not os.path.isdir(output_dir):
+        raise RuntimeError('merge_exported_biBTSP_model_output_files_from_yaml: cannot find output_dir: %s' %
+                           output_dir)
+    else:
+        output_prefix = '%s/' % output_dir
+    if include is None:
+        include = list(filename_dict.keys())
+    if exclude is not None:
+        for model_key in exclude:
+            if model_key in include:
+                include.remove(model_key)
+    for model_key in filename_dict:
+        if model_key not in include:
+            continue
+        for input_field_width in filename_dict[model_key]:
+            new_file_path = '%s%s_biBTSP_%s_%scm%s.hdf5' % \
+                            (output_prefix, datetime.datetime.today().strftime('%Y%m%d'), model_key,
+                             input_field_width, label)
+            file_path_list = ['%s%s' % (input_prefix, filename) for filename in
+                              filename_dict[model_key][input_field_width]]
+            merge_exported_data(file_path_list, new_file_path, verbose=verbose)

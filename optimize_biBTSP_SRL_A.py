@@ -37,7 +37,7 @@ f_dep is linear.
 biBTSP_SRL_B: Single eligibility signal filter. Linear f_pot and f_dep.
 """
 __author__ = 'milsteina'
-from BTSP_utils import *
+from biBTSP_utils import *
 from nested.parallel import *
 from nested.optimize_utils import *
 import click

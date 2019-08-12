@@ -37,7 +37,7 @@ f_dep has the flexibility to be any segment of a sigmoid (so can be linear, expo
 biBTSP_SRL_B: Single eligibility signal filter. Sigmoidal f_pot and f_dep.
 """
 __author__ = 'milsteina'
-from BTSP_utils import *
+from biBTSP_utils import *
 from nested.parallel import *
 from nested.optimize_utils import *
 import click
