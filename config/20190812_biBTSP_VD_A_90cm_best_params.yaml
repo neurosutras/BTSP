@@ -1,0 +1,104 @@
+1:
+  delta_peak_ramp_amp: 1.762065960743855
+  global_signal_decay: 217.38476043119536
+  global_signal_rise: 178.56706171806545
+  k_dep: 0.7211936669032339
+  k_pot: 9.999979107658055
+  local_signal_decay: 442.09037417324555
+  local_signal_rise: 199.85857231618465
+4:
+  delta_peak_ramp_amp: 7.787164680671867
+  global_signal_decay: 425.2106889080465
+  global_signal_rise: 198.39312340269763
+  k_dep: 0.45627610523190487
+  k_pot: 0.8867639927393404
+  local_signal_decay: 531.8523433498963
+  local_signal_rise: 9.497003666759532
+5:
+  delta_peak_ramp_amp: 1.0724099187784377
+  global_signal_decay: 181.14472518823308
+  global_signal_rise: 44.44551213361791
+  k_dep: 1.1878563841822347
+  k_pot: 9.995910368192513
+  local_signal_decay: 463.4564604867871
+  local_signal_rise: 54.7308709279356
+7:
+  delta_peak_ramp_amp: 1.7058302096127467
+  global_signal_decay: 256.9976410148232
+  global_signal_rise: 45.37340940034159
+  k_dep: 1.686362027587074
+  k_pot: 8.409280385956684
+  local_signal_decay: 257.2726271718856
+  local_signal_rise: 199.6919698894164
+8:
+  delta_peak_ramp_amp: 7.178313824167031
+  global_signal_decay: 167.7368580798054
+  global_signal_rise: 167.21100836137063
+  k_dep: 1.207490001191177
+  k_pot: 3.9052444682707916
+  local_signal_decay: 167.91633737338853
+  local_signal_rise: 5.31823889340721
+9:
+  delta_peak_ramp_amp: 0.0017378658026340654
+  global_signal_decay: 499.9363774274906
+  global_signal_rise: 122.0892298186039
+  k_dep: 0.28494447302534565
+  k_pot: 5.743005499919296
+  local_signal_decay: 499.9727641301382
+  local_signal_rise: 5.730283968202965
+11:
+  delta_peak_ramp_amp: 5.038269584390071
+  global_signal_decay: 50.02552022097259
+  global_signal_rise: 6.562355828970609
+  k_dep: 5.1975242328437865
+  k_pot: 9.704081370120258
+  local_signal_decay: 146.94740336838225
+  local_signal_rise: 146.36348086066195
+15:
+  delta_peak_ramp_amp: 0.0006565280201037928
+  global_signal_decay: 105.86280058127299
+  global_signal_rise: 83.22502578114198
+  k_dep: 0.3187804181609687
+  k_pot: 2.34066137348565
+  local_signal_decay: 776.4535758582139
+  local_signal_rise: 14.502728884965675
+18:
+  delta_peak_ramp_amp: 0.4182045213549243
+  global_signal_decay: 216.0008371681293
+  global_signal_rise: 181.5493716461971
+  k_dep: 1.1569426687612783
+  k_pot: 9.998448879244394
+  local_signal_decay: 685.1787495299401
+  local_signal_rise: 199.62449561869474
+28:
+  delta_peak_ramp_amp: 0.0008975769659709177
+  global_signal_decay: 2499.8084887430286
+  global_signal_rise: 62.59819783978624
+  k_dep: 0.5820127435648654
+  k_pot: 0.9139940892945005
+  local_signal_decay: 2499.893881202352
+  local_signal_rise: 65.39594908826119
+29:
+  delta_peak_ramp_amp: 9.998997964151162
+  global_signal_decay: 279.3409639066091
+  global_signal_rise: 199.70690104660045
+  k_dep: 5.345919234527663
+  k_pot: 9.999498938151957
+  local_signal_decay: 330.0823467369031
+  local_signal_rise: 55.24113384906015
+30:
+  delta_peak_ramp_amp: 1.540235602452178
+  global_signal_decay: 50.00111957440353
+  global_signal_rise: 7.637801401024908
+  k_dep: 1.2142496397361404
+  k_pot: 9.89212739056307
+  local_signal_decay: 512.6113183142878
+  local_signal_rise: 130.6525273678391
+31:
+  delta_peak_ramp_amp: 3.1373105522272438
+  global_signal_decay: 532.9257967229856
+  global_signal_rise: 173.29880446317273
+  k_dep: 3.483434877545158
+  k_pot: 5.9937850188143225
+  local_signal_decay: 933.2811973784218
+  local_signal_rise: 5.047107530781374

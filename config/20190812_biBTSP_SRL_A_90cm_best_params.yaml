@@ -1,0 +1,104 @@
+1:
+  global_signal_decay: 54.385898431741545
+  global_signal_rise: 15.28224159294079
+  k_dep: 0.010092957790306821
+  k_pot: 6.601043762050506
+  local_signal_decay: 411.76718715772137
+  local_signal_rise: 19.869629204220136
+  peak_delta_weight: 2.425716793621036
+4:
+  global_signal_decay: 633.9667783231706
+  global_signal_rise: 173.94835185406856
+  k_dep: 0.01145663265732647
+  k_pot: 0.19309941603969819
+  local_signal_decay: 635.6184230454004
+  local_signal_rise: 21.832090983378983
+  peak_delta_weight: 2.309588844492409
+5:
+  global_signal_decay: 50.79112530736153
+  global_signal_rise: 14.257735330301735
+  k_dep: 0.010173646460261726
+  k_pot: 3.616050488712815
+  local_signal_decay: 437.3385111456426
+  local_signal_rise: 109.162963112778
+  peak_delta_weight: 1.7151411785899648
+7:
+  global_signal_decay: 124.87989613085753
+  global_signal_rise: 18.5441503044583
+  k_dep: 1.2622699979691243
+  k_pot: 4.126086015231645
+  local_signal_decay: 193.6506010713204
+  local_signal_rise: 174.68808048521066
+  peak_delta_weight: 2.182239727923482
+8:
+  global_signal_decay: 161.32264176975534
+  global_signal_rise: 149.36237581735924
+  k_dep: 0.010423288138801792
+  k_pot: 0.38049759102109276
+  local_signal_decay: 161.71257750813209
+  local_signal_rise: 13.230158470975148
+  peak_delta_weight: 3.2325419881121156
+9:
+  global_signal_decay: 397.5082621561084
+  global_signal_rise: 199.6699431991338
+  k_dep: 1.0352812295160732
+  k_pot: 1.4236449324034601
+  local_signal_decay: 397.54522069732593
+  local_signal_rise: 11.487486476996102
+  peak_delta_weight: 3.8884984808430403
+11:
+  global_signal_decay: 50.20435251757538
+  global_signal_rise: 5.667480065231172
+  k_dep: 0.010071374385874897
+  k_pot: 0.32473337122266255
+  local_signal_decay: 1641.1580161045467
+  local_signal_rise: 98.42767818538948
+  peak_delta_weight: 3.6145944233300638
+15:
+  global_signal_decay: 50.09009522420147
+  global_signal_rise: 8.499172461892488
+  k_dep: 0.6281253313762897
+  k_pot: 1.320305799637379
+  local_signal_decay: 712.1349897975076
+  local_signal_rise: 119.26564081454715
+  peak_delta_weight: 2.255672656186876
+18:
+  global_signal_decay: 50.47926980488072
+  global_signal_rise: 8.21701586649769
+  k_dep: 1.3172501829406587
+  k_pot: 3.298538127822855
+  local_signal_decay: 283.82814841886375
+  local_signal_rise: 191.38251078496685
+  peak_delta_weight: 2.172159956381745
+28:
+  global_signal_decay: 1632.8819686007976
+  global_signal_rise: 112.7785847583356
+  k_dep: 0.17431858967408487
+  k_pot: 0.5066920041429697
+  local_signal_decay: 2109.25955227079
+  local_signal_rise: 36.16515466175948
+  peak_delta_weight: 2.1325618736514786
+29:
+  global_signal_decay: 163.2095296200366
+  global_signal_rise: 162.22353851007944
+  k_dep: 0.5745757342948162
+  k_pot: 8.497297005504825
+  local_signal_decay: 163.21118453888724
+  local_signal_rise: 5.224014624036327
+  peak_delta_weight: 2.548982670426266
+30:
+  global_signal_decay: 50.099093319214816
+  global_signal_rise: 22.577367085596414
+  k_dep: 0.011920373096296594
+  k_pot: 0.6840097922278456
+  local_signal_decay: 702.174192984548
+  local_signal_rise: 172.31875046192064
+  peak_delta_weight: 3.9375943839330794
+31:
+  global_signal_decay: 66.84404348017424
+  global_signal_rise: 47.783775968668564
+  k_dep: 2.3132250694946106
+  k_pot: 2.671603565064342
+  local_signal_decay: 1123.8113923324993
+  local_signal_rise: 199.8751612622996
+  peak_delta_weight: 2.6918896502521457

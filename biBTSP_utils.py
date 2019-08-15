@@ -1327,3 +1327,113 @@ def merge_exported_biBTSP_model_output_files_from_yaml(yaml_file_path, label='al
             file_path_list = ['%s%s' % (input_prefix, filename) for filename in
                               filename_dict[model_key][input_field_width]]
             merge_exported_data(file_path_list, new_file_path, verbose=verbose)
+
+
+def update_min_t_arrays(binned_extra_x, t, x, backward_t, forward_t):
+    """
+
+    :param binned_extra_x: array
+    :param t: array
+    :param x: array
+    :param backward_t: array
+    :param forward_t: array
+    :return array, array
+    """
+    binned_t = np.interp(binned_extra_x, x, t)
+    temp_backward_t = np.empty_like(binned_extra_x)
+    temp_backward_t[:] = np.nan
+    temp_forward_t = np.array(temp_backward_t)
+    backward_indexes = np.where(binned_t <= 0.)[0]
+    forward_indexes = np.where(binned_t >= 0.)[0]
+    temp_backward_t[backward_indexes] = binned_t[backward_indexes]
+    temp_forward_t[forward_indexes] = binned_t[forward_indexes]
+    backward_t = np.nanmax([backward_t, temp_backward_t], axis=0)
+    forward_t = np.nanmin([forward_t, temp_forward_t], axis=0)
+    return backward_t, forward_t
+
+
+def merge_min_t_arrays(binned_x, binned_extra_x, extended_binned_x, induction_loc, backward_t, forward_t, debug=False):
+    """
+
+    :param binned_x: array
+    :param binned_extra_x: array
+    :param extended_binned_x: array
+    :param induction_loc:
+    :param backward_t:
+    :param forward_t:
+    :param debug: bool
+    :return: array
+    """
+    merged_min_t = np.empty_like(binned_extra_x)
+    merged_min_t[:] = np.nan
+    extended_min_t = np.empty_like(extended_binned_x)
+    extended_min_t[:] = np.nan
+    before = np.where(binned_extra_x < induction_loc)[0]
+    if np.any(before):
+        merged_min_t[before] = backward_t[before]
+        extended_min_t[np.add(before[:-1], 2 * len(binned_x))] = forward_t[before[:-1]]
+    else:
+        merged_min_t[0] = backward_t[0]
+        if debug:
+            print('merge_min_t_arrays: no before indexes')
+    after = np.where(binned_extra_x >= induction_loc)[0]
+    if np.any(after):
+        merged_min_t[after] = forward_t[after]
+        extended_min_t[after[1:-1]] = backward_t[after[1:-1]]
+    else:
+        if debug:
+            print('merge_min_t_arrays: no after indexes')
+    if debug:
+        for i in range(len(merged_min_t)):
+            val = merged_min_t[i]
+            if np.isnan(val):
+                print('merge_min_t_arrays: nan in merged_min_t at index: %i' % i)
+                break
+        fig4, axes4 = plt.subplots(1)
+        axes4.plot(binned_extra_x, backward_t, binned_extra_x, forward_t)
+        axes4.plot(binned_extra_x, merged_min_t, label='Merged')
+        axes4.legend(loc='best', frameon=False, framealpha=0.5)
+        fig4.show()
+
+        print('merge_min_t_arrays: val at backward_t[0]: %.2f; val at forward_t[-1]: %.2f' % \
+              (backward_t[0], forward_t[-1]))
+    extended_min_t[len(binned_x):2 * len(binned_x)] = merged_min_t[:-1]
+    return extended_min_t
+
+
+def make_segments(x, y):
+    """
+    Create list of line segments from x and y coordinates, in the correct format
+    for LineCollection: an array of the form numlines x (points per line) x 2 (x
+    and y) array
+    """
+
+    points = np.array([x, y]).T.reshape(-1, 1, 2)
+    segments = np.concatenate([points[:-1], points[1:]], axis=1)
+    return segments
+
+
+def colorline(x, y, z, cmap='RdBu_r', vmin=None, vmax=None, linewidth=1., alpha=1.):
+    """
+    http://nbviewer.ipython.org/github/dpsanders/matplotlib-examples/blob/master/colorline.ipynb
+    http://matplotlib.org/examples/pylab_examples/multicolored_line.html
+    Plot a colored line with coordinates x and y
+    Optionally specify colors in the array z
+    Optionally specify a colormap, a norm function and a line width
+    """
+    from matplotlib.collections import LineCollection
+    if isinstance(cmap, str):
+        cmap = plt.get_cmap(cmap)
+
+    if vmin is None:
+        vmin = np.min(z)
+    if vmax is None:
+        vmax = np.max(z)
+
+    norm = plt.Normalize(vmin, vmax)
+
+    segments = make_segments(x, y)
+    lc = LineCollection(segments, array=z, cmap=cmap, norm=norm,
+                        linewidth=linewidth, alpha=alpha)
+
+    return lc

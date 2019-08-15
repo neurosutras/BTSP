@@ -20,18 +20,28 @@ mpl.rcParams['axes.unicode_minus'] = True
 
 context = Context()
 
-context.param_labels = {'local_signal_rise': 'signal$_{eligibility}$ tau$_{rise}$ (ms)',
-                        'local_signal_decay': 'signal$_{eligibility}$ tau$_{decay}$ (ms)',
-                        'global_signal_rise': 'signal$_{gating}$ tau$_{rise}$ (ms)',
-                        'global_signal_decay': 'signal$_{gating}$ tau$_{decay}$ (ms)',
-                        'peak_delta_weight': 'weight$_{max}$',
-                        'k_pot': 'k$_{+}$ (Hz)',
-                        'f_pot_th': 'q$_{+} th$',
-                        'f_pot_peak': 'q$_{+} peak$',
-                        'k_dep': 'k$_{-}$ (Hz)',
-                        'f_dep_th': 'q$_{-}$ th',
-                        'f_dep_peak': 'q$_{-}$ peak'
-                        }
+param_labels = {'local_signal_rise': 'signal$_{eligibility}$ tau$_{rise}$ (ms)',
+                'local_signal_decay': 'signal$_{eligibility}$ tau$_{decay}$ (ms)',
+                'pot_signal_rise': 'signal$_{eligibility,+}$ tau$_{rise}$ (ms)',
+                'pot_signal_decay': 'signal$_{eligibility,+}$ tau$_{decay}$ (ms)',
+                'dep_signal_rise': 'signal$_{eligibility,-}$ tau$_{rise}$ (ms)',
+                'dep_signal_decay': 'signal$_{eligibility,-}$ tau$_{decay}$ (ms)',
+                'global_signal_rise': 'signal$_{gating}$ tau$_{rise}$ (ms)',
+                'global_signal_decay': 'signal$_{gating}$ tau$_{decay}$ (ms)',
+                'k_pot': 'k$_{+}$ (Hz)',
+                'f_pot_th': 'q$_{+}$ th',
+                'f_pot_peak': 'q$_{+}$ peak',
+                'k_dep': 'k$_{-}$ (Hz)',
+                'f_dep_th': 'q$_{-}$ th',
+                'f_dep_peak': 'q$_{-}$ peak',
+                'peak_delta_weight': u'\u0394weight$_{max}$',
+                'delta_peak_ramp_amp': u'\u0394V$_{max}$'
+                }
+
+ordered_param_names = ['local_signal_rise', 'local_signal_decay', 'pot_signal_rise', 'pot_signal_decay',
+                       'dep_signal_rise', 'dep_signal_decay', 'global_signal_rise', 'global_signal_decay',
+                       'k_pot', 'k_dep', 'f_pot_th', 'f_pot_peak', 'f_dep_th', 'f_dep_peak',
+                       'peak_delta_weight', 'delta_peak_ramp_amp']
 
 
 @click.command()
@@ -40,7 +50,7 @@ context.param_labels = {'local_signal_rise': 'signal$_{eligibility}$ tau$_{rise}
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
               default='config/optimize_biBTSP_SRL_B_cli_config.yaml')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
-@click.option("--pcadim", type=int, default=4)
+@click.option("--pcadim", type=int, default=None)
 @click.option("--export", is_flag=True)
 @click.option("--label", type=str, default=None)
 def main(param_file_path, config_file_path, output_dir, pcadim, export, label):
@@ -64,33 +74,31 @@ def main(param_file_path, config_file_path, output_dir, pcadim, export, label):
         raise IOError('Invalid config_file_path: %s' % config_file_path)
     if export and not os.path.isdir(output_dir):
         raise IOError('Invalid output_dir: %s' % output_dir)
+    param_dict = read_from_yaml(param_file_path)
+    config_dict = read_from_yaml(config_file_path)
     context.update(locals())
-    plot_BTSP_model_param_cdfs(param_file_path, config_file_path, export, output_dir, label)
-    plot_BTSP_model_param_PCA(param_file_path, config_file_path, pcadim, export, output_dir, label)
+    plot_BTSP_model_param_cdfs(param_dict, config_dict, export, output_dir, label)
+    if pcadim is not None:
+        plot_BTSP_model_param_PCA(param_dict, config_dict, pcadim, export, output_dir, label)
 
 
-def plot_BTSP_model_param_cdfs(param_file_path, config_file_path, export=False, output_dir=None, label=None):
+def plot_BTSP_model_param_cdfs(param_dict, config_dict, export=False, output_dir=None, label=None):
     """
 
-    :param param_file_path: str (path)
-    :param config_file_path: str (path)
+    :param param_dict: dict
+    :param config_dict: dict
     :param export: bool
     :param output_dir: str (dir)
     :param label: str
-    :return: dict
     """
-    params_by_cell = read_from_yaml(param_file_path)
-    cell_keys = [key for key in params_by_cell if key not in ['all']]
+    cell_keys = [key for key in param_dict if key not in ['all', 'default']]
     params = defaultdict(list)
-    config_dict = read_from_yaml(config_file_path)
+
     bounds = config_dict['bounds']
-    ordered_param_keys = config_dict['param_names']
 
     for cell in cell_keys:
-        for param, val in viewitems(params_by_cell[cell]):
-            if param == 'peak_delta_weight':
-                val += 1.
-            params[param].append(val)
+        for param_name, param_val in viewitems(param_dict[cell]):
+            params[param_name].append(param_val)
 
     fig, axes = plt.figure(figsize=(10, 9)), []
     gs0 = gridspec.GridSpec(4, 4, wspace=0.65, hspace=0.7, left=0.1, right=0.95, top=0.95, bottom=0.075)
@@ -99,49 +107,44 @@ def plot_BTSP_model_param_cdfs(param_file_path, config_file_path, export=False, 
         for col in range(4):
             this_axis = fig.add_subplot(gs0[row, col])
             axes.append(this_axis)
+    ordered_param_keys = [param_name for param_name in ordered_param_names if param_name in params]
     for i, param_name in enumerate(ordered_param_keys):
         params[param_name].sort()
         vals = params[param_name]
         n = len(vals)
         xlim = np.array(bounds[param_name])
-        if param_name == 'peak_delta_weight':
-            xlim = np.add(xlim, 1.)
         xlim[0] = xlim[0] -0.05 * xlim[1]
         xlim[1] *= 1.05
         axes[i].plot(vals, np.add(np.arange(n), 1.)/float(n), c='k')
         axes[i].set_xlim(xlim)
         axes[i].set_ylim(0., axes[i].get_ylim()[1])
-        axes[i].set_xlabel(context.param_labels[param_name])
+        axes[i].set_xlabel(param_labels[param_name])
         if i % 4 == 0:
             axes[i].set_ylabel('Cum. fraction')
-
     clean_axes(axes)
     if export:
-        fig_path = '%s/%s_BTSP_model_param_cdfs.svg' % (output_dir, label)
+        fig_path = '%s/%s_biBTSP_model_param_cdfs.svg' % (output_dir, label)
         fig.savefig(fig_path, format='svg')
-    plt.show()
+    fig.show()
 
 
-def plot_BTSP_model_param_PCA(param_file_path, config_file_path, pcadim=None, export=False, output_dir=None,
-                              label=None):
+def plot_BTSP_model_param_PCA(param_dict, config_dict, pcadim=None, export=False, output_dir=None, label=None):
     """
 
-    :param param_file_path: str (path)
-    :param config_file_path: str (path)
+    :param param_dict: dict
+    :param config_dict: dict
     :param pcadim: int (number of pca components to plot)
     :param export: bool
     :param output_dir: str (dir)
     :param label: str
-    :return: dict
     """
-    params_by_cell = read_from_yaml(param_file_path)
-    config_dict = read_from_yaml(config_file_path)
-    ordered_param_keys = config_dict['param_names']
-
+    param_names = config_dict['param_names']
+    ordered_param_keys = [param_name for param_name in ordered_param_names if param_name in param_names]
+    cell_keys = [key for key in param_dict if key not in ['all', 'default']]
     data = []
-    for cell, param_dict in viewitems(params_by_cell):
-        if cell not in ['all']:
-            data.append(param_dict_to_array(param_dict, ordered_param_keys))
+
+    for cell in cell_keys:
+        data.append(param_dict_to_array(param_dict[cell], ordered_param_keys))
     data = np.array(data)
     scaled_data = scale(data)
     corr = np.corrcoef(scaled_data, rowvar=False)
@@ -163,7 +166,7 @@ def plot_BTSP_model_param_PCA(param_file_path, config_file_path, pcadim=None, ex
 
     x = np.arange(len(ordered_param_keys) + 1)
     y = np.arange(len(ordered_param_keys) + 1)
-    labels = [context.param_labels[key] for key in ordered_param_keys]
+    labels = [param_labels[key] for key in ordered_param_keys]
     X, Y = np.meshgrid(x, y[::-1])
     fig, axes = plt.subplots(figsize=(12, 10))
     pc = axes.pcolor(X, Y, corr)
@@ -179,7 +182,7 @@ def plot_BTSP_model_param_PCA(param_file_path, config_file_path, pcadim=None, ex
     if export:
         fig_path = '%s/%s_BTSP_model_param_corrcoefs.svg' % (output_dir, label)
         fig.savefig(fig_path, format='svg')
-    plt.show()
+    fig.show()
 
     if plotdim == 1:
         fig, axes = plt.subplots(figsize=(5, 5))
@@ -197,7 +200,7 @@ def plot_BTSP_model_param_PCA(param_file_path, config_file_path, pcadim=None, ex
                     axes[row][col].scatter(plot_data[:, col], plot_data[:, row + 1])
     clean_axes(axes)
     fig.tight_layout()
-    plt.show()
+    fig.show()
 
 
 if __name__ == '__main__':
