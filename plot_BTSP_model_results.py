@@ -20,7 +20,7 @@ context = Context()
 
 @click.command()
 @click.option("--model-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='data/20190221_BTSP_D_all_cells_merged_exported_data.hdf5')
+              default='data/20190812_biBTSP_SRL_B_90cm_all_cells_merged_exported_model_output.hdf5')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
 @click.option("--show-traces", is_flag=True)
@@ -37,15 +37,16 @@ def main(model_file_path, output_dir, export, show_traces, label):
     date_stamp = datetime.datetime.today().strftime('%Y%m%d_%H%M')
     if label is None:
         label = date_stamp
-    else:
-        label = '%s_%s' % (date_stamp, label)
     if not os.path.isfile(model_file_path):
         raise IOError('Invalid model_file_path: %s' % model_file_path)
     if export and not os.path.isdir(output_dir):
         raise IOError('Invalid output_dir: %s' % output_dir)
-    ramp_amp, ramp_width, peak_shift, min_val, ramp_mse_dict, ramp_mse_array, delta_exp_ramp, delta_model_ramp = \
+
+    ramp_amp, ramp_width, peak_shift, min_val, ramp_mse_dict, ramp_sse_dict, delta_exp_ramp, delta_model_ramp = \
         process_BTSP_model_results(model_file_path, show_traces, export, output_dir, label)
-    plot_BTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, ramp_mse_dict, export, output_dir, label)
+
+    plot_BTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, ramp_mse_dict, ramp_sse_dict, export,
+                                output_dir, label)
     context.update(locals())
 
 
@@ -63,10 +64,10 @@ def process_BTSP_model_results(file_path, show=False, export=False, output_dir=N
     ramp_width = defaultdict(lambda: defaultdict(dict))
     local_peak_shift = defaultdict(lambda: defaultdict(dict))
     min_val = defaultdict(lambda: defaultdict(dict))
-    ramp_mse_dict = defaultdict(dict)
+    ramp_mse_dict = defaultdict(list)
+    ramp_sse_dict = defaultdict(list)
     delta_model_ramp = []
     delta_exp_ramp = []
-    ramp_mse_array = []
     with h5py.File(file_path, 'r') as f:
         shared_context_key = 'shared_context'
         group = f[shared_context_key]
@@ -76,7 +77,7 @@ def process_BTSP_model_results(file_path, show=False, export=False, output_dir=N
         exported_data_key = 'exported_data'
         for cell_key in f[exported_data_key]:
             description = 'model_ramp_features'
-            group = f[exported_data_key][cell_key].itervalues().next()[description]
+            group = next(iter(viewvalues(f[exported_data_key][cell_key])))[description]
             param_array = group['param_array'][:]
             param_dict = param_array_to_dict(param_array, param_names)
             if 'peak_delta_weight' in param_dict:
@@ -112,8 +113,8 @@ def process_BTSP_model_results(file_path, show=False, export=False, output_dir=N
                 model_ramp = group['model_ramp'][:]
 
                 this_mse_array = np.square(np.subtract(target_ramp, model_ramp))
-                ramp_mse_array.extend(this_mse_array)
-                ramp_mse_dict[cell_key][induction_key] = np.mean(this_mse_array)
+                ramp_mse_dict[induction_key].append(np.mean(this_mse_array))
+                ramp_sse_dict[induction_key].append(np.sum(this_mse_array))
 
                 ymin = min(ymin, np.min(model_ramp) - 1., np.min(target_ramp) - 1.)
                 ymax = max(ymax, np.max(model_ramp) + 1., np.max(target_ramp) + 1.)
@@ -129,7 +130,7 @@ def process_BTSP_model_results(file_path, show=False, export=False, output_dir=N
                 axes3[i][0].plot(binned_x, target_ramp, label='After', c='r')
                 axes3[i][0].set_title('Induction %i\nExperiment Vm:' % (i + 1), fontsize=mpl.rcParams['font.size'])
                 axes3[i][1].plot(binned_x, initial_model_ramp, label='Before', c='darkgrey')
-                axes3[i][1].plot(binned_x, model_ramp, label='After', c='c')
+                axes3[i][1].plot(binned_x, model_ramp, label='After', c='k')
                 axes3[i][1].set_title('\nModel Vm', fontsize=mpl.rcParams['font.size'])
                 axes3[i][2].plot(peak_locs, delta_weights, c='k')
                 axes3[i][2].set_title('Change in\nSynaptic Weights', fontsize=mpl.rcParams['font.size'])
@@ -170,12 +171,12 @@ def process_BTSP_model_results(file_path, show=False, export=False, output_dir=N
     else:
         plt.close('all')
 
-    return ramp_amp, ramp_width, local_peak_shift, min_val, ramp_mse_dict, ramp_mse_array, delta_exp_ramp, \
+    return ramp_amp, ramp_width, local_peak_shift, min_val, ramp_mse_dict, ramp_sse_dict, delta_exp_ramp, \
            delta_model_ramp
 
 
-def plot_BTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, ramp_mse_dict, export=False, output_dir=None,
-                                label=None):
+def plot_BTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, ramp_mse_dict, ramp_sse_dict, export=False,
+                                output_dir=None, label=None):
     """
 
     :param ramp_amp: dict
@@ -191,14 +192,14 @@ def plot_BTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, ramp_
     gs0 = gridspec.GridSpec(3, 4, wspace=0.55, hspace=0.9, left=0.075, right=0.975, top=0.925, bottom=0.075)
     axes = []
     tick_locs = [np.arange(0., 16., 3.), np.arange(30., 151., 30.), np.arange(-120., 121., 60.), np.arange(-2., 9., 2.)]
-    for col, (parameter, label, tick_loc) in \
+    for col, (parameter, param_label, tick_loc) in \
             enumerate(zip([ramp_amp, ramp_width, peak_shift, min_val],
                           ['Peak amplitude (mV)', 'Width (cm)', 'Peak shift (cm)', 'Minimum amplitude (mV)'],
                           tick_locs)):
-        this_axis = fig.add_subplot(gs0[2, col])
+        this_axis = fig.add_subplot(gs0[0, col])
         axes.append(this_axis)
         target_vals, model_vals = {}, {}
-        for color, induction_key in zip(['darkgrey', 'c'], ['1', '2']):
+        for color, induction_key in zip(['darkgrey', 'k'], ['1', '2']):
             target_vals[induction_key] = []
             model_vals[induction_key] = []
             for cell_key in (cell_key for cell_key in parameter if induction_key in parameter[cell_key]):
@@ -209,40 +210,41 @@ def plot_BTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, ramp_
         r_val, p_val = pearsonr(target_vals['1'] + target_vals['2'], model_vals['1'] + model_vals['2'])
         this_axis.annotate('R$^{2}$ = %.3f; p < %.3f' % (r_val ** 2., p_val if p_val > 0.001 else 0.001),
                            xy=(0.25, 0.05), xycoords='axes fraction')
-        this_axis.set_title(label, fontsize=mpl.rcParams['font.size'])
+        this_axis.set_title(param_label, fontsize=mpl.rcParams['font.size'])
         if col == 0:
             this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, handletextpad=0.5,
                              fontsize=mpl.rcParams['font.size'])
-        this_axis.set_xlim(np.min(tick_loc), np.max(tick_loc))
-        this_axis.set_ylim(np.min(tick_loc), np.max(tick_loc))
-        this_axis.set_xticks(tick_loc)
-        this_axis.set_yticks(tick_loc)
+        #this_axis.set_xlim(np.min(tick_loc), np.max(tick_loc))
+        #this_axis.set_ylim(np.min(tick_loc), np.max(tick_loc))
+        #this_axis.set_xticks(tick_loc)
+        #this_axis.set_yticks(tick_loc)
         this_axis.plot(tick_loc, tick_loc, c='darkgrey', alpha=0.5, ls='--')
         this_axis.set_xlabel('Experiment')
         this_axis.set_ylabel('Model')
-    this_axis = fig.add_subplot(gs0[1, 0])
-    axes.append(this_axis)
-    vals = defaultdict(list)
-    for cell_key in ramp_mse_dict:
-        for induction_key in ramp_mse_dict[cell_key]:
-            vals[induction_key].append(ramp_mse_dict[cell_key][induction_key])
-    max_val = 0.
-    for induction_key in vals:
-        vals[induction_key].sort()
-        max_val = max(max_val, np.max(vals[induction_key]))
-        n = len(vals[induction_key])
-        this_axis.plot(vals[induction_key], np.add(np.arange(n), 1.) / float(n), label='Induction: %s' % induction_key)
-    this_axis.set_ylim(0., 1.05)
-    this_axis.set_ylabel('Cum. fraction')
-    this_axis.set_xlim(0., math.ceil(max_val))
-    int_max_val = int(math.ceil(max_val))
-    int_delta_val = max(1, int_max_val / 6)
-    this_axis.set_xticks(np.arange(0, int_max_val+1, int_delta_val))
-    this_axis.set_xlabel('Mean squared error')
-    this_axis.set_title('Model ramp residual error', fontsize=mpl.rcParams['font.size'])
-    this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, handletextpad=0.5,
-                     fontsize=mpl.rcParams['font.size'])
+
+    for i, (xlabel, vals) in enumerate(zip(['Mean squared error', 'Sum of squared error'],
+                                           [ramp_mse_dict, ramp_sse_dict])):
+        this_axis = fig.add_subplot(gs0[1, i])
+        axes.append(this_axis)
+        max_val = 0.
+        for color, induction_key in zip(['darkgrey', 'k'], ['1', '2']):
+            vals[induction_key].sort()
+            max_val = max(max_val, np.max(vals[induction_key]))
+            n = len(vals[induction_key])
+            this_axis.plot(vals[induction_key], np.add(np.arange(n), 1.) / float(n),
+                           label='Induction: %s' % induction_key, c=color)
+        this_axis.set_ylim(0., 1.05)
+        this_axis.set_ylabel('Cum. fraction')
+        this_axis.set_xlim(0., math.ceil(max_val))
+        int_max_val = int(math.ceil(max_val))
+        int_delta_val = max(1, int_max_val // 6)
+        # this_axis.set_xticks(np.arange(0, int_max_val+1, int_delta_val))
+        this_axis.set_xlabel(xlabel)
+        this_axis.set_title('Model ramp residual error', fontsize=mpl.rcParams['font.size'])
+        this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, handletextpad=0.5,
+                         fontsize=mpl.rcParams['font.size'])
     clean_axes(axes)
+    fig.suptitle('%s: ' % label, fontsize=mpl.rcParams['font.size'], ha='left', x=0.)
     if export:
         fig_path = '%s/%s_BTSP_model_fit_summary.svg' % (output_dir, label)
         fig.savefig(fig_path, format='svg')
@@ -262,9 +264,82 @@ def plot_compare_models_mse_by_induction(model_file_path_dict=None):
         model_file_path_dict = {label: 'data/20190221_BTSP_%s_all_cells_merged_exported_data.hdf5' % model
                                 for label, model in zip(['Voltage-dependent model', 'Bistable synapse model'],
                                                         ['V_B', 'D'])}
-    for model, model_file_path in model_file_path_dict.iteritems():
-        ramp_amp, ramp_width, peak_shift, min_val, all_mse[model], discard_ramp_mse_array, discard_delta_exp_ramp, \
+    for model, model_file_path in viewitems(model_file_path_dict):
+        ramp_amp, ramp_width, peak_shift, min_val, all_mse[model], discard_ramp_mse_array, discard_ramp_sse_array, \
+        discard_delta_exp_ramp, discard_delta_model_ramp = process_BTSP_model_results(model_file_path)
+    fig, axes = plt.subplots(1, 2)
+
+    for model in all_mse:
+        vals = defaultdict(list)
+        for cell_key in all_mse[model]:
+            for induction_key in all_mse[model][cell_key]:
+                vals[induction_key].append(all_mse[model][cell_key][induction_key])
+        for induction_key in vals:
+            if induction_key == '1':
+                col = 0
+            elif induction_key == '2':
+                col = 1
+            vals[induction_key].sort()
+            max_val[induction_key] = max(max_val[induction_key], np.max(vals[induction_key]))
+            n = len(vals[induction_key])
+            axes[col].plot(vals[induction_key], np.add(np.arange(n), 1.) / float(n), label=model)
+
+    for induction_key in vals:
+        if induction_key == '1':
+            col = 0
+        elif induction_key == '2':
+            col = 1
+        axes[col].set_title('Induction %s' % induction_key, fontsize=mpl.rcParams['font.size'])
+        axes[col].set_xlim(0., math.ceil(max_val[induction_key]))
+        int_max_val = int(math.ceil(max_val[induction_key]))
+        int_delta_val = max(1, int_max_val / 6)
+        axes[col].set_xticks(np.arange(0, int_max_val + 1, int_delta_val))
+        axes[col].set_ylim(0., 1.05)
+        axes[col].set_ylabel('Cum. fraction')
+        axes[col].set_xlabel('Mean squared error')
+
+    axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, handletextpad=0.5,
+                   fontsize=mpl.rcParams['font.size'])
+    fig.suptitle('Model ramp residual error', fontsize=mpl.rcParams['font.size'])
+    clean_axes(axes)
+    fig.tight_layout(rect=[0., 0., 1., 0.95])
+    fig.show()
+
+
+def plot_compare_models_boxplot(model_file_path_dict, ordered_keys=None):
+    """
+
+    :param model_file_path_dict: {label (str): file_path (str; path)}
+    :param ordered_keys: list of str
+    """
+    mse_data = []
+    sse_data = []
+    if ordered_keys is None:
+        ordered_keys = list(model_file_path_dict.keys())
+    for model in ordered_keys:
+        if model not in model_file_path_dict:
+            raise RuntimeError('plot_compare_models_sse_box: no model file specified for model name: %s' % model)
+        model_file_path = model_file_path_dict[model]
+        ramp_amp, ramp_width, peak_shift, min_val, this_mse_dict, this_sse_dict, discard_delta_exp_ramp, \
         discard_delta_model_ramp = process_BTSP_model_results(model_file_path)
+        this_sse_list = []
+        this_mse_list = []
+        for induction_key in ['2']:  # this_sse_dict:
+            this_sse_list.extend(this_sse_dict[induction_key])
+            this_mse_list.extend(this_mse_dict[induction_key])
+        sse_data.append(this_sse_list)
+        mse_data.append(this_mse_list)
+
+    fig, axes = plt.subplots()
+    axes.boxplot(mse_data, showfliers=False)
+    # axes[1].boxplot(sse_data)
+    axes.set_xticklabels(ordered_keys)
+    axes.set_ylabel('Mean squared error')
+    clean_axes(axes)
+    fig.suptitle('Model ramp residual error', fontsize=mpl.rcParams['font.size'])
+    fig.show()
+    return
+
     fig, axes = plt.subplots(1, 2)
 
     for model in all_mse:
@@ -318,7 +393,7 @@ def plot_compare_models_mse_vs_delta_ramp(model_file_path_dict=None):
         model_file_path_dict = {label: 'data/20190221_BTSP_%s_all_cells_merged_exported_data.hdf5' % model
                                 for label, model in zip(['Voltage-dependent model', 'Bistable synapse model'],
                                                         ['V_B', 'D'])}
-    for model, model_file_path in model_file_path_dict.iteritems():
+    for model, model_file_path in viewitems(model_file_path_dict):
         ramp_amp, ramp_width, peak_shift, min_val, all_mse[model], ramp_mse_array[model], delta_exp_ramp[model],\
             delta_model_ramp[model] = process_BTSP_model_results(model_file_path)
 
