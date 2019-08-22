@@ -19,32 +19,18 @@ context = Context()
               default='data/20190711_biBTSP_data_calibrated_input.hdf5')
 @click.option("--model-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
               default='data/20190812_biBTSP_SRL_B_90cm_all_cells_merged_exported_model_output.hdf5')
-@click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--cell", type=int, multiple=True, default=[1])
-@click.option("--export", is_flag=True)
-@click.option("--debug", is_flag=True)
-@click.option("--label", type=str, default=None)
-def main(data_file_path, model_file_path, output_dir, cell, export, debug, label):
+def main(data_file_path, model_file_path, cell):
     """
 
     :param data_file_path: str (path)
     :param model_file_path: str (path)
-    :param output_dir: str (dir)
     :param cell: list of int
-    :param export: bool
-    :param label: str
     """
-    date_stamp = datetime.datetime.today().strftime('%Y%m%d_%H%M')
-    if label is None:
-        label = date_stamp
-    else:
-        label = '%s_%s' % (date_stamp, label)
     if not os.path.isfile(data_file_path):
         raise IOError('plot_biBTSP_data_example_figure: invalid data_file_path: %s' % data_file_path)
     if not os.path.isfile(model_file_path):
         raise IOError('plot_biBTSP_data_example_figure: invalid model_file_path: %s' % model_file_path)
-    if export and not os.path.isdir(output_dir):
-        raise IOError('plot_biBTSP_data_example_figure: invalid output_dir: %s' % output_dir)
 
     cell_keys = [str(cell_id) for cell_id in cell[:3]]
     with h5py.File(data_file_path, 'r') as f:
@@ -73,8 +59,8 @@ def main(data_file_path, model_file_path, output_dir, cell, export, debug, label
     extended_min_delta_t = {}
     extended_delta_exp_ramp = {}
 
-    fig, axes = plt.figure(figsize=(9, 6)), []
-    gs0 = gridspec.GridSpec(3, 7, wspace=3.6, hspace=0.65, left=0.075, right=0.95)
+    fig, axes = plt.figure(figsize=(11, 7.5)), []
+    gs0 = gridspec.GridSpec(3, 7, wspace=3.9, hspace=0.8, left=0.075, right=0.95)
     for row in range(len(cell_keys)):
         this_axes_row = []
         this_axes_row.append(fig.add_subplot(gs0[row, :3]))
@@ -122,15 +108,12 @@ def main(data_file_path, model_file_path, output_dir, cell, export, debug, label
                 for category in exp_ramp[cell_key][induction_key]:
                     extended_exp_ramp[cell_key][induction_key][category] = \
                         np.concatenate([exp_ramp[cell_key][induction_key][category]] * 3)
-                if debug:
-                    fig1, axes1 = plt.subplots(1)
                 backward_t = np.empty_like(binned_extra_x)
                 backward_t[:] = np.nan
                 forward_t = np.array(backward_t)
                 for i in range(len(induction_locs)):
                     this_induction_loc = mean_induction_loc[cell_key][induction_key]
                     key = str(i)
-                    # this_induction_loc = induction_locs[i]
                     this_position = f['data'][cell_key][induction_key]['processed']['position']['induction'][key][:]
                     this_t = f['data'][cell_key][induction_key]['processed']['t']['induction'][key][:]
                     this_induction_index = np.where(this_position >= this_induction_loc)[0][0]
@@ -140,32 +123,17 @@ def main(data_file_path, model_file_path, output_dir, cell, export, debug, label
                         pre_t = f['data'][cell_key][induction_key]['processed']['t']['pre']['0'][:]
                         pre_t -= len(pre_t) * dt
                         pre_t -= this_induction_t
-                        backward_t, forward_t = update_min_t_arrays(binned_extra_x, pre_t, pre_position, backward_t, forward_t)
-                        if debug:
-                            axes1.plot(np.subtract(pre_position,
-                                                   track_length + mean_induction_loc[cell_key][induction_key]), pre_t,
-                                       label='Lap: Pre')
+                        backward_t, forward_t = update_min_t_arrays(binned_extra_x, pre_t, pre_position, backward_t,
+                                                                    forward_t)
                     elif i > 0:
                         prev_t -= len(prev_t) * dt
                         prev_induction_t = prev_t[prev_induction_index]
                         backward_t, forward_t = update_min_t_arrays(binned_extra_x, np.subtract(prev_t, this_induction_t),
                                                                     prev_position, backward_t, forward_t)
-                        if debug:
-                            axes1.plot(np.subtract(prev_position,
-                                                   track_length + mean_induction_loc[cell_key][induction_key]),
-                                       np.subtract(prev_t, this_induction_t), label='Lap: %s (Prev)' % prev_key)
-
                         backward_t, forward_t = update_min_t_arrays(binned_extra_x, np.subtract(this_t, prev_induction_t),
                                                                     this_position, backward_t, forward_t)
-                        if debug:
-                            axes1.plot(np.subtract(this_position,
-                                                   mean_induction_loc[cell_key][induction_key] - track_length),
-                                       np.subtract(this_t, prev_induction_t), label='Lap: %s (Next)' % key)
                     backward_t, forward_t = update_min_t_arrays(binned_extra_x, np.subtract(this_t, this_induction_t),
                                                                 this_position, backward_t, forward_t)
-                    if debug:
-                        axes1.plot(np.subtract(this_position, mean_induction_loc[cell_key][induction_key]),
-                                 np.subtract(this_t, this_induction_t), label='Lap: %s (Current)' % key)
                     if i == len(induction_locs) - 1 and 'post' in f['data'][cell_key][induction_key]['raw']['position']:
                         post_position = f['data'][cell_key][induction_key]['processed']['position']['post']['0'][:]
                         post_t = f['data'][cell_key][induction_key]['processed']['t']['post']['0'][:]
@@ -173,10 +141,6 @@ def main(data_file_path, model_file_path, output_dir, cell, export, debug, label
                         post_t -= this_induction_t
                         backward_t, forward_t = update_min_t_arrays(binned_extra_x, post_t, post_position, backward_t,
                                                                     forward_t)
-                        if debug:
-                            axes1.plot(np.subtract(post_position,
-                                                   mean_induction_loc[cell_key][induction_key] - track_length), post_t,
-                                       label='Lap: Post')
                     prev_key = key
                     prev_induction_index = this_induction_index
                     prev_t = this_t
@@ -185,18 +149,7 @@ def main(data_file_path, model_file_path, output_dir, cell, export, debug, label
                     merge_min_t_arrays(binned_x, binned_extra_x, extended_binned_x, mean_induction_loc[cell_key][induction_key], backward_t, forward_t)
                 this_extended_delta_position = np.subtract(extended_binned_x,
                                                            mean_induction_loc[cell_key][induction_key])
-                if debug:
-                    axes1.plot(this_extended_delta_position, extended_min_delta_t[cell_key][induction_key], c='k',
-                               label='Min Interval')
-                    fig1.suptitle('Cell: %s; Induction: %s' % (cell_key, induction_key),
-                                  fontsize=mpl.rcParams['font.size'])
-                    box = axes1.get_position()
-                    axes1.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-                    axes1.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False, framealpha=0.5)
-                    axes1.set_xlabel('Position relative to plateau onset (cm)')
-                    axes1.set_ylabel('Time relative to plateau onset (ms)')
-                    clean_axes(axes1)
-                    fig1.show()
+
                 indexes = np.where((this_extended_delta_position > -track_length) &
                                    (this_extended_delta_position < track_length))[0]
                 mask = ~np.isnan(extended_min_delta_t[cell_key][induction_key])
@@ -263,11 +216,10 @@ def main(data_file_path, model_file_path, output_dir, cell, export, debug, label
             axes[row][0].set_yticks(np.arange(0., track_length, 60.))
             axes[row][0].set_ylabel('Position (cm)')
             axes[row][0].set_xlabel('Time (s)')
-            axes[row][0].set_title('Cell: %s' % cell_key, fontsize=mpl.rcParams['font.size'], loc='left')
+            axes[row][0].set_title('Cell: %s' % cell_key, fontsize=mpl.rcParams['font.size'], loc='left', y=1.1)
     context.update(locals())
 
     clean_axes(np.array(axes))
-    # fig.subplots_adjust(left=0.1, hspace=0.5, wspace=0.625, right=0.95)
     fig.show()
 
 
