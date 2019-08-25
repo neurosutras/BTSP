@@ -1437,3 +1437,12 @@ def colorline(x, y, z, cmap='RdBu_r', vmin=None, vmax=None, linewidth=1., alpha=
                         linewidth=linewidth, alpha=alpha)
 
     return lc
+
+
+def get_circular_distance(start_loc, end_loc, track_length):
+    delta_loc = end_loc - start_loc
+    if delta_loc > track_length / 2.:
+        delta_loc -= track_length
+    elif delta_loc < -track_length / 2.:
+        delta_loc += track_length
+    return delta_loc

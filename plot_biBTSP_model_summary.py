@@ -301,7 +301,7 @@ def plot_compare_models_mse_by_induction(model_file_path_dict):
     fig.show()
 
 
-def plot_compare_models_boxplot(model_file_path_dict, ordered_keys=None):
+def plot_compare_models_boxplot(model_file_path_dict, ordered_keys=None, ymax=6.):
     """
 
     :param model_file_path_dict: {label (str): file_path (str; path)}
@@ -316,7 +316,7 @@ def plot_compare_models_boxplot(model_file_path_dict, ordered_keys=None):
             raise RuntimeError('plot_compare_models_sse_box: no model file specified for model name: %s' % model)
         model_file_path = model_file_path_dict[model]
         ramp_amp, ramp_width, peak_shift, min_val, this_mse_dict, this_sse_dict, discard_delta_exp_ramp, \
-        discard_delta_model_ramp = process_biBTSP_model_results(model_file_path)
+            discard_delta_model_ramp = process_biBTSP_model_results(model_file_path)
         this_sse_list = []
         this_mse_list = []
         for induction_key in ['2']:  # this_sse_dict:
@@ -325,52 +325,14 @@ def plot_compare_models_boxplot(model_file_path_dict, ordered_keys=None):
         sse_data.append(this_sse_list)
         mse_data.append(this_mse_list)
 
-    fig, axes = plt.subplots()
-    axes.boxplot(mse_data, showfliers=False)
-    # axes[1].boxplot(sse_data)
-    axes.set_xticklabels(ordered_keys)
-    axes.set_ylabel('Mean squared error')
+    fig, axes = plt.subplots(2, figsize=(8.25, 6))
+    axes[0].boxplot(mse_data, showfliers=False)
+    axes[0].set_xticklabels(ordered_keys)
+    axes[0].set_ylabel('Mean squared error')
+    axes[0].set_ylim(axes[0].get_ylim()[0], ymax)
+    axes[0].set_title('Model ramp residual error', fontsize=mpl.rcParams['font.size'])
     clean_axes(axes)
-    fig.suptitle('Model ramp residual error', fontsize=mpl.rcParams['font.size'])
-    fig.show()
-    return
-
-    fig, axes = plt.subplots(1, 2)
-
-    for model in all_mse:
-        vals = defaultdict(list)
-        for cell_key in all_mse[model]:
-            for induction_key in all_mse[model][cell_key]:
-                vals[induction_key].append(all_mse[model][cell_key][induction_key])
-        for induction_key in vals:
-            if induction_key == '1':
-                col = 0
-            elif induction_key == '2':
-                col = 1
-            vals[induction_key].sort()
-            max_val[induction_key] = max(max_val[induction_key], np.max(vals[induction_key]))
-            n = len(vals[induction_key])
-            axes[col].plot(vals[induction_key], np.add(np.arange(n), 1.) / float(n), label=model)
-
-    for induction_key in vals:
-        if induction_key == '1':
-            col = 0
-        elif induction_key == '2':
-            col = 1
-        axes[col].set_title('Induction %s' % induction_key, fontsize=mpl.rcParams['font.size'])
-        axes[col].set_xlim(0., math.ceil(max_val[induction_key]))
-        int_max_val = int(math.ceil(max_val[induction_key]))
-        int_delta_val = max(1, int_max_val / 6)
-        axes[col].set_xticks(np.arange(0, int_max_val + 1, int_delta_val))
-        axes[col].set_ylim(0., 1.05)
-        axes[col].set_ylabel('Cum. fraction')
-        axes[col].set_xlabel('Mean squared error')
-
-    axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, handletextpad=0.5,
-                   fontsize=mpl.rcParams['font.size'])
-    fig.suptitle('Model ramp residual error', fontsize=mpl.rcParams['font.size'])
-    clean_axes(axes)
-    fig.tight_layout(rect=[0., 0., 1., 0.95])
+    fig.subplots_adjust(left=0.125, hspace=0.5, wspace=0.6, right=0.925)
     fig.show()
 
 

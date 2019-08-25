@@ -5,7 +5,7 @@ import pandas as pd
 
 
 """
-Magee lab CA1 BTSP2 place field data is in a series of text files. This organizes them into a single .hdf5 file with a 
+Magee lab CA1 biBTSP place field data is in a series of text files. This organizes them into a single .hdf5 file with a 
 standard format:
 
 defaults:
@@ -69,7 +69,7 @@ context = Context()
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
               default='config/process_biBTSP_data_config.yaml')
 @click.option("--data-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True),
-              default='data')
+              default='data/BTSP')
 @click.option("--plot", type=int, default=1)
 @click.option("--export", is_flag=True)
 @click.option("--export-file-path", type=click.Path(exists=False, file_okay=True, dir_okay=False))
@@ -88,8 +88,7 @@ def main(cell_id, induction, config_file_path, data_dir, plot, export, export_fi
     initialize()
     print('Processing cell_id: %i, induction: %i' % (cell_id, induction))
     if export_file_path is None:
-        export_file_path = context.data_dir + '/%s_BTSP_CA1_data.hdf5' % \
-                                              datetime.datetime.today().strftime('%Y%m%d_%H%M')
+        export_file_path = '%s_biBTSP_CA1_data.hdf5' % datetime.datetime.today().strftime('%Y%m%d_%H%M')
     raw_position = {}
     position = {}
     raw_current = []
@@ -132,10 +131,9 @@ def main(cell_id, induction, config_file_path, data_dir, plot, export, export_fi
         axes[1].legend(loc='best', frameon=False, framealpha=0.5)
         fig.tight_layout()
         clean_axes(axes)
-        plt.show()
-        plt.close()
+        fig.show()
 
-    vel_window_bins = int(context.vel_window / context.dt) / 2
+    vel_window_bins = int(context.vel_window / context.dt) // 2
     for count in range(2):
         complete_run_vel = np.array([])
         complete_position = np.array([])
@@ -160,8 +158,7 @@ def main(cell_id, induction, config_file_path, data_dir, plot, export, export_fi
             axes.set_xlabel('Time (s)')
             axes.set_ylabel('Running speed (cm/s)')
             clean_axes(axes)
-            plt.show()
-            plt.close()
+            fig.show()
 
         if count == 0:
             delta_t_list = []
@@ -193,8 +190,7 @@ def main(cell_id, induction, config_file_path, data_dir, plot, export, export_fi
                 axes.set_ylabel('Position (cm)')
                 clean_axes(axes)
                 fig.tight_layout()
-                plt.show()
-                plt.close()
+                fig.show()
             break
 
     complete_run_vel_gate = np.ones_like(complete_run_vel)
@@ -213,8 +209,7 @@ def main(cell_id, induction, config_file_path, data_dir, plot, export, export_fi
         axes2.get_xaxis().tick_bottom()
         axes2.get_yaxis().tick_right()
         fig.tight_layout()
-        plt.show()
-        plt.close()
+        fig.show()
 
     exp_ramp_raw = {'after': context.data[context.ramp_laps['after']][:100] * context.ramp_scale}
     exp_ramp = {'after': signal.savgol_filter(exp_ramp_raw['after'], 21, 3, mode='wrap')}
@@ -281,9 +276,11 @@ def main(cell_id, induction, config_file_path, data_dir, plot, export, export_fi
 
     if plot>0:
         peak_val, ramp_width, peak_shift, ratio, start_loc, peak_loc, end_loc, min_val, min_loc = \
-            calculate_ramp_features(context,exp_ramp['after'], mean_induction_loc)
+            calculate_ramp_features(exp_ramp['after'], mean_induction_loc, context.binned_x,
+                                    context.default_interp_x, context.track_length)
         start_index, peak_index, end_index, min_index = \
             get_indexes_from_ramp_bounds_with_wrap(context.binned_x, start_loc, peak_loc, end_loc, min_loc)
+
         axes[1][0].scatter(context.binned_x[[start_index, peak_index, end_index]],
                            exp_ramp['after'][[start_index, peak_index, end_index]])
         start_index, peak_index, end_index, min_index = \
@@ -297,11 +294,13 @@ def main(cell_id, induction, config_file_path, data_dir, plot, export, export_fi
         axes[0][0].legend(loc='best', frameon=False, framealpha=0.5)
         clean_axes(axes)
         fig.tight_layout()
-        plt.show()
-        plt.close()
+        fig.show()
 
     if export:
         export_data()
+
+    if plot:
+        plt.show()
 
 
 def initialize():
@@ -334,8 +333,8 @@ def initialize():
     if context.cell_id not in meta_data or context.induction not in meta_data[context.cell_id]:
         raise Exception('Cannot process cell_id: %i, induction: %i' % (context.cell_id, context.induction))
 
-    file_path = context.data_dir + '/BTSP/' + meta_data[context.cell_id][context.induction]['file_name']
-    df = pd.read_table(file_path, sep='\t', header=0)
+    file_path = context.data_dir + '/' + meta_data[context.cell_id][context.induction]['file_name']
+    df = pd.read_csv(file_path, sep='\t', header=0)
 
     data = {}
     for c in range(len(df.values[0, :])):
@@ -351,6 +350,10 @@ def initialize():
 
     # True for spontaneously-occurring field, False for or induced field
     spont = meta_data[context.cell_id][context.induction]['spont']
+    if 'DC_soma' in meta_data[context.cell_id][context.induction]:
+        DC_soma = meta_data[context.cell_id][context.induction]['DC_soma']
+    else:
+        DC_soma = False
     position_laps = meta_data[context.cell_id][context.induction]['position_laps']
     current_laps = meta_data[context.cell_id][context.induction]['current_laps']
     ramp_laps = meta_data[context.cell_id][context.induction]['ramp_laps']
@@ -398,6 +401,7 @@ def export_data(export_file_path=None):
         if induction_key not in f['data'][cell_key]:
             f['data'][cell_key].create_group(induction_key)
         f['data'][cell_key].attrs['spont'] = context.spont
+        f['data'][cell_key].attrs['DC_soma'] = context.DC_soma
         this_group = f['data'][cell_key][induction_key]
         this_group.attrs['induction_locs'] = context.induction_locs
         this_group.attrs['induction_durs'] = context.induction_durs

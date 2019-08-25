@@ -325,43 +325,44 @@ def main(data_file_path, model_file_path, vmax, tmax, debug, target_induction):
     axes[1].set_yticks(np.arange(-10., 16., 5.))
     axes[1].set_xticks(np.arange(-4., 5., 2.))
 
-    axes[2].scatter(flat_initial_ramp, flat_delta_ramp, c='grey', s=5., alpha=0.5, linewidth=0.)
-    fit_params = np.polyfit(flat_initial_ramp, flat_delta_ramp, 1)
-    fit_f = np.vectorize(lambda x: fit_params[0] * x + fit_params[1])
-    xlim = [0., math.ceil(np.max(flat_initial_ramp))]
-    axes[2].plot(xlim, fit_f(xlim), c='k', alpha=0.75, zorder=1, linestyle='--')
-    r_val, p_val = pearsonr(flat_initial_ramp, flat_delta_ramp)
-    axes[2].annotate('R$^{2}$ = %.3f;\np %s %.3f' %
-                     (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001), xy=(0.6, 0.7),
-                     xycoords='axes fraction')
-    axes[2].set_xlim(xlim)
-    axes[2].set_xlabel('Initial ramp amplitude (mV)')
-    axes[2].set_ylabel('Change in ramp\namplitude (mV)')
+    if target_induction != 1:
+        axes[2].scatter(flat_initial_ramp, flat_delta_ramp, c='grey', s=5., alpha=0.5, linewidth=0.)
+        fit_params = np.polyfit(flat_initial_ramp, flat_delta_ramp, 1)
+        fit_f = np.vectorize(lambda x: fit_params[0] * x + fit_params[1])
+        xlim = [0., math.ceil(np.max(flat_initial_ramp))]
+        axes[2].plot(xlim, fit_f(xlim), c='k', alpha=0.75, zorder=1, linestyle='--')
+        r_val, p_val = pearsonr(flat_initial_ramp, flat_delta_ramp)
+        axes[2].annotate('R$^{2}$ = %.3f;\np %s %.3f' %
+                         (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001), xy=(0.6, 0.7),
+                         xycoords='axes fraction')
+        axes[2].set_xlim(xlim)
+        axes[2].set_xlabel('Initial ramp amplitude (mV)')
+        axes[2].set_ylabel('Change in ramp\namplitude (mV)')
 
-    res = 50
-    t_range = np.linspace(np.min(flat_min_t), np.max(flat_min_t), res)
-    initial_ramp_range = np.linspace(np.min(flat_initial_ramp), np.max(flat_initial_ramp), res)
+        res = 50
+        t_range = np.linspace(np.min(flat_min_t), np.max(flat_min_t), res)
+        initial_ramp_range = np.linspace(np.min(flat_initial_ramp), np.max(flat_initial_ramp), res)
 
-    t_grid, initial_ramp_grid = np.meshgrid(t_range, initial_ramp_range)
-    interp_points = np.vstack((t_grid.flatten(), initial_ramp_grid.flatten())).T
+        t_grid, initial_ramp_grid = np.meshgrid(t_range, initial_ramp_range)
+        interp_points = np.vstack((t_grid.flatten(), initial_ramp_grid.flatten())).T
 
-    kernel = RationalQuadratic(1., length_scale_bounds=(1e-10, 10.))
-    gp = GaussianProcessRegressor(kernel=kernel, alpha=3., n_restarts_optimizer=20, normalize_y=True)
-    start_time = time.time()
-    print('Starting Gaussian Process Regression with %i samples' % len(data))
-    gp.fit(points, data)
-    interp_data = gp.predict(interp_points).reshape(-1, res)
-    print('Gaussian Process Regression took %.1f s' % (time.time() - start_time))
+        kernel = RationalQuadratic(1., length_scale_bounds=(1e-10, 10.))
+        gp = GaussianProcessRegressor(kernel=kernel, alpha=3., n_restarts_optimizer=20, normalize_y=True)
+        start_time = time.time()
+        print('Starting Gaussian Process Regression with %i samples' % len(data))
+        gp.fit(points, data)
+        interp_data = gp.predict(interp_points).reshape(-1, res)
+        print('Gaussian Process Regression took %.1f s' % (time.time() - start_time))
 
-    # axes[3].plot(reference_delta_t, mean_final_ramp, c='k')
-    cax = axes[3].pcolor(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax, zorder=0)
-    axes[3].set_ylabel('Initial ramp\namplitude (mV)')
-    axes[3].set_xlabel('Time relative to plateau onset (s)')
-    axes[3].set_ylim(0., ymax)
-    axes[3].set_xlim(-tmax, tmax)
-    axes[3].set_xticks(np.arange(-4., 5., 2.))
-    cbar = plt.colorbar(cax, ax=axes[3])
-    cbar.set_label('Change in ramp\namplitude (mV)', rotation=270., labelpad=23.)
+        # axes[3].plot(reference_delta_t, mean_final_ramp, c='k')
+        cax = axes[3].pcolor(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax, zorder=0)
+        axes[3].set_ylabel('Initial ramp\namplitude (mV)')
+        axes[3].set_xlabel('Time relative to plateau onset (s)')
+        axes[3].set_ylim(0., ymax)
+        axes[3].set_xlim(-tmax, tmax)
+        axes[3].set_xticks(np.arange(-4., 5., 2.))
+        cbar = plt.colorbar(cax, ax=axes[3])
+        cbar.set_label('Change in ramp\namplitude (mV)', rotation=270., labelpad=23.)
     clean_axes(axes)
     fig.subplots_adjust(left=0.125, hspace=0.5, wspace=0.6, right=0.925)
     fig.show()

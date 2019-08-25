@@ -1,0 +1,103 @@
+32:
+  1:
+    current_laps:
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    file_name: 190629_1.txt
+    position_laps:
+      induction:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+    ramp_laps:
+      after: 10
+    sampling_rate: 1000.0
+    spont: False
+    DC_soma: True
+33:
+  1:
+    current_laps:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 9
+    file_name: 190709_2.txt
+    position_laps:
+      induction:
+      - 0
+      - 2
+      - 4
+      - 6
+      - 8
+    ramp_laps:
+      after: 10
+    sampling_rate: 1000.0
+    spont: False
+    DC_soma: True
+34:
+  1:
+    current_laps:
+    - 1
+    - 3
+    - 5
+    - 7
+    file_name: 190726_4.txt
+    position_laps:
+      induction:
+      - 0
+      - 2
+      - 4
+      - 6
+    ramp_laps:
+      after: 8
+    sampling_rate: 1000.0
+    spont: False
+    DC_soma: True
+35:
+  1:
+    current_laps:
+    - 1
+    - 3
+    - 5
+    - 7
+    file_name: 190727_2.txt
+    position_laps:
+      induction:
+      - 0
+      - 2
+      - 4
+      - 6
+      post:
+      - 8
+    ramp_laps:
+      after: 9
+    sampling_rate: 1000.0
+    spont: False
+    DC_soma: True
+36:
+  1:
+    current_laps:
+    - 1
+    - 3
+    - 5
+    - 7
+    - 9
+    file_name: 190801_1.txt
+    position_laps:
+      induction:
+      - 0
+      - 2
+      - 4
+      - 6
+      - 8
+    ramp_laps:
+      after: 10
+    sampling_rate: 1000.0
+    spont: False
+    DC_soma: True

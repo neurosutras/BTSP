@@ -492,8 +492,10 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
     mpl.rcParams['text.usetex'] = False
     mpl.rcParams['axes.titlepad'] = 2.
     mpl.rcParams['mathtext.default'] = 'regular'
-    
-    track_phase_summary = [(0, 0, 'Before')]
+
+    reward_loc_by_track_phase = dict()
+
+    track_phase_summary = [(0, 0, 'Before explore')]
     lap_num = 0
     for track_phase in context.track_phases:
         this_num_laps = int(track_phase['num_laps'])
@@ -501,20 +503,132 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
         lap_num += this_num_laps
         end_lap = lap_num
         if track_phase['lap_type'] == 'reward':
-            label = 'After reward at %i cm (laps %i: %i)' % \
-                    (int(track_phase['reward_loc']), start_lap, end_lap)
+            this_reward_loc = float(track_phase['reward_loc'])
+            label = 'After fixed reward'
+            reward_loc_by_track_phase[label] = this_reward_loc
+        elif start_lap == 1:
+            label = 'After explore novel'
         else:
-            label = 'After run (laps %i: %i)' % (start_lap, end_lap)
+            label = 'After explore familiar'
         track_phase_summary.append((start_lap, end_lap, label))
+
+    initial_loc_by_cell = dict()
+    initial_locs_by_lap = []
+    initial_locs_by_track_phase = defaultdict(list)
+    start_locs_by_track_phase = defaultdict(dict)
+    end_locs_by_track_phase = defaultdict(dict)
+    delta_locs_by_track_phase = defaultdict(list)
+    delta_reward_distance_by_track_phase = defaultdict(list)
+
+    this_lap_locs = dict()
+    for start_lap, end_lap, label in track_phase_summary:
+        lap = start_lap
+        start_locs_by_track_phase[label] = this_lap_locs
+        while lap <= end_lap:
+            this_lap_initial_locs = []
+            this_lap_locs = dict()
+            ramp_pop = ramp_pop_history[lap]
+            for cell_index, ramp in enumerate(ramp_pop):
+                this_peak_index = np.argmax(ramp)
+                this_peak_loc = context.binned_x[this_peak_index]
+                if np.max(ramp) - np.min(ramp) > 2.:
+                    if cell_index not in initial_loc_by_cell:
+                        initial_loc_by_cell[cell_index] = this_peak_loc
+                        this_lap_initial_locs.append(this_peak_loc)
+                    this_lap_locs[cell_index] = this_peak_loc
+            initial_locs_by_lap.append(this_lap_initial_locs)
+            initial_locs_by_track_phase[label].extend(this_lap_initial_locs)
+            lap += 1
+        end_locs_by_track_phase[label] = this_lap_locs
+    for label in end_locs_by_track_phase:
+        for cell_index in end_locs_by_track_phase[label]:
+            if cell_index in start_locs_by_track_phase[label]:
+                this_delta_loc = get_circular_distance(start_locs_by_track_phase[label][cell_index],
+                                                       end_locs_by_track_phase[label][cell_index], context.track_length)
+            elif cell_index in initial_loc_by_cell:
+                this_delta_loc = get_circular_distance(initial_loc_by_cell[cell_index],
+                                                       end_locs_by_track_phase[label][cell_index], context.track_length)
+            if this_delta_loc < -1. or this_delta_loc > 1.:
+                delta_locs_by_track_phase[label].append(this_delta_loc)
+            if label in reward_loc_by_track_phase:
+                end_reward_distance = abs(get_circular_distance(end_locs_by_track_phase[label][cell_index],
+                                                                reward_loc_by_track_phase[label], context.track_length))
+                if cell_index in start_locs_by_track_phase[label]:
+                    initial_reward_distance = abs(get_circular_distance(start_locs_by_track_phase[label][cell_index],
+                                                                        reward_loc_by_track_phase[label],
+                                                                        context.track_length))
+                elif cell_index in initial_loc_by_cell:
+                    initial_reward_distance = abs(get_circular_distance(initial_loc_by_cell[cell_index],
+                                                                        reward_loc_by_track_phase[label],
+                                                                        context.track_length))
+                this_delta_reward_distance = end_reward_distance - initial_reward_distance
+                if this_delta_reward_distance < -1. or this_delta_reward_distance > 1.:
+                    delta_reward_distance_by_track_phase[label].append(this_delta_reward_distance)
+
+    fig1, axes1 = plt.subplots(3, 3, figsize=(11, 9))
+
+    norm_basal_plateau_prob = context.basal_plateau_prob_f(context.basal_representation_xscale)
+    norm_basal_plateau_prob /= np.max(norm_basal_plateau_prob)
+    norm_basal_plateau_prob *= context.peak_basal_plateau_prob_per_lap
+    norm_reward_plateau_prob = context.reward_plateau_prob_f(context.reward_representation_xscale)
+    norm_reward_plateau_prob /= np.max(norm_reward_plateau_prob)
+    norm_reward_plateau_prob *= context.peak_reward_plateau_prob_per_lap
+    axes1[0][1].plot(context.basal_representation_xscale, norm_basal_plateau_prob, label='No reward', c='k')
+    axes1[0][1].plot(context.reward_representation_xscale, norm_reward_plateau_prob, label='Reward', c='r')
+    axes1[0][1].set_xticks([i * 0.25 for i in range(6)])
+    axes1[0][1].set_xlim(0., 1.25)
+    axes1[0][1].set_ylim(0., axes1[0][1].get_ylim()[1])
+    axes1[0][1].set_xlabel('Normalized population activity')
+    axes1[0][1].set_ylabel('Plateau probability\nper lap')
+    axes1[0][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+    axes1[0][1].set_title('Modulation of plateau probability\nby feedback inhibition and reward',
+                       fontsize=mpl.rcParams['font.size'], y=1.1)
+
+    plateau_prob_ramp_modulation = context.plateau_prob_ramp_sensitivity_f(context.ramp_xscale)
+    axes1[0][0].plot(context.ramp_xscale, plateau_prob_ramp_modulation *
+                     context.basal_plateau_prob_ramp_sensitivity + 1., label='No reward', c='k')
+    axes1[0][0].plot(context.ramp_xscale, plateau_prob_ramp_modulation *
+                     context.reward_plateau_prob_ramp_sensitivity + 1., label='Reward', c='r')
+    axes1[0][0].set_xlim(0., 10.)
+    # axes1[0][0].set_ylim(0., 1.)
+    axes1[0][0].set_xlabel('Ramp amplitude (mV)')
+    axes1[0][0].set_ylabel('Normalized\nplateau probability')
+    axes1[0][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+    axes1[0][0].set_title('Modulation of plateau probability\nby ramp amplitude',
+                          fontsize=mpl.rcParams['font.size'], y=1.1)
+
+    bins = 20
+
+    for label in delta_locs_by_track_phase:
+        edges = np.linspace(0., context.track_length, bins)
+        bin_width = edges[1] - edges[0]
+        hist, _ = np.histogram(initial_locs_by_track_phase[label], bins=edges)
+        axes1[2][0].bar(edges[:-1] + bin_width / 2., hist, label=label, alpha=0.5, width=bin_width)
+        edges = np.linspace(-context.track_length / 2., context.track_length / 2., bins)
+        bin_width = edges[1] - edges[0]
+        hist, _ = np.histogram(delta_locs_by_track_phase[label], bins=edges)
+        axes1[2][1].bar(edges[:-1] + bin_width / 2., hist, label=label, alpha=0.5, width=bin_width)
+        if label in reward_loc_by_track_phase:
+            hist, _ = np.histogram(delta_reward_distance_by_track_phase[label], bins=edges)
+            axes1[2][2].bar(edges[:-1] + bin_width / 2., hist, label=label, alpha=0.5, width=bin_width)
+    axes1[2][0].legend(loc='best', frameon=False, framealpha=0.5)
+    axes1[2][0].set_ylabel('Cell count')
+    axes1[2][0].set_xlabel('Location (cm)')
+    axes1[2][1].legend(loc='best', frameon=False, framealpha=0.5)
+    axes1[2][1].set_ylabel('Cell count')
+    axes1[2][1].set_xlabel('Change in location (cm)')
+    axes1[2][2].legend(loc='best', frameon=False, framealpha=0.5)
+    axes1[2][2].set_ylabel('Cell count')
+    axes1[2][2].set_xlabel('Change in distance to reward (cm)')
 
     prev_sorted_cell_indexes = None
     for start_lap, end_lap, label in track_phase_summary:
+        fig2, axes2 = plt.subplots(3, 4, figsize=(14, 9))
         ramp_pop = ramp_pop_history[end_lap]
         cell_indexes = list(range(len(ramp_pop)))
         max_index = []
         for ramp in ramp_pop:
             max_index.append(np.argmax(ramp))
-        fig, axes = plt.subplots(1, 3)
         sorted_cell_indexes = [cell_index for (_, cell_index) in sorted(zip(max_index, cell_indexes))]
         modulated_cell_indexes = []
         nonmodulated_cell_indexes = []
@@ -530,226 +644,53 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
                 nonmodulated_cell_indexes.append(i)
         sorted_ramp_pop = modulated_ramp_pop + nonmodulated_ramp_pop
         X, Y = np.meshgrid(context.binned_x, range(len(sorted_ramp_pop)))
-        hm = axes[1].pcolor(X, Y, sorted_ramp_pop)
-        cb = plt.colorbar(hm, ax=axes[1])
+        hm = axes2[0][2].pcolor(X, Y, sorted_ramp_pop)
+        cb = plt.colorbar(hm, ax=axes2[0][2])
         cb.ax.set_ylabel('Ramp amplitude (mV)', rotation=270, fontsize=mpl.rcParams['font.size'])
         cb.ax.get_yaxis().labelpad = 15
-        axes[1].set_ylim(len(sorted_ramp_pop) - 1, 0)
-        axes[1].set_ylabel('Sorted cell #', fontsize=mpl.rcParams['font.size'])
-        axes[1].set_xlabel('Location (cm)', fontsize=mpl.rcParams['font.size'])
-        axes[1].set_title('Sorted by lap %i' % end_lap)
-        if len(modulated_ramp_pop) > 0:
-            X, Y = np.meshgrid(context.binned_x, range(len(modulated_ramp_pop)))
-            hm = axes[2].pcolor(X, Y, modulated_ramp_pop)
-            cb = plt.colorbar(hm, ax=axes[2])
-            cb.ax.set_ylabel('Ramp amplitude (mV)', rotation=270, fontsize=mpl.rcParams['font.size'])
-            cb.ax.get_yaxis().labelpad = 15
-            axes[2].set_ylim(len(modulated_ramp_pop) - 1, 0)
-            axes[2].set_ylabel('Sorted cell #', fontsize=mpl.rcParams['font.size'])
-            axes[2].set_xlabel('Location (cm)', fontsize=mpl.rcParams['font.size'])
-            axes[2].set_title('Sorted by lap %i' % end_lap)
+        axes2[0][2].set_ylim(len(sorted_ramp_pop) - 1, 0)
+        axes2[0][2].set_ylabel('Sorted cell #', fontsize=mpl.rcParams['font.size'])
+        axes2[0][2].set_xlabel('Location (cm)', fontsize=mpl.rcParams['font.size'])
+        axes2[0][2].set_title('Sorted by lap %i' % end_lap, fontsize=mpl.rcParams['font.size'], y=1.1)
         if prev_sorted_cell_indexes is not None:
             prev_sorted_ramp_pop = [ramp_pop[i] for i in prev_sorted_cell_indexes]
             X, Y = np.meshgrid(context.binned_x, range(len(prev_sorted_ramp_pop)))
-            hm = axes[0].pcolor(X, Y, prev_sorted_ramp_pop)
-            cb = plt.colorbar(hm, ax=axes[0])
+            hm = axes2[0][1].pcolor(X, Y, prev_sorted_ramp_pop)
+            cb = plt.colorbar(hm, ax=axes2[0][1])
             cb.ax.set_ylabel('Ramp amplitude (mV)', rotation=270, fontsize=mpl.rcParams['font.size'])
             cb.ax.get_yaxis().labelpad = 15
-            axes[0].set_ylim(len(prev_sorted_ramp_pop) - 1, 0)
-            axes[0].set_ylabel('Sorted cell #', fontsize=mpl.rcParams['font.size'])
-            axes[0].set_xlabel('Location (cm)', fontsize=mpl.rcParams['font.size'])
-            axes[0].set_title('Sorted by lap %i' % (start_lap - 1))
-        fig.suptitle(label, fontsize=mpl.rcParams['font.size'])
+            axes2[0][1].set_ylim(len(prev_sorted_ramp_pop) - 1, 0)
+            axes2[0][1].set_ylabel('Sorted cell #', fontsize=mpl.rcParams['font.size'])
+            axes2[0][1].set_xlabel('Location (cm)', fontsize=mpl.rcParams['font.size'])
+            axes2[0][1].set_title('Sorted by lap %i' % (start_lap - 1), fontsize=mpl.rcParams['font.size'], y=1.1)
         prev_sorted_cell_indexes = modulated_cell_indexes + nonmodulated_cell_indexes
-        clean_axes(axes)
-        fig.show()
+        clean_axes(axes2)
+        fig2.suptitle('%s (laps %i - %i)' % (label, start_lap, end_lap), fontsize=mpl.rcParams['font.size'])
+        fig2.subplots_adjust(left=0.075, hspace=0.5, wspace=0.8, right=0.9)
+        fig2.show()
 
-    fig, axes = plt.subplots(1, 2)
+    fig3, axes3 = plt.subplots()
     for lap, pop_rep_density in enumerate(pop_rep_density_history):
-        axes[0].plot(context.default_interp_x, pop_rep_density)
-    axes[0].set_ylabel('Normalized population activity')
-    axes[0].set_xlabel('Location (cm)')
+        axes3.plot(context.default_interp_x, pop_rep_density)
+    axes3.set_ylabel('Normalized population activity')
+    axes3.set_xlabel('Location (cm)')
+    clean_axes(axes3)
+    fig3.show()
 
     X, Y = np.meshgrid(context.default_interp_x, range(len(pop_rep_density_history)))
-    hm = axes[1].pcolor(X, Y, pop_rep_density_history)
-    cb = plt.colorbar(hm, ax=axes[1])
-    cb.ax.set_ylabel('Normalized population activity', rotation=270)
-    cb.ax.get_yaxis().labelpad = 15
-    axes[1].set_ylim(len(pop_rep_density_history) - 1, 0)
-    axes[1].set_ylabel('Lap #')
-    axes[1].set_xlabel('Location (cm)')
-    fig.suptitle('Summed population activity')
-    clean_axes(axes)
-    fig.show()
-
-    """
-    snapshot_laps = [0, num_baseline_laps]
-    summary_laps = [0]
-    if len(reward_locs_array) > 0:
-        lap_labels = ['Familiar environment:\nBefore', 'After laps 1-%i:\nNo reward' % num_baseline_laps]
-        summary_lap_labels = ['Familiar environment:\nBefore']
-        for reward_loc in reward_locs_array:
-            start = max(snapshot_laps)
-            stop = start + num_reward_laps
-            snapshot_laps.append(stop)
-            summary_laps.append(stop)
-            lap_labels.append('After laps %i-%i: Reward at %i cm' % (start + 1, stop, reward_loc))
-            summary_lap_labels.append('After laps %i-%i:\nReward at %i cm' % (start + 1, stop, reward_loc))
-            start = max(snapshot_laps)
-            stop = start + num_assay_laps
-            snapshot_laps.append(stop)
-            lap_labels.append('After laps %i-%i: No reward' % (start + 1, stop))
-    else:
-        summary_laps.append(num_baseline_laps)
-        lap_labels = ['Novel environment:\nBefore', 'After laps 1-%i:\nNo reward' % num_baseline_laps]
-        summary_lap_labels = list(lap_labels)
-
-    print('Trial: %i' % trial)
-    pprint.pprint(lap_labels)
-
-    peak_loc_history = defaultdict(list)
-    delta_peak_loc_history = defaultdict(list)
-    active_cell_index_set = set()
-
-    num_cells = len(ramp_snapshots[0])
-    num_laps = len(ramp_snapshots)
-    peak_locs_snapshots = []
-    for lap, this_ramp_snapshot in enumerate(ramp_snapshots):
-        this_peak_locs_snapshot = []
-        for cell_index, this_ramp in enumerate(this_ramp_snapshot):
-            if np.any(this_ramp > 0.):
-                active_cell_index_set.add(cell_index)
-                peak_index = np.argmax(this_ramp)
-                this_peak_loc = binned_x[peak_index]
-                this_peak_locs_snapshot.append(this_peak_loc)
-            else:
-                this_peak_loc = np.nan
-            if lap > 0:
-                if np.isnan(this_peak_loc) or np.isnan(peak_loc_history[cell_index][-1]):
-                    this_delta_peak_loc = np.nan
-                else:
-                    this_delta_peak_loc = this_peak_loc - peak_loc_history[cell_index][-1]
-                    if this_delta_peak_loc < -track_length / 2.:
-                        this_delta_peak_loc += track_length
-                    elif this_delta_peak_loc > track_length / 2.:
-                        this_delta_peak_loc -= track_length
-                delta_peak_loc_history[cell_index].append(this_delta_peak_loc)
-            peak_loc_history[cell_index].append(this_peak_loc)
-        peak_locs_snapshots.append(np.array(this_peak_locs_snapshot))
-
-    this_peak_shift_count = 0
-    for lap in range(1, snapshot_laps[-1] + 1, 1):
-        for cell_index, this_delta_peak_loc_history in viewitems(delta_peak_loc_history):
-            this_delta_peak_loc = this_delta_peak_loc_history[lap - 1]
-            if not np.isnan(this_delta_peak_loc) and this_delta_peak_loc > 0.:
-                this_peak_shift_count += 1
-        if lap in snapshot_laps:
-            print('lap: %i; peak_shift_count: %i cells' % (lap, this_peak_shift_count))
-            this_peak_shift_count = 0
-    print('total active cells: %i / %i' % (len(active_cell_index_set), num_cells))
-
-    num_bins = 50
-    edges = np.linspace(0., track_length, num_bins + 1)
-    bin_width = edges[1] - edges[0]
-
-    peak_locs_histogram_history = []
-    for lap in range(num_laps):
-        this_peak_locs_snapshot = peak_locs_snapshots[lap]
-        hist, _edges = np.histogram(this_peak_locs_snapshot, bins=edges)
-        hist = hist.astype(float) / num_cells
-        peak_locs_histogram_history.append(hist)
-    peak_locs_histogram_history = np.array(peak_locs_histogram_history)
-
-    fig1, axes1 = plt.subplots()
-    fig2, axes2 = plt.subplots()
-    for lap, lap_label in zip(snapshot_laps, lap_labels):
-        this_population_representation_density = population_representation_density_history[lap]
-        this_peak_locs_hist = peak_locs_histogram_history[lap]
-        axes1.plot(default_interp_x, this_population_representation_density, label=lap_label)
-        axes2.plot(edges[:-1] + bin_width / 2., this_peak_locs_hist, label=lap_label)
-    axes1.set_xlabel('Position (cm)')
-    axes1.set_xticks(np.arange(0., track_length, 45.))
-    axes1.set_title('Summed population activity', fontsize=mpl.rcParams['font.size'])
-    axes1.set_ylabel('Normalized population activity')
-    axes1.set_ylim([0., axes1.get_ylim()[1]])
-    axes1.legend(loc='best', frameon=False, framealpha=0.5)
-    axes2.set_title('Place field peak locations', fontsize=mpl.rcParams['font.size'])
-    axes2.set_xlabel('Position (cm)')
-    axes2.set_xticks(np.arange(0., track_length, 45.))
-    axes2.set_ylabel('Fraction of cells')
-    axes2.legend(loc='best', frameon=False, framealpha=0.5)
-    clean_axes([axes1, axes2])
-    fig1.tight_layout()
-    fig2.tight_layout()
-
-    num_snapshots = 3
-    num_cols = num_snapshots + 2
-    start_col = num_snapshots - min(num_snapshots, len(summary_laps))
-    col_width = 4
-    col_height = 4
-    fig3, axes = plt.subplots(1, num_cols, figsize=[num_cols * col_width, col_height])
-    hmaps = []
-    cbars = []
-
-    sorted_normalized_ramp_snapshots = []
-    max_ramp = np.max(ramp_snapshots)
-    for i, lap in enumerate(summary_laps[:num_snapshots]):
-        this_peak_locs = np.array([peak_loc_history[cell][lap] for cell in range(num_cells)])
-        this_indexes = np.arange(num_cells)
-        valid_indexes = np.where(~np.isnan(this_peak_locs))[0]
-        sorted_subindexes = np.argsort(this_peak_locs[valid_indexes])
-        this_sorted_ramps = []
-        for cell in this_indexes[valid_indexes][sorted_subindexes]:
-            ramp = np.interp(default_interp_x, binned_x, ramp_snapshots[lap][cell])
-            this_sorted_ramps.append(ramp)
-        sorted_normalized_ramp_snapshots.append(this_sorted_ramps)
-        hm = axes[i + start_col].imshow(this_sorted_ramps, extent=(0., track_length, len(this_sorted_ramps), 0),
-                                        aspect='auto',
-                                        vmin=0., vmax=max_ramp)
-        hmaps.append(hm)
-        cbar = plt.colorbar(hm, ax=axes[i + start_col])
-        cbar.ax.set_ylabel('Ramp amplitude (mV)', rotation=270)
-        cbar.ax.get_yaxis().labelpad = 15
-        cbars.append(cbar)
-        axes[i + start_col].set_xticks(np.arange(0., track_length, 45.))
-        axes[i + start_col].set_xlabel('Position (cm)')
-        axes[i + start_col].set_ylabel('Cell index', labelpad=-15)
-        axes[i + start_col].set_yticks([0, len(this_sorted_ramps) - 1])
-        axes[i + start_col].set_yticklabels([1, len(this_sorted_ramps)])
-        axes[i + start_col].set_title(summary_lap_labels[i], fontsize=mpl.rcParams['font.size'], y=1.025)
-
-    hm3 = axes[3].imshow(population_representation_density_history, extent=(0., track_length, len(ramp_snapshots), 0),
-                         aspect='auto')
-    cbar3 = plt.colorbar(hm3, ax=axes[3])
-    cbar3.ax.set_ylabel('Normalized population activity', rotation=270)
-    cbar3.ax.get_yaxis().labelpad = 15
-    axes[3].set_xticks(np.arange(0., track_length, 45.))
-    axes[3].set_xlabel('Position (cm)')
-    axes[3].set_ylabel('Lap')
-    axes[3].set_yticks(range(num_laps), minor=True)
-    axes[3].set_yticks(range(0, num_laps + 1, 5))
-    axes[3].set_yticklabels(range(0, num_laps + 1, 5))
-    axes[3].set_title('Summed\npopulation activity', fontsize=mpl.rcParams['font.size'], y=1.025)
-
-    hm4 = axes[4].imshow(peak_locs_histogram_history, extent=(0., track_length, num_laps, 0),
-                         aspect='auto', vmin=0.)  # , vmax=max(np.max(peak_locs_histogram_history), 0.12))
-    hmaps.append(hm4)
-    cbar4 = plt.colorbar(hm4, ax=axes[4])
-    cbar4.ax.set_ylabel('Fraction of cells', rotation=270)
-    cbar4.ax.get_yaxis().labelpad = 15
-    cbars.append(cbar4)
-    axes[4].set_xticks(np.arange(0., track_length, 45.))
-    axes[4].set_xlabel('Position (cm)')
-    axes[4].set_ylabel('Lap')
-    axes[4].set_yticks(range(num_laps), minor=True)
-    axes[4].set_yticks(range(0, num_laps + 1, 5))
-    axes[4].set_yticklabels(range(0, num_laps + 1, 5))
-    axes[4].set_title('Place field\npeak locations', fontsize=mpl.rcParams['font.size'], y=1.025)
-
-    fig3.tight_layout(w_pad=0.8)
+    hm = axes1[0][2].pcolor(X, Y, pop_rep_density_history)
+    cb = plt.colorbar(hm, ax=axes1[0][2])
+    cb.ax.set_ylabel('Normalized\npopulation activity', rotation=270)
+    cb.ax.get_yaxis().labelpad = 25
+    axes1[0][2].set_ylim(len(pop_rep_density_history) - 1, 0)
+    axes1[0][2].set_ylabel('Lap #')
+    axes1[0][2].set_xlabel('Location (cm)')
+    axes1[0][2].set_title('Summed population activity', fontsize=mpl.rcParams['font.size'], y=1.1)
+    clean_axes(axes1)
+    fig1.subplots_adjust(left=0.075, hspace=0.5, wspace=0.6, right=0.925)
+    fig1.show()
 
     context.update(locals())
-    """
 
 
 def plot_model_summary(model_file_path):
@@ -799,56 +740,6 @@ def plot_model_summary(model_file_path):
     context.update(locals())
 
 
-def plot_plateau_modulation():
-    """
-
-    """
-    import matplotlib as mpl
-    mpl.rcParams['svg.fonttype'] = 'none'
-    mpl.rcParams['font.size'] = 11.
-    mpl.rcParams['font.sans-serif'] = 'Arial'
-    mpl.rcParams['text.usetex'] = False
-    mpl.rcParams['axes.titlepad'] = 2.
-    mpl.rcParams['mathtext.default'] = 'regular'
-
-    max_cols = 5
-    col_width = 3.15
-    col_height = 4
-    fig6, axes6 = plt.subplots(1, max_cols, figsize=[max_cols * col_width, col_height])
-    norm_basal_plateau_prob = context.basal_plateau_prob_f(context.basal_representation_xscale)
-    norm_basal_plateau_prob /= np.max(norm_basal_plateau_prob)
-    norm_basal_plateau_prob *= context.peak_basal_plateau_prob_per_lap
-    norm_reward_plateau_prob = context.reward_plateau_prob_f(context.reward_representation_xscale)
-    norm_reward_plateau_prob /= np.max(norm_reward_plateau_prob)
-    norm_reward_plateau_prob *= context.peak_reward_plateau_prob_per_lap
-    axes6[0].plot(context.basal_representation_xscale, norm_basal_plateau_prob, label='No reward', c='k')
-    axes6[0].plot(context.reward_representation_xscale, norm_reward_plateau_prob, label='Reward', c='r')
-    axes6[0].set_xticks([i * 0.25 for i in range(6)])
-    axes6[0].set_xlim(0., 1.25)
-    axes6[0].set_ylim(0., axes6[0].get_ylim()[1])
-    axes6[0].set_xlabel('Normalized population activity')
-    axes6[0].set_ylabel('Plateau probability per lap')
-    axes6[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-    axes6[0].set_title('Modulation of plateau probability\nby feedback inhibition and reward',
-                       fontsize=mpl.rcParams['font.size'], y=1.025)
-
-    plateau_prob_ramp_modulation = context.plateau_prob_ramp_sensitivity_f(context.ramp_xscale)
-    axes6[1].plot(context.ramp_xscale, plateau_prob_ramp_modulation * context.basal_plateau_prob_ramp_sensitivity + 1.,
-                  label='No reward', c='k')
-    axes6[1].plot(context.ramp_xscale, plateau_prob_ramp_modulation * context.reward_plateau_prob_ramp_sensitivity + 1.,
-                  label='Reward', c='r')
-    axes6[1].set_xlim(0., 10.)
-    # axes6[1].set_ylim(0., 1.)
-    axes6[1].set_xlabel('Ramp amplitude (mV)')
-    axes6[1].set_ylabel('Normalized plateau probability')
-    axes6[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-    axes6[1].set_title('Modulation of plateau probability\nby ramp amplitude',
-                       fontsize=mpl.rcParams['font.size'], y=1.025)
-
-    clean_axes(axes6)
-    fig6.tight_layout(w_pad=0.8)
-
-
 @click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True, ))
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
               default='config/simulate_biBTSP_synthetic_network_config.yaml')
@@ -872,8 +763,6 @@ def main(cli, config_file_path, trial, output_dir, export, export_file_path, lab
 
     To execute using MPI parallelism with 1 controller process and N - 1 worker processes:
     mpirun -n N python -i -m mpi4py.futures simulate_biBTSP_synthetic_network.py --plot --framework=mpi --interactive
-
-    or interactively:
 
     To plot results previously exported to a file on a single process:
     python -i simulate_biBTSP_synthetic_network.py --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
@@ -913,7 +802,6 @@ def main(cli, config_file_path, trial, output_dir, export, export_file_path, lab
         simulate_network(export, plot)
     if plot:
         context.interface.apply(plt.show)
-        plot_plateau_modulation()
         plt.show()
 
     if context.interactive:
