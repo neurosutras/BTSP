@@ -494,22 +494,19 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
     mpl.rcParams['mathtext.default'] = 'regular'
 
     reward_loc_by_track_phase = dict()
+    colors = dict()
 
-    track_phase_summary = [(0, 0, 'Before explore')]
+    track_phase_summary = [(0, 0, 'before')]
     lap_num = 0
     for track_phase in context.track_phases:
         this_num_laps = int(track_phase['num_laps'])
         start_lap = lap_num + 1
         lap_num += this_num_laps
         end_lap = lap_num
+        label = track_phase['label']
+        colors[label] = track_phase['color']
         if track_phase['lap_type'] == 'reward':
-            this_reward_loc = float(track_phase['reward_loc'])
-            label = 'After fixed reward'
-            reward_loc_by_track_phase[label] = this_reward_loc
-        elif start_lap == 1:
-            label = 'After explore novel'
-        else:
-            label = 'After explore familiar'
+            reward_loc_by_track_phase[label] = float(track_phase['reward_loc'])
         track_phase_summary.append((start_lap, end_lap, label))
 
     initial_loc_by_cell = dict()
@@ -518,7 +515,7 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
     start_locs_by_track_phase = defaultdict(dict)
     end_locs_by_track_phase = defaultdict(dict)
     delta_locs_by_track_phase = defaultdict(list)
-    delta_reward_distance_by_track_phase = defaultdict(list)
+    delta_reward_distance_by_track_phase = defaultdict(lambda: defaultdict(list))
 
     this_lap_locs = dict()
     for start_lap, end_lap, label in track_phase_summary:
@@ -550,20 +547,18 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
                                                        end_locs_by_track_phase[label][cell_index], context.track_length)
             if this_delta_loc < -1. or this_delta_loc > 1.:
                 delta_locs_by_track_phase[label].append(this_delta_loc)
-            if label in reward_loc_by_track_phase:
+            for reward_loc in viewvalues(reward_loc_by_track_phase):
                 end_reward_distance = abs(get_circular_distance(end_locs_by_track_phase[label][cell_index],
-                                                                reward_loc_by_track_phase[label], context.track_length))
+                                                                reward_loc, context.track_length))
                 if cell_index in start_locs_by_track_phase[label]:
                     initial_reward_distance = abs(get_circular_distance(start_locs_by_track_phase[label][cell_index],
-                                                                        reward_loc_by_track_phase[label],
-                                                                        context.track_length))
+                                                                        reward_loc, context.track_length))
                 elif cell_index in initial_loc_by_cell:
                     initial_reward_distance = abs(get_circular_distance(initial_loc_by_cell[cell_index],
-                                                                        reward_loc_by_track_phase[label],
-                                                                        context.track_length))
+                                                                        reward_loc, context.track_length))
                 this_delta_reward_distance = end_reward_distance - initial_reward_distance
                 if this_delta_reward_distance < -1. or this_delta_reward_distance > 1.:
-                    delta_reward_distance_by_track_phase[label].append(this_delta_reward_distance)
+                    delta_reward_distance_by_track_phase[reward_loc][label].append(this_delta_reward_distance)
 
     fig1, axes1 = plt.subplots(3, 3, figsize=(11, 9))
 
@@ -575,14 +570,14 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
     norm_reward_plateau_prob *= context.peak_reward_plateau_prob_per_lap
     axes1[0][1].plot(context.basal_representation_xscale, norm_basal_plateau_prob, label='No reward', c='k')
     axes1[0][1].plot(context.reward_representation_xscale, norm_reward_plateau_prob, label='Reward', c='r')
-    axes1[0][1].set_xticks([i * 0.25 for i in range(6)])
-    axes1[0][1].set_xlim(0., 1.25)
+    axes1[0][1].set_xticks([i * 0.15 for i in range(5)])
+    axes1[0][1].set_xlim(0., 0.6)
     axes1[0][1].set_ylim(0., axes1[0][1].get_ylim()[1])
     axes1[0][1].set_xlabel('Normalized population activity')
     axes1[0][1].set_ylabel('Plateau probability\nper lap')
     axes1[0][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
     axes1[0][1].set_title('Modulation of plateau probability\nby feedback inhibition and reward',
-                       fontsize=mpl.rcParams['font.size'], y=1.1)
+                          fontsize=mpl.rcParams['font.size'], y=1.1)
 
     plateau_prob_ramp_modulation = context.plateau_prob_ramp_sensitivity_f(context.ramp_xscale)
     axes1[0][0].plot(context.ramp_xscale, plateau_prob_ramp_modulation *
@@ -590,7 +585,6 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
     axes1[0][0].plot(context.ramp_xscale, plateau_prob_ramp_modulation *
                      context.reward_plateau_prob_ramp_sensitivity + 1., label='Reward', c='r')
     axes1[0][0].set_xlim(0., 10.)
-    # axes1[0][0].set_ylim(0., 1.)
     axes1[0][0].set_xlabel('Ramp amplitude (mV)')
     axes1[0][0].set_ylabel('Normalized\nplateau probability')
     axes1[0][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
@@ -598,36 +592,47 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
                           fontsize=mpl.rcParams['font.size'], y=1.1)
 
     bins = 20
-
     for label in delta_locs_by_track_phase:
         edges = np.linspace(0., context.track_length, bins)
         bin_width = edges[1] - edges[0]
         hist, _ = np.histogram(initial_locs_by_track_phase[label], bins=edges)
-        axes1[2][0].bar(edges[:-1] + bin_width / 2., hist, label=label, alpha=0.5, width=bin_width)
+        axes1[2][0].bar(edges[:-1] + bin_width / 2., hist, label=label.capitalize(), alpha=0.5, width=bin_width,
+                        color=colors[label])
         edges = np.linspace(-context.track_length / 2., context.track_length / 2., bins)
         bin_width = edges[1] - edges[0]
         hist, _ = np.histogram(delta_locs_by_track_phase[label], bins=edges)
-        axes1[2][1].bar(edges[:-1] + bin_width / 2., hist, label=label, alpha=0.5, width=bin_width)
-        if label in reward_loc_by_track_phase:
-            hist, _ = np.histogram(delta_reward_distance_by_track_phase[label], bins=edges)
-            axes1[2][2].bar(edges[:-1] + bin_width / 2., hist, label=label, alpha=0.5, width=bin_width)
-    axes1[2][0].legend(loc='best', frameon=False, framealpha=0.5)
+        axes1[2][1].bar(edges[:-1] + bin_width / 2., hist, label=label.capitalize(), alpha=0.5, width=bin_width,
+                        color=colors[label])
+        for reward_loc in delta_reward_distance_by_track_phase:
+            hist, _ = np.histogram(delta_reward_distance_by_track_phase[reward_loc][label], bins=edges)
+            axes1[2][2].bar(edges[:-1] + bin_width / 2., hist, label=label.capitalize(), alpha=0.5, width=bin_width,
+                            color=colors[label])
+    axes1[2][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
     axes1[2][0].set_ylabel('Cell count')
     axes1[2][0].set_xlabel('Location (cm)')
-    axes1[2][1].legend(loc='best', frameon=False, framealpha=0.5)
+    axes1[2][0].set_xlim(0., context.track_length)
+    axes1[2][0].set_xticks(np.arange(0., context.track_length, 45.))
+    axes1[2][0].set_title('Emergence of new place fields', fontsize=mpl.rcParams['font.size'], y=1.1)
+
     axes1[2][1].set_ylabel('Cell count')
     axes1[2][1].set_xlabel('Change in location (cm)')
-    axes1[2][2].legend(loc='best', frameon=False, framealpha=0.5)
+    axes1[2][1].set_title('Place field translocation', fontsize=mpl.rcParams['font.size'], y=1.1)
+    axes1[2][1].set_xticks(np.arange(-90., 91., 45.))
+
     axes1[2][2].set_ylabel('Cell count')
     axes1[2][2].set_xlabel('Change in distance to reward (cm)')
+    axes1[2][2].set_xticks(np.arange(-90., 91., 45.))
+    axes1[2][2].set_title('Translocation towards reward location', fontsize=mpl.rcParams['font.size'], y=1.1)
 
+    max_count = len(initial_loc_by_cell)
     prev_sorted_cell_indexes = None
     for start_lap, end_lap, label in track_phase_summary:
-        fig2, axes2 = plt.subplots(3, 4, figsize=(14, 9))
+        fig2, axes2 = plt.subplots(3, 3, figsize=(11, 9))
         ramp_pop = ramp_pop_history[end_lap]
-        cell_indexes = list(range(len(ramp_pop)))
+        cell_indexes = list(initial_loc_by_cell.keys())
         max_index = []
-        for ramp in ramp_pop:
+        for cell_index in cell_indexes:
+            ramp = ramp_pop[cell_index]
             max_index.append(np.argmax(ramp))
         sorted_cell_indexes = [cell_index for (_, cell_index) in sorted(zip(max_index, cell_indexes))]
         modulated_cell_indexes = []
@@ -651,7 +656,9 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
         axes2[0][2].set_ylim(len(sorted_ramp_pop) - 1, 0)
         axes2[0][2].set_ylabel('Sorted cell #', fontsize=mpl.rcParams['font.size'])
         axes2[0][2].set_xlabel('Location (cm)', fontsize=mpl.rcParams['font.size'])
-        axes2[0][2].set_title('Sorted by lap %i' % end_lap, fontsize=mpl.rcParams['font.size'], y=1.1)
+        axes2[0][2].set_xlim(0., context.track_length)
+        axes2[0][2].set_xticks(np.arange(0., context.track_length, 45.))
+        axes2[0][2].set_title('Sorted after %s' % label, fontsize=mpl.rcParams['font.size'], y=1.1)
         if prev_sorted_cell_indexes is not None:
             prev_sorted_ramp_pop = [ramp_pop[i] for i in prev_sorted_cell_indexes]
             X, Y = np.meshgrid(context.binned_x, range(len(prev_sorted_ramp_pop)))
@@ -662,11 +669,16 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
             axes2[0][1].set_ylim(len(prev_sorted_ramp_pop) - 1, 0)
             axes2[0][1].set_ylabel('Sorted cell #', fontsize=mpl.rcParams['font.size'])
             axes2[0][1].set_xlabel('Location (cm)', fontsize=mpl.rcParams['font.size'])
-            axes2[0][1].set_title('Sorted by lap %i' % (start_lap - 1), fontsize=mpl.rcParams['font.size'], y=1.1)
+            axes2[0][1].set_xlim(0., context.track_length)
+            axes2[0][1].set_xticks(np.arange(0., context.track_length, 45.))
+            axes2[0][1].set_title('Sorted before %s' % label, fontsize=mpl.rcParams['font.size'], y=1.1)
         prev_sorted_cell_indexes = modulated_cell_indexes + nonmodulated_cell_indexes
         clean_axes(axes2)
-        fig2.suptitle('%s (laps %i - %i)' % (label, start_lap, end_lap), fontsize=mpl.rcParams['font.size'])
-        fig2.subplots_adjust(left=0.075, hspace=0.5, wspace=0.8, right=0.9)
+        if end_lap == 0:
+            fig2.suptitle('Before (lap 0)', fontsize=mpl.rcParams['font.size'])
+        else:
+            fig2.suptitle('After %s (laps %i - %i)' % (label, start_lap, end_lap), fontsize=mpl.rcParams['font.size'])
+        fig2.subplots_adjust(left=0.075, hspace=0.5, wspace=0.6, right=0.925)
         fig2.show()
 
     fig3, axes3 = plt.subplots()
@@ -685,6 +697,8 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
     axes1[0][2].set_ylim(len(pop_rep_density_history) - 1, 0)
     axes1[0][2].set_ylabel('Lap #')
     axes1[0][2].set_xlabel('Location (cm)')
+    axes1[0][2].set_xlim(0., context.track_length)
+    axes1[0][2].set_xticks(np.arange(0., context.track_length, 45.))
     axes1[0][2].set_title('Summed population activity', fontsize=mpl.rcParams['font.size'], y=1.1)
     clean_axes(axes1)
     fig1.subplots_adjust(left=0.075, hspace=0.5, wspace=0.6, right=0.925)

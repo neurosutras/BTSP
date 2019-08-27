@@ -350,10 +350,11 @@ def initialize():
 
     # True for spontaneously-occurring field, False for or induced field
     spont = meta_data[context.cell_id][context.induction]['spont']
-    if 'DC_soma' in meta_data[context.cell_id][context.induction]:
-        DC_soma = meta_data[context.cell_id][context.induction]['DC_soma']
+    if 'depo_soma' in meta_data[context.cell_id][context.induction]:
+        depo_soma = float(meta_data[context.cell_id][context.induction]['depo_soma'])
     else:
-        DC_soma = False
+        depo_soma = None
+
     position_laps = meta_data[context.cell_id][context.induction]['position_laps']
     current_laps = meta_data[context.cell_id][context.induction]['current_laps']
     ramp_laps = meta_data[context.cell_id][context.induction]['ramp_laps']
@@ -401,8 +402,9 @@ def export_data(export_file_path=None):
         if induction_key not in f['data'][cell_key]:
             f['data'][cell_key].create_group(induction_key)
         f['data'][cell_key].attrs['spont'] = context.spont
-        f['data'][cell_key].attrs['DC_soma'] = context.DC_soma
         this_group = f['data'][cell_key][induction_key]
+        if context.depo_soma is not None:
+            this_group.attrs['depo_soma'] = context.depo_soma
         this_group.attrs['induction_locs'] = context.induction_locs
         this_group.attrs['induction_durs'] = context.induction_durs
         this_group.create_group('raw')

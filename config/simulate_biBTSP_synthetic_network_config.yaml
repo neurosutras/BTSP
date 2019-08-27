@@ -9,12 +9,18 @@ basal_target_representation_density: 0.3
 reward_target_representation_density: 0.45
 track_phases:
   - lap_type: explore
+    label: 'novel explore'
     num_laps: 10
+    color: 'c'
   - lap_type: reward
+    label: 'fixed reward'
     reward_loc: 90.
     num_laps: 10
+    color: 'r'
   - lap_type: explore
+    label: 'familiar explore'
     num_laps: 5
+    color: 'k'
 peak_basal_plateau_prob_per_lap: 0.05
 peak_reward_plateau_prob_per_lap: 0.05
 basal_plateau_prob_ramp_sensitivity: 0.
