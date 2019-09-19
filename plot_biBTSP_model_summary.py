@@ -1,7 +1,6 @@
 __author__ = 'milsteina'
 from nested.optimize_utils import *
 import matplotlib as mpl
-import matplotlib.gridspec as gridspec
 from scipy.stats import pearsonr
 from collections import defaultdict
 import click
@@ -46,7 +45,7 @@ def main(model_file_path, output_dir, export, show_traces, label):
         process_biBTSP_model_results(model_file_path, show_traces, export, output_dir, label)
 
     plot_biBTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, ramp_mse_dict, ramp_sse_dict, export,
-                                output_dir, label)
+                                  output_dir, label)
     context.update(locals())
 
 
@@ -175,8 +174,8 @@ def process_biBTSP_model_results(file_path, show=False, export=False, output_dir
            delta_model_ramp
 
 
-def plot_biBTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, ramp_mse_dict, ramp_sse_dict, export=False,
-                                output_dir=None, label=None):
+def plot_biBTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, ramp_mse_dict, ramp_sse_dict,
+                                  export=False, output_dir=None, label=None):
     """
 
     :param ramp_amp: dict
@@ -188,18 +187,20 @@ def plot_biBTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, ram
     :param output_dir: str (dir)
     :param label: str
     """
-    fig, axes = plt.figure(figsize=(12, 8.5)), []
-    gs0 = gridspec.GridSpec(3, 4, wspace=0.55, hspace=0.9, left=0.075, right=0.975, top=0.925, bottom=0.075)
+    fig, axesgrid = plt.subplots(2, 2, figsize=(8.25, 6))
     axes = []
-    tick_locs = [np.arange(0., 16., 3.), np.arange(30., 151., 30.), np.arange(-120., 121., 60.), np.arange(-2., 9., 2.)]
-    for col, (parameter, param_label, tick_loc) in \
+    for row in range(2):
+        for col in range(2):
+            axes.append(axesgrid[col][row])
+
+    tick_locs = [np.arange(0., 16., 3.), np.arange(60., 181., 30.), np.arange(-60., 61., 30.), np.arange(-2., 9., 2.)]
+    for i, (parameter, param_label, tick_loc) in \
             enumerate(zip([ramp_amp, ramp_width, peak_shift, min_val],
                           ['Peak amplitude (mV)', 'Width (cm)', 'Peak shift (cm)', 'Minimum amplitude (mV)'],
                           tick_locs)):
-        this_axis = fig.add_subplot(gs0[0, col])
-        axes.append(this_axis)
+        this_axis = axes[i]
         target_vals, model_vals = {}, {}
-        for color, induction_key in zip(['darkgrey', 'k'], ['1', '2']):
+        for color, induction_key in zip(['c', 'r'], ['1', '2']):
             target_vals[induction_key] = []
             model_vals[induction_key] = []
             for cell_key in (cell_key for cell_key in parameter if induction_key in parameter[cell_key]):
@@ -211,21 +212,30 @@ def plot_biBTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, ram
         this_axis.annotate('R$^{2}$ = %.3f; p < %.3f' % (r_val ** 2., p_val if p_val > 0.001 else 0.001),
                            xy=(0.25, 0.05), xycoords='axes fraction')
         this_axis.set_title(param_label, fontsize=mpl.rcParams['font.size'])
-        if col == 0:
+        if i == 0:
             this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, handletextpad=0.5,
                              fontsize=mpl.rcParams['font.size'])
-        #this_axis.set_xlim(np.min(tick_loc), np.max(tick_loc))
-        #this_axis.set_ylim(np.min(tick_loc), np.max(tick_loc))
-        #this_axis.set_xticks(tick_loc)
-        #this_axis.set_yticks(tick_loc)
+        this_axis.set_xlim(np.min(tick_loc), np.max(tick_loc))
+        this_axis.set_ylim(np.min(tick_loc), np.max(tick_loc))
+        this_axis.set_xticks(tick_loc)
+        this_axis.set_yticks(tick_loc)
         this_axis.plot(tick_loc, tick_loc, c='darkgrey', alpha=0.5, ls='--')
         this_axis.set_xlabel('Experiment')
         this_axis.set_ylabel('Model')
 
+    clean_axes(axes)
+    fig.subplots_adjust(left=0.125, hspace=0.5, wspace=0.6, right=0.925)
+    fig.suptitle('%s: ' % label, x=0.05, y=0.95, ha='left', fontsize=mpl.rcParams['font.size'])
+    # fig.show()
+    # fig.suptitle('%s: ' % label, fontsize=mpl.rcParams['font.size'], ha='left', x=0.)
+    if export:
+        fig_path = '%s/%s_biBTSP_model_fit_summary.svg' % (output_dir, label)
+        fig.savefig(fig_path, format='svg')
+
+    fig2, axes2 = plt.subplots(2, 2, figsize=(8.25, 6))
     for i, (xlabel, vals) in enumerate(zip(['Mean squared error', 'Sum of squared error'],
                                            [ramp_mse_dict, ramp_sse_dict])):
-        this_axis = fig.add_subplot(gs0[1, i])
-        axes.append(this_axis)
+        this_axis = axes2[0][i]
         max_val = 0.
         for color, induction_key in zip(['darkgrey', 'k'], ['1', '2']):
             vals[induction_key].sort()
@@ -243,11 +253,10 @@ def plot_biBTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, ram
         this_axis.set_title('Model ramp residual error', fontsize=mpl.rcParams['font.size'])
         this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, handletextpad=0.5,
                          fontsize=mpl.rcParams['font.size'])
-    clean_axes(axes)
-    fig.suptitle('%s: ' % label, fontsize=mpl.rcParams['font.size'], ha='left', x=0.)
-    if export:
-        fig_path = '%s/%s_biBTSP_model_fit_summary.svg' % (output_dir, label)
-        fig.savefig(fig_path, format='svg')
+    clean_axes(axes2)
+    fig2.subplots_adjust(left=0.125, hspace=0.5, wspace=0.6, right=0.925)
+    fig2.suptitle('%s: ' % label, x=0.05, y=0.95, ha='left', fontsize=mpl.rcParams['font.size'])
+
     plt.show()
 
 

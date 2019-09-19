@@ -1,3 +1,22 @@
+"""
+To reproduce Figure 3:
+python -i plot_biBTSP_data_summary_figure.py --target-induction=2
+
+To reproduce panels from Figure 6:
+python -i plot_biBTSP_data_summary_figure.py --target-induction=1 --target-induction=2
+plot_ramp_prediction_from_interpolation(context.gp, 'data/20190711_biBTSP_data_calibrated_input.hdf5',
+        context.binned_x, context.binned_extra_x, context.extended_binned_x, context.reference_delta_t,
+        context.track_length, context.dt, context.debug, label='Control', color='k', tmax=context.tmax, induction=1,
+        group='exp1')
+plot_ramp_prediction_from_interpolation(context.gp, 'data/20190825_biBTSP_data_soma_DC.hdf5',
+        context.binned_x, context.binned_extra_x, context.extended_binned_x, context.reference_delta_t,
+        context.track_length, context.dt, context.debug, label='Depolarized', color='purple', tmax=context.tmax,
+        induction=1, group='exp1')
+boxplot_compare_ramp_summary_features(
+        {'Control': 'data/20190812_biBTSP_SRL_B_90cm_all_cells_merged_exported_model_output.hdf5',
+         'Depolarized': 'data/20190825_biBTSP_SRL_B_90cm_soma_DC_cells_exported_model_output.hdf5'},
+        ['Control', 'Depolarized'], induction=1)
+"""
 from biBTSP_utils import *
 from nested.optimize_utils import *
 import matplotlib.lines as mlines
@@ -9,7 +28,6 @@ from sklearn.gaussian_process.kernels import RationalQuadratic
 from collections import defaultdict
 
 mpl.rcParams['svg.fonttype'] = 'none'
-mpl.rcParams['font.size'] = 11.
 mpl.rcParams['font.sans-serif'] = 'Arial'
 mpl.rcParams['text.usetex'] = False
 mpl.rcParams['axes.titlepad'] = 2.
@@ -18,187 +36,12 @@ mpl.rcParams['mathtext.default'] = 'regular'
 context = Context()
 
 
-def get_biBTSP_analysis_results(data_file_path, binned_x, binned_extra_x, extended_binned_x, reference_delta_t,
-                                track_length, dt, debug=False):
-    """
-
-    :param data_file_path: str (path)
-    :param binned_x: array
-    :param binned_extra_x: array
-    :param extended_binned_x: array
-    :param reference_delta_t: array
-    :param track_length: float
-    :param dt: float
-    :param debug: bool
-    :return: tuple
-    """
-    peak_ramp_amp = []
-    total_induction_dur = []
-    depo_soma = []
-
-    group_indexes = defaultdict(list)
-
-    exp_ramp = defaultdict(lambda: defaultdict(dict))
-    extended_exp_ramp = defaultdict(lambda: defaultdict(dict))
-    delta_exp_ramp = defaultdict(dict)
-    mean_induction_loc = defaultdict(dict)
-    extended_min_delta_t = defaultdict(dict)
-    extended_delta_exp_ramp = defaultdict(dict)
-    interp_initial_exp_ramp = defaultdict(dict)
-    interp_delta_exp_ramp = defaultdict(dict)
-    interp_final_exp_ramp = defaultdict(dict)
-
-    with h5py.File(data_file_path, 'r') as f:
-        for cell_key in f['data']:
-            for induction_key in f['data'][cell_key]:
-                induction_locs = f['data'][cell_key][induction_key].attrs['induction_locs']
-                induction_durs = f['data'][cell_key][induction_key].attrs['induction_durs']
-                if induction_key == '1':
-                    if f['data'][cell_key].attrs['spont']:
-                        group = 'spont'
-                    else:
-                        group = 'exp1'
-                else:
-                    group = 'exp2'
-                group_indexes[group].append(len(total_induction_dur))
-                total_induction_dur.append(np.sum(induction_durs))
-                if 'depo_soma' in f['data'][cell_key][induction_key].attrs:
-                    depo_soma.append(f['data'][cell_key][induction_key].attrs['depo_soma'])
-
-                if induction_key == '1' and '2' in f['data'][cell_key]:
-                    exp_ramp[cell_key][induction_key]['after'] = \
-                        f['data'][cell_key]['2']['processed']['exp_ramp']['before'][:]
-                else:
-                    exp_ramp[cell_key][induction_key]['after'] = \
-                        f['data'][cell_key][induction_key]['processed']['exp_ramp']['after'][:]
-
-                if 'before' in f['data'][cell_key][induction_key]['processed']['exp_ramp']:
-                    exp_ramp[cell_key][induction_key]['before'] = \
-                        f['data'][cell_key][induction_key]['processed']['exp_ramp']['before'][:]
-                    delta_exp_ramp[cell_key][induction_key] = np.subtract(exp_ramp[cell_key][induction_key]['after'],
-                                                                          exp_ramp[cell_key][induction_key]['before'])
-                else:
-                    exp_ramp[cell_key][induction_key]['before'] = \
-                        np.zeros_like(exp_ramp[cell_key][induction_key]['after'])
-                    delta_exp_ramp[cell_key][induction_key], discard = \
-                        subtract_baseline(exp_ramp[cell_key][induction_key]['after'])
-
-                peak_ramp_amp.append(np.max(exp_ramp[cell_key][induction_key]['after']))
-                mean_induction_loc[cell_key][induction_key] = np.mean(induction_locs)
-                extended_delta_exp_ramp[cell_key][induction_key] = \
-                    np.concatenate([delta_exp_ramp[cell_key][induction_key]] * 3)
-                for category in exp_ramp[cell_key][induction_key]:
-                    extended_exp_ramp[cell_key][induction_key][category] = \
-                        np.concatenate([exp_ramp[cell_key][induction_key][category]] * 3)
-                if debug:
-                    fig1, axes1 = plt.subplots(1)
-                backward_t = np.empty_like(binned_extra_x)
-                backward_t[:] = np.nan
-                forward_t = np.array(backward_t)
-                for i in range(len(induction_locs)):
-                    this_induction_loc = mean_induction_loc[cell_key][induction_key]
-                    key = str(i)
-                    this_position = f['data'][cell_key][induction_key]['processed']['position']['induction'][key][:]
-                    this_t = f['data'][cell_key][induction_key]['processed']['t']['induction'][key][:]
-                    this_induction_index = np.where(this_position >= this_induction_loc)[0][0]
-                    this_induction_t = this_t[this_induction_index]
-                    if i == 0 and 'pre' in f['data'][cell_key][induction_key]['raw']['position']:
-                        pre_position = f['data'][cell_key][induction_key]['processed']['position']['pre']['0'][:]
-                        pre_t = f['data'][cell_key][induction_key]['processed']['t']['pre']['0'][:]
-                        pre_t -= len(pre_t) * dt
-                        pre_t -= this_induction_t
-                        backward_t, forward_t = update_min_t_arrays(binned_extra_x, pre_t, pre_position, backward_t,
-                                                                    forward_t)
-                        if debug:
-                            axes1.plot(np.subtract(pre_position,
-                                                   track_length + mean_induction_loc[cell_key][induction_key]), pre_t,
-                                       label='Lap: Pre')
-                    elif i > 0:
-                        prev_t -= len(prev_t) * dt
-                        prev_induction_t = prev_t[prev_induction_index]
-                        backward_t, forward_t = update_min_t_arrays(binned_extra_x,
-                                                                    np.subtract(prev_t, this_induction_t),
-                                                                    prev_position, backward_t, forward_t)
-                        if debug:
-                            axes1.plot(np.subtract(prev_position,
-                                                   track_length + mean_induction_loc[cell_key][induction_key]),
-                                       np.subtract(prev_t, this_induction_t), label='Lap: %s (Prev)' % prev_key)
-
-                        backward_t, forward_t = update_min_t_arrays(binned_extra_x,
-                                                                    np.subtract(this_t, prev_induction_t),
-                                                                    this_position, backward_t, forward_t)
-                        if debug:
-                            axes1.plot(np.subtract(this_position,
-                                                   mean_induction_loc[cell_key][induction_key] - track_length),
-                                       np.subtract(this_t, prev_induction_t), label='Lap: %s (Next)' % key)
-                    backward_t, forward_t = update_min_t_arrays(binned_extra_x, np.subtract(this_t, this_induction_t),
-                                                                this_position, backward_t, forward_t)
-                    if debug:
-                        axes1.plot(np.subtract(this_position, mean_induction_loc[cell_key][induction_key]),
-                                   np.subtract(this_t, this_induction_t), label='Lap: %s (Current)' % key)
-                    if i == len(induction_locs) - 1 and 'post' in f['data'][cell_key][induction_key]['raw']['position']:
-                        post_position = f['data'][cell_key][induction_key]['processed']['position']['post']['0'][:]
-                        post_t = f['data'][cell_key][induction_key]['processed']['t']['post']['0'][:]
-                        post_t += len(this_t) * dt
-                        post_t -= this_induction_t
-                        backward_t, forward_t = update_min_t_arrays(binned_extra_x, post_t, post_position, backward_t,
-                                                                    forward_t)
-                        if debug:
-                            axes1.plot(np.subtract(post_position,
-                                                   mean_induction_loc[cell_key][induction_key] - track_length), post_t,
-                                       label='Lap: Post')
-                    prev_key = key
-                    prev_induction_index = this_induction_index
-                    prev_t = this_t
-                    prev_position = this_position
-                extended_min_delta_t[cell_key][induction_key] = \
-                    merge_min_t_arrays(binned_x, binned_extra_x, extended_binned_x, mean_induction_loc[cell_key][induction_key], backward_t, forward_t)
-                this_extended_delta_position = np.subtract(extended_binned_x,
-                                                           mean_induction_loc[cell_key][induction_key])
-                if debug:
-                    axes1.plot(this_extended_delta_position, extended_min_delta_t[cell_key][induction_key], c='k',
-                               label='Min Interval')
-                    fig1.suptitle('Cell: %s; Induction: %s' % (cell_key, induction_key),
-                                  fontsize=mpl.rcParams['font.size'])
-                    box = axes1.get_position()
-                    axes1.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-                    axes1.legend(loc='center left', bbox_to_anchor=(1, 0.5), frameon=False, framealpha=0.5)
-                    axes1.set_xlabel('Position relative to plateau onset (cm)')
-                    axes1.set_ylabel('Time relative to plateau onset (ms)')
-                    clean_axes(axes1)
-                    fig1.show()
-
-                mask = ~np.isnan(extended_min_delta_t[cell_key][induction_key])
-                indexes = np.where((extended_min_delta_t[cell_key][induction_key][mask] >= -5000.) &
-                                   (extended_min_delta_t[cell_key][induction_key][mask] <= 5000.))[0]
-                this_interp_delta_exp_ramp = np.interp(reference_delta_t,
-                                                       extended_min_delta_t[cell_key][induction_key][mask][indexes],
-                                                       extended_delta_exp_ramp[cell_key][induction_key][mask][indexes])
-
-                interp_delta_exp_ramp[cell_key][induction_key] = this_interp_delta_exp_ramp
-
-                interp_initial_exp_ramp[cell_key][induction_key] = \
-                    np.interp(reference_delta_t, extended_min_delta_t[cell_key][induction_key][mask][indexes],
-                              extended_exp_ramp[cell_key][induction_key]['before'][mask][indexes])
-                interp_final_exp_ramp[cell_key][induction_key] = \
-                    np.interp(reference_delta_t, extended_min_delta_t[cell_key][induction_key][mask][indexes],
-                              extended_exp_ramp[cell_key][induction_key]['after'][mask][indexes])
-
-    total_induction_dur = np.array(total_induction_dur)
-    peak_ramp_amp = np.array(peak_ramp_amp)
-    depo_soma = np.array(depo_soma)
-
-    return peak_ramp_amp, total_induction_dur, depo_soma, group_indexes, exp_ramp, extended_exp_ramp, delta_exp_ramp, \
-           mean_induction_loc, extended_min_delta_t, extended_delta_exp_ramp, interp_initial_exp_ramp, \
-           interp_delta_exp_ramp, interp_final_exp_ramp
-
-
 def plot_ramp_prediction_from_interpolation(regressor, data_file_path, binned_x, binned_extra_x, extended_binned_x,
                                             reference_delta_t, track_length, dt, debug, label, color='k', tmax=5.,
-                                            induction=1, group='exp1'):
+                                            induction=1, group='exp1', show_std=True):
     """
 
-    :param interpolant: :class:'GaussianProcessRegressor'
+    :param regressor: :class:'GaussianProcessRegressor'
     :param data_file_path: str (path)
     :param binned_x: array
     :param binned_extra_x: array
@@ -211,13 +54,16 @@ def plot_ramp_prediction_from_interpolation(regressor, data_file_path, binned_x,
     :param color: str
     :param tmax: float
     :param induction: int
+    :param show_std: bool
     """
+    if not os.path.isfile(data_file_path):
+        raise IOError('plot_ramp_prediction_from_interpolation: invalid data_file_path: %s' % data_file_path)
 
     peak_ramp_amp, total_induction_dur, depo_soma, group_indexes, exp_ramp, extended_exp_ramp, delta_exp_ramp, \
     mean_induction_loc, extended_min_delta_t, extended_delta_exp_ramp, interp_initial_exp_ramp, \
     interp_delta_exp_ramp, interp_final_exp_ramp = \
         get_biBTSP_analysis_results(data_file_path, binned_x, binned_extra_x, extended_binned_x, reference_delta_t,
-                                    track_length, dt, debug)
+                                    track_length, dt, debug, truncate=truncate)
 
     fig, axes = plt.subplots(1, 3, figsize=(8, 2.75))
 
@@ -230,7 +76,7 @@ def plot_ramp_prediction_from_interpolation(regressor, data_file_path, binned_x,
             ramp_list.append(interp_delta_exp_ramp[cell_key][induction_key])
             this_axis.plot(np.divide(reference_delta_t, 1000.), interp_delta_exp_ramp[cell_key][induction_key],
                            c='darkgrey', linewidth=1., alpha=0.75)
-    this_axis.plot(np.divide(reference_delta_t, 1000.), np.mean(ramp_list, axis=0), c=color)
+    this_axis.plot(np.divide(reference_delta_t, 1000.), np.nanmean(ramp_list, axis=0), c=color)
     this_axis.set_title(label, fontsize=mpl.rcParams['font.size'], y=1.1)
     this_axis.set_ylabel('Change in ramp\namplitude (mV)')
     this_axis.set_xlabel('Time relative to\nplateau onset (s)')
@@ -243,21 +89,40 @@ def plot_ramp_prediction_from_interpolation(regressor, data_file_path, binned_x,
     this_axis = axes[2]
     this_axis.set_xlim(-tmax, tmax)
     interp_points = np.vstack((t_range, np.zeros(res))).T
-    voltage_independent_prediction = regressor.predict(interp_points)
-    this_axis.plot(t_range, voltage_independent_prediction, c='c',
-                   label='Voltage-independent')
-    if len(depo_soma) > 0 and group in group_indexes and len(group_indexes[group]) > 0:
-        vals = depo_soma[group_indexes[group]]
+    if show_std:
+        voltage_independent_prediction, voltage_independent_prediction_std = \
+            regressor.predict(interp_points, return_std=True)
+    else:
+        voltage_independent_prediction = regressor.predict(interp_points)
+    this_axis.plot(t_range, voltage_independent_prediction, c='c', label='Voltage-independent')
+    if show_std:
+        this_axis.fill_between(t_range, np.add(voltage_independent_prediction, voltage_independent_prediction_std),
+                               np.subtract(voltage_independent_prediction, voltage_independent_prediction_std),
+                               color='c', alpha=0.25, linewidth=0)
+    if group in depo_soma and len(depo_soma[group]) > 0 and group in group_indexes and \
+            len(group_indexes[group]) == len(depo_soma[group]):
+        vals = np.array(depo_soma[group])
     else:
         vals = np.ones(len(group_indexes[group])) * 10.
     ramp_list = []
+    std_list = []
     for val in vals:
         interp_points = np.vstack((t_range, np.ones(res) * val)).T
-        voltage_dependent_prediction = regressor.predict(interp_points)
+        if show_std:
+            voltage_dependent_prediction, voltage_dependent_prediction_std = \
+                regressor.predict(interp_points, return_std=True)
+            std_list.append(voltage_dependent_prediction_std)
+        else:
+            voltage_dependent_prediction = regressor.predict(interp_points)
         ramp_list.append(voltage_dependent_prediction)
-        this_axis.plot(t_range, voltage_dependent_prediction, c='darkgrey', linewidth=1., alpha=0.75)
-    this_axis.plot(t_range, np.mean(ramp_list, axis=0), c='r',
-                   label='Voltage-dependent')
+        # this_axis.plot(t_range, voltage_dependent_prediction, c='darkgrey', linewidth=1., alpha=0.75)
+    voltage_dependent_prediction = np.mean(ramp_list, axis=0)
+    this_axis.plot(t_range, voltage_dependent_prediction, c='r', label='Voltage-dependent')
+    if show_std:
+        voltage_dependent_prediction_std = np.mean(std_list, axis=0)
+        this_axis.fill_between(t_range, np.add(voltage_dependent_prediction, voltage_dependent_prediction_std),
+                               np.subtract(voltage_dependent_prediction, voltage_dependent_prediction_std),
+                               color='r', alpha=0.25, linewidth=0)
     this_axis.legend(loc='best', frameon=False, framealpha=0.5, fontsize=mpl.rcParams['font.size'], handletextpad=0.3,
                      handlelength=1.)
     this_axis.set_title('Kernel prediction', fontsize=mpl.rcParams['font.size'], y=1.1)
@@ -329,18 +194,22 @@ def boxplot_compare_ramp_summary_features(model_file_path_dict, ordered_labels, 
 @click.command()
 @click.option("--data-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
               default='data/20190711_biBTSP_data_calibrated_input.hdf5')
-@click.option("--vmax", type=float, default=12.66762)
+@click.option("--vmax", type=float, default=12.97868)
 @click.option("--tmax", type=float, default=5.)
+@click.option("--truncate", type=bool, default=True)
 @click.option("--debug", is_flag=True)
 @click.option("--target-induction", type=int, multiple=True, default=[2])
-def main(data_file_path, vmax, tmax, debug, target_induction):
+@click.option("--font-size", type=float, default=11.)
+def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_size):
     """
 
     :param data_file_path: str (path)
     :param vmax: float
     :param tmax: float
+    :param truncate: bool
     :param debug: bool
-    :param target_induction: int
+    :param target_induction: tuple of int
+    :param font_size: float
     """
     if not os.path.isfile(data_file_path):
         raise IOError('plot_biBTSP_data_summary_figure: invalid data_file_path: %s' % data_file_path)
@@ -352,11 +221,13 @@ def main(data_file_path, vmax, tmax, debug, target_induction):
     extended_binned_x = np.concatenate([binned_x - track_length, binned_x, binned_x + track_length])
     reference_delta_t = np.linspace(-1000. * tmax, 1000. * tmax, 100)
 
+    mpl.rcParams['font.size'] = font_size
+
     peak_ramp_amp, total_induction_dur, depo_soma, group_indexes, exp_ramp, extended_exp_ramp, delta_exp_ramp, \
         mean_induction_loc, extended_min_delta_t, extended_delta_exp_ramp, interp_initial_exp_ramp, \
         interp_delta_exp_ramp, interp_final_exp_ramp = \
         get_biBTSP_analysis_results(data_file_path, binned_x, binned_extra_x, extended_binned_x, reference_delta_t,
-                                    track_length, dt, debug)
+                                    track_length, dt, debug, truncate=truncate)
 
     context.update(locals())
 
@@ -396,27 +267,35 @@ def main(data_file_path, vmax, tmax, debug, target_induction):
     flat_delta_ramp = []
     flat_initial_ramp = []
     flat_final_ramp = []
+    target_flat_delta_ramp = []
+    target_flat_initial_ramp = []
 
     for cell_key in interp_delta_exp_ramp:
         for induction in target_induction:
             induction_key = str(induction)
             if induction_key in interp_delta_exp_ramp[cell_key]:
-                flat_min_t.extend(np.divide(reference_delta_t, 1000.))
-                flat_delta_ramp.extend(interp_delta_exp_ramp[cell_key][induction_key])
-                flat_initial_ramp.extend(interp_initial_exp_ramp[cell_key][induction_key])
-                flat_final_ramp.extend(interp_final_exp_ramp[cell_key][induction_key])
+                if debug:
+                    print('Including cell: %s, induction: %s' % (cell_key, induction_key))
+                indexes = np.where(~np.isnan(interp_delta_exp_ramp[cell_key][induction_key]))[0]
+                flat_min_t.extend(np.divide(reference_delta_t[indexes], 1000.))
+                flat_delta_ramp.extend(interp_delta_exp_ramp[cell_key][induction_key][indexes])
+                target_flat_delta_ramp.extend(interp_delta_exp_ramp[cell_key][induction_key][indexes])
+                flat_initial_ramp.extend(interp_initial_exp_ramp[cell_key][induction_key][indexes])
+                target_flat_initial_ramp.extend(interp_initial_exp_ramp[cell_key][induction_key][indexes])
+                flat_final_ramp.extend(interp_final_exp_ramp[cell_key][induction_key][indexes])
+        if 2 in target_induction and 1 not in target_induction and '2' in interp_delta_exp_ramp[cell_key] and \
+                '1' in interp_delta_exp_ramp[cell_key]:
+            induction_key = '1'
+            if debug:
+                print('Including cell: %s, induction: %s' % (cell_key, induction_key))
+            indexes = np.where(~np.isnan(interp_delta_exp_ramp[cell_key][induction_key]))[0]
+            flat_min_t.extend(np.divide(reference_delta_t[indexes], 1000.))
+            flat_delta_ramp.extend(interp_delta_exp_ramp[cell_key][induction_key][indexes])
+            flat_initial_ramp.extend(interp_initial_exp_ramp[cell_key][induction_key][indexes])
+            flat_final_ramp.extend(interp_final_exp_ramp[cell_key][induction_key][indexes])
 
-    points = np.array([flat_min_t, flat_initial_ramp]).transpose()
-    data = np.array(flat_delta_ramp)
-
-    ymax = np.max(flat_initial_ramp)
-    ymin = min(0., np.min(flat_initial_ramp))
-
-    this_vmax = max(abs(np.max(flat_delta_ramp)), abs(np.min(flat_delta_ramp)))
-    if this_vmax > vmax:
-        print('New max detected for 3D data color legend: vmax: %.5f' % this_vmax)
-        sys.stdout.flush()
-        vmax = this_vmax
+    ymax = np.max(target_flat_initial_ramp)
+    ymin = min(0., np.min(target_flat_initial_ramp))
 
     lines_cmap = 'jet'
     interp_cmap = 'bwr_r'
@@ -426,8 +305,11 @@ def main(data_file_path, vmax, tmax, debug, target_induction):
         for induction in target_induction:
             induction_key = str(induction)
             if induction_key in interp_delta_exp_ramp[cell_key]:
-                lc = colorline(np.divide(reference_delta_t, 1000.), interp_delta_exp_ramp[cell_key][induction_key],
-                               interp_initial_exp_ramp[cell_key][induction_key], vmin=ymin, vmax=ymax, cmap=lines_cmap)
+                indexes = np.where(~np.isnan(interp_delta_exp_ramp[cell_key][induction_key]))[0]
+                lc = colorline(np.divide(reference_delta_t[indexes], 1000.),
+                               interp_delta_exp_ramp[cell_key][induction_key][indexes],
+                               interp_initial_exp_ramp[cell_key][induction_key][indexes],
+                               vmin=ymin, vmax=ymax, cmap=lines_cmap)
                 cax = axes[1].add_collection(lc)
     cbar = plt.colorbar(cax, ax=axes[1])
     cbar.set_label('Initial ramp\namplitude (mV)', rotation=270., labelpad=23.)
@@ -437,18 +319,27 @@ def main(data_file_path, vmax, tmax, debug, target_induction):
     axes[1].set_xticks(np.arange(-4., 5., 2.))
 
     if np.any(np.array(target_induction) != 1):
-        axes[2].scatter(flat_initial_ramp, flat_delta_ramp, c='grey', s=5., alpha=0.5, linewidth=0.)
-        fit_params = np.polyfit(flat_initial_ramp, flat_delta_ramp, 1)
+        axes[2].scatter(target_flat_initial_ramp, target_flat_delta_ramp, c='grey', s=5., alpha=0.5, linewidth=0.)
+        fit_params = np.polyfit(target_flat_initial_ramp, target_flat_delta_ramp, 1)
         fit_f = np.vectorize(lambda x: fit_params[0] * x + fit_params[1])
-        xlim = [0., math.ceil(np.max(flat_initial_ramp))]
+        xlim = [0., math.ceil(np.max(target_flat_initial_ramp))]
         axes[2].plot(xlim, fit_f(xlim), c='k', alpha=0.75, zorder=1, linestyle='--')
-        r_val, p_val = pearsonr(flat_initial_ramp, flat_delta_ramp)
+        r_val, p_val = pearsonr(target_flat_initial_ramp, target_flat_delta_ramp)
         axes[2].annotate('R$^{2}$ = %.3f;\np %s %.3f' %
                          (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001), xy=(0.6, 0.7),
                          xycoords='axes fraction')
         axes[2].set_xlim(xlim)
         axes[2].set_xlabel('Initial ramp amplitude (mV)')
         axes[2].set_ylabel('Change in ramp\namplitude (mV)')
+
+        points = np.array([flat_min_t, flat_initial_ramp]).transpose()
+        data = np.array(flat_delta_ramp)
+
+        this_vmax = max(abs(np.max(flat_delta_ramp)), abs(np.min(flat_delta_ramp)))
+        if this_vmax > vmax:
+            print('New max detected for 3D data color legend: vmax: %.5f' % this_vmax)
+            sys.stdout.flush()
+            vmax = this_vmax
 
         res = 50
         t_range = np.linspace(np.min(flat_min_t), np.max(flat_min_t), res)

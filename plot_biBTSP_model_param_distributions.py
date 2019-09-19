@@ -28,12 +28,12 @@ param_labels = {'local_signal_rise': 'signal$_{eligibility}$ tau$_{rise}$ (ms)',
                 'dep_signal_decay': 'signal$_{eligibility,-}$ tau$_{decay}$ (ms)',
                 'global_signal_rise': 'signal$_{gating}$ tau$_{rise}$ (ms)',
                 'global_signal_decay': 'signal$_{gating}$ tau$_{decay}$ (ms)',
-                'k_pot': 'k$_{+}$ (Hz)',
-                'f_pot_th': 'q$_{+}$ th',
-                'f_pot_peak': 'q$_{+}$ peak',
-                'k_dep': 'k$_{-}$ (Hz)',
-                'f_dep_th': 'q$_{-}$ th',
-                'f_dep_peak': 'q$_{-}$ peak',
+                'k_pot': 'k$_{(+)}$ (Hz)',
+                'f_pot_th': 'rate$_{(+)}$ th',
+                'f_pot_peak': 'rate$_{(+)}$ peak',
+                'k_dep': 'k$_{(-)}$ (Hz)',
+                'f_dep_th': 'rate$_{(-)}$ th',
+                'f_dep_peak': 'rate$_{(-)}$ peak',
                 'peak_delta_weight': u'\u0394weight$_{max}$',
                 'delta_peak_ramp_amp': u'\u0394V$_{max}$'
                 }
@@ -66,8 +66,6 @@ def main(param_file_path, config_file_path, output_dir, pcadim, export, label):
     date_stamp = datetime.datetime.today().strftime('%Y%m%d_%H%M')
     if label is None:
         label = date_stamp
-    else:
-        label = '%s_%s' % (date_stamp, label)
     if not os.path.isfile(param_file_path):
         raise IOError('Invalid param_file_path: %s' % param_file_path)
     if not os.path.isfile(config_file_path):
@@ -122,6 +120,7 @@ def plot_BTSP_model_param_cdfs(param_dict, config_dict, export=False, output_dir
         if i % 4 == 0:
             axes[i].set_ylabel('Cum. fraction')
     clean_axes(axes)
+    fig.suptitle('%s:' % label, fontsize=mpl.rcParams['font.size'], x=0.1, y=0.99)
     if export:
         fig_path = '%s/%s_biBTSP_model_param_cdfs.svg' % (output_dir, label)
         fig.savefig(fig_path, format='svg')
