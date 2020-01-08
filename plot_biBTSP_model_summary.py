@@ -187,11 +187,7 @@ def plot_biBTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, ram
     :param output_dir: str (dir)
     :param label: str
     """
-    fig, axesgrid = plt.subplots(2, 2, figsize=(8.25, 6))
-    axes = []
-    for row in range(2):
-        for col in range(2):
-            axes.append(axesgrid[col][row])
+    fig, axes = plt.subplots(1, 4, figsize=(12, 3.))
 
     tick_locs = [np.arange(0., 16., 3.), np.arange(60., 181., 30.), np.arange(-60., 61., 30.), np.arange(-2., 9., 2.)]
     for i, (parameter, param_label, tick_loc) in \
@@ -211,7 +207,7 @@ def plot_biBTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, ram
         r_val, p_val = pearsonr(target_vals['1'] + target_vals['2'], model_vals['1'] + model_vals['2'])
         this_axis.annotate('R$^{2}$ = %.3f; p < %.3f' % (r_val ** 2., p_val if p_val > 0.001 else 0.001),
                            xy=(0.25, 0.05), xycoords='axes fraction')
-        this_axis.set_title(param_label, fontsize=mpl.rcParams['font.size'])
+        this_axis.set_title(param_label, fontsize=mpl.rcParams['font.size'], y=1.05)
         if i == 0:
             this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, handletextpad=0.5,
                              fontsize=mpl.rcParams['font.size'])
@@ -224,8 +220,8 @@ def plot_biBTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, ram
         this_axis.set_ylabel('Model')
 
     clean_axes(axes)
-    fig.subplots_adjust(left=0.125, hspace=0.5, wspace=0.6, right=0.925)
-    fig.suptitle('%s: ' % label, x=0.05, y=0.95, ha='left', fontsize=mpl.rcParams['font.size'])
+    fig.subplots_adjust(left=0.05, wspace=0.675, right=0.975, bottom=0.2, top=0.75)
+    fig.suptitle('%s: ' % label, x=0.01, y=0.975, ha='left', fontsize=mpl.rcParams['font.size'])
     # fig.show()
     # fig.suptitle('%s: ' % label, fontsize=mpl.rcParams['font.size'], ha='left', x=0.)
     if export:

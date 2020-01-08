@@ -977,7 +977,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, export
     return {context.cell_id: {context.induction: result}}
 
 
-def plot_model_summary_figure(cell_id, model_file_path, induction_lap=0):
+def plot_model_summary_supp_figure(cell_id, model_file_path, induction_lap=0):
     """
 
     :param cell_id: int
@@ -1377,6 +1377,206 @@ def plot_model_summary_figure(cell_id, model_file_path, induction_lap=0):
     context.update(locals())
 
 
+def plot_model_summary_figure(cell_id, model_file_path, induction_lap=0, target_min_delay=2750.,
+                              target_delay_range=250.):
+    """
+
+    :param cell_id: int
+    :param model_file_path: str (path)
+    :param induction_lap: int
+    :param target_min_delay
+    :param target_delay_range
+    """
+    if (cell_id, 2) not in context.data_keys:
+        raise KeyError('plot_model_summary_figure: cell_id: %i, induction: 2 not found' % cell_id)
+    if not os.path.isfile(model_file_path):
+        raise IOError('plot_model_summary_figure: invalid model file path: %s' % model_file_path)
+    with h5py.File(model_file_path, 'r') as f:
+        if 'exported_data' not in f or str(cell_id) not in f['exported_data'] or \
+                '2' not in f['exported_data'][str(cell_id)] or \
+                'model_ramp_features' not in f['exported_data'][str(cell_id)]['2']:
+            raise KeyError('plot_model_summary_figure: problem loading model results for cell_id: %i, '
+                           'induction 2; from file: %s' % (cell_id, model_file_path))
+    with h5py.File(model_file_path, 'r') as f:
+        group = f['exported_data'][str(cell_id)]['2']['model_ramp_features']
+        x = group['param_array'][:]
+        if 'local_signal_peak' not in group.attrs or 'global_signal_peak' not in group.attrs:
+            raise KeyError('plot_model_summary_figure: missing required attributes for cell_id: %i, '
+                           'induction 2; from file: %s' % (cell_id, model_file_path))
+        group = f['exported_data'][str(cell_id)]['2']['model_ramp_features']
+        local_signal_peak = group.attrs['local_signal_peak']
+        global_signal_peak = group.attrs['global_signal_peak']
+        local_signal_filter_t = group['local_signal_filter_t'][:]
+        local_signal_filter = group['local_signal_filter'][:]
+        global_filter_t = group['global_filter_t'][:]
+        global_filter = group['global_filter'][:]
+        initial_weights = group['initial_weights'][:]
+        initial_ramp = group['initial_model_ramp'][:]
+        model_ramp = group['model_ramp'][:]
+        ramp_snapshots = []
+        for lap in range(len(group['ramp_snapshots'])):
+            ramp_snapshots.append(group['ramp_snapshots'][str(lap)][:])
+        delta_weights_snapshots = []
+        for lap in range(len(group['delta_weights_snapshots'])):
+            delta_weights_snapshots.append(group['delta_weights_snapshots'][str(lap)][:])
+        final_weights = group['model_weights'][:]
+
+    import_data(cell_id, 2)
+    update_source_contexts(x)
+
+    initial_exp_ramp = context.exp_ramp['before']  # context.exp_ramp_raw['before']
+    target_ramp = context.exp_ramp['after']  # context.exp_ramp_raw['after']
+
+    global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
+    local_signals = \
+        np.divide(get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt),
+                  local_signal_peak)
+
+    signal_xrange = np.linspace(0., 1., 10000)
+    pot_rate = np.vectorize(scaled_single_sigmoid(
+        context.f_pot_th, context.f_pot_th + context.f_pot_peak, signal_xrange))
+    dep_rate = np.vectorize(scaled_single_sigmoid(
+        context.f_dep_th, context.f_dep_th + context.f_dep_peak, signal_xrange))
+
+    peak_weight = context.peak_delta_weight + 1.
+    peak_ramp_amp = np.max(ramp_snapshots) + 5.
+
+    input_sample_indexes = np.arange(len(context.peak_locs))
+
+    example_input_dict = {}
+
+    sample_time_delays = []
+    mean_induction_start_time_index = np.where(context.mean_position > context.mean_induction_start_loc)[0][0]
+    mean_induction_start_time = context.mean_t[mean_induction_start_time_index]
+    for index in input_sample_indexes:
+        this_peak_loc = context.peak_locs[index]
+        this_time_index = np.where(context.mean_position > this_peak_loc)[0][0]
+        this_delay = context.mean_t[this_time_index] - mean_induction_start_time
+        sample_time_delays.append(this_delay)
+    sample_time_delays = np.array(sample_time_delays)
+
+    relative_indexes = np.where((sample_time_delays > target_min_delay) &
+                                (sample_time_delays <= target_min_delay + target_delay_range) &
+                                (final_weights[input_sample_indexes] < initial_weights[input_sample_indexes]))[0]
+    distant_depressing_indexes = input_sample_indexes[relative_indexes]
+    if np.any(distant_depressing_indexes):
+        relative_index = np.argmin(np.subtract(final_weights, initial_weights)[distant_depressing_indexes])
+        depressing_example_index = distant_depressing_indexes[relative_index]
+    else:
+        relative_index = np.argmin(np.subtract(final_weights, initial_weights)[input_sample_indexes])
+        depressing_example_index = input_sample_indexes[relative_index]
+
+    import matplotlib as mpl
+    mpl.rcParams['svg.fonttype'] = 'none'
+    mpl.rcParams['font.size'] = 12.
+    mpl.rcParams['font.sans-serif'] = 'Arial'
+    mpl.rcParams['text.usetex'] = False
+    mpl.rcParams['axes.titlepad'] = 2.
+    mpl.rcParams['mathtext.default'] = 'regular'
+    mpl.rcParams['axes.unicode_minus'] = True
+    from matplotlib.lines import Line2D
+
+    fig, axes = plt.subplots(3, figsize=(4, 8.5))
+
+    current_weights = np.add(delta_weights_snapshots[induction_lap], 1.)
+    current_ramp = ramp_snapshots[induction_lap]
+    current_complete_ramp = get_complete_ramp(current_ramp, context.binned_x, context.position,
+                                              context.complete_run_vel_gate, context.induction_gate, peak_ramp_amp)
+
+    if induction_lap == 0:
+        start_time = context.down_t[0]
+    else:
+        start_time = context.induction_stop_times[induction_lap - 1]
+    if induction_lap == len(context.induction_start_times) - 1:
+        stop_time = context.down_t[-1]
+    else:
+        stop_time = context.induction_start_times[induction_lap + 1]
+    indexes = np.where((context.down_t >= start_time) & (context.down_t <= stop_time))
+
+    this_current_ramp = np.interp(context.down_t, context.complete_t, current_complete_ramp)[indexes]
+    this_t = context.down_t[indexes] / 1000.
+    this_global_signal = global_signal[indexes]
+
+    example_pre_rate = context.down_rate_maps[depressing_example_index][indexes]
+    example_current_normalized_weight = current_weights[depressing_example_index] / peak_weight
+    example_local_signal = local_signals[depressing_example_index][indexes]
+    example_pot_elig_signal = example_local_signal * (1. - example_current_normalized_weight)
+    example_dep_elig_signal = example_local_signal * example_current_normalized_weight
+    example_pot_rate = peak_weight * context.k_pot * np.multiply(pot_rate(example_pot_elig_signal), this_global_signal)
+    example_dep_rate = peak_weight * context.k_dep * np.multiply(dep_rate(example_dep_elig_signal), this_global_signal)
+    example_net_dwdt = np.subtract(example_pot_rate, example_dep_rate)
+
+    axes[0].get_shared_x_axes().join(axes[0], axes[1], axes[2])
+    ymax1 = max(np.max(this_global_signal), np.max(example_pot_elig_signal), np.max(example_dep_elig_signal))
+    axes0_right = axes[0].twinx()
+
+    axes[0].plot(this_t, example_pre_rate, c='r', linewidth=1., label='Presynaptic\nfiring rate')
+    axes0_right.plot(this_t, this_current_ramp, c='grey', linewidth=1., label='Postsynaptic $V_{m}$')
+    handles, labels = axes[0].get_legend_handles_labels()
+    handles_right, labels_right = axes0_right.get_legend_handles_labels()
+    handles.extend(handles_right)
+    labels.extend(labels_right)
+    handles.append(Line2D([0], [0], color='k'))
+    labels.append('Postsynaptic\nplateau')
+    leg = axes[0].legend(handles=handles, labels=labels, loc=(0., 1.), frameon=False, framealpha=0.5, handlelength=1,
+                         fontsize=mpl.rcParams['font.size'])
+    for line in leg.get_lines():
+        line.set_linewidth(2.)
+
+    axes[1].plot(this_t, example_pot_elig_signal, c='c', linewidth=1., label='Potentiation $signal_{eligibility}$')
+    axes[1].plot(this_t, example_dep_elig_signal, c='r', linewidth=1.,
+                 label='Depression $signal_{eligibility}$')
+    axes[1].plot(this_t, this_global_signal, c='k', linewidth=1., label='Dendritic $signal_{gating}$')
+    axes[1].fill_between(this_t, 0., np.minimum(example_pot_elig_signal, this_global_signal), alpha=0.5,
+                         facecolor='c', edgecolor='none', label='Potentiation signal overlap')
+    axes[1].fill_between(this_t, 0., np.minimum(example_dep_elig_signal, this_global_signal),
+                         alpha=0.5, facecolor='r', edgecolor='none', label='Depression signal overlap')
+    leg = axes[1].legend(loc=(0., 1.0), frameon=False, framealpha=0.5, handlelength=1,
+                         fontsize=mpl.rcParams['font.size'])
+    for line in leg.get_lines():
+        line.set_linewidth(2.)
+
+    axes[2].plot(this_t, example_pot_rate, c='c', linewidth=1., label='Potentiation rate')
+    axes[2].plot(this_t, example_dep_rate, c='r', linewidth=1., label='Depression rate')
+    axes[2].plot(this_t, example_net_dwdt, c='k', linewidth=1., label='Net dW/dt')
+    axes[2].set_xlabel('Time (s)')
+    axes[2].legend(loc=(0., 1.0), frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
+
+    xmin = max(-5., np.min(this_t))
+    xmax = np.max(this_t)
+    axes[0].set_xlim(xmin, xmax)
+    axes[0].set_xticks(np.round((np.arange(xmin, xmax, 5.) / 5.)) * 5.)
+    axes[1].set_xticks(np.round((np.arange(xmin, xmax, 5.) / 5.)) * 5.)
+    axes[2].set_xticks(np.round((np.arange(xmin, xmax, 5.) / 5.)) * 5.)
+
+    ymax0_left = context.input_field_peak_rate / 0.85
+    ymax0_right = peak_ramp_amp / 0.85
+
+    axes[0].set_ylim([0., ymax0_left])
+    axes0_right.set_ylim([0., ymax0_right])
+    axes[1].set_ylim([0., axes[1].get_ylim()[1]])
+
+    bar_loc0 = ymax0_left * 0.95
+    axes[0].hlines(bar_loc0, xmin=context.induction_start_times[induction_lap] / 1000.,
+                   xmax=context.induction_stop_times[induction_lap] / 1000., linewidth=2.)
+
+    axes[0].set_ylabel('Firing rate (Hz)')
+    axes0_right.set_ylabel('Ramp\namplitude (mV)', rotation=-90, labelpad=30)
+    axes0_right.set_yticks(np.arange(0., np.max(this_current_ramp), 5.))
+    axes[0].set_yticks(np.arange(0., context.input_field_peak_rate + 1., 10.))
+    axes[1].set_ylabel('Plasticity signal\namplitude')
+    axes[2].set_ylabel('Rate of change\nin synaptic weight')
+
+    clean_twin_right_axes([axes0_right])
+    clean_axes(axes)
+    fig.suptitle('History-dependent model B (cell %i)' % cell_id,
+                 fontsize=mpl.rcParams['font.size'], x=0.02, ha='left')
+    fig.subplots_adjust(left=0.25, hspace=0.8, right=0.8, top=0.8, bottom=0.1)
+    fig.show()
+
+    context.update(locals())
+
+
 def get_args_dynamic_model_ramp(x, features):
     """
     A nested map operation is required to compute model_ramp features. The arguments to be mapped depend on each set of
@@ -1604,6 +1804,7 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
         if 'cell_id' not in kwargs:
             raise RuntimeError('optimize_biBTSP_%s: missing required parameter: cell_id' % BTSP_model_name)
         context.interface.execute(plot_model_summary_figure, int(context.kwargs['cell_id']), model_file_path)
+        context.interface.execute(plot_model_summary_supp_figure, int(context.kwargs['cell_id']), model_file_path)
     elif not debug:
         features = get_features_interactive(context.interface, context.x0_array, plot=plot)
         features, objectives = context.interface.execute(get_objectives, features, context.export)

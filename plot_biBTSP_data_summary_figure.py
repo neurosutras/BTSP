@@ -1,17 +1,17 @@
 """
-To reproduce Figure 3:
+To reproduce panels from Figure 1:
 python -i plot_biBTSP_data_summary_figure.py --target-induction=2
 
-To reproduce panels from Figure 6:
+To reproduce panels from Figure 3:
 python -i plot_biBTSP_data_summary_figure.py --target-induction=1 --target-induction=2
-plot_ramp_prediction_from_interpolation(context.gp, 'data/20190711_biBTSP_data_calibrated_input.hdf5',
-        context.binned_x, context.binned_extra_x, context.extended_binned_x, context.reference_delta_t,
-        context.track_length, context.dt, context.debug, label='Control', color='k', tmax=context.tmax, induction=1,
-        group='exp1')
-plot_ramp_prediction_from_interpolation(context.gp, 'data/20190825_biBTSP_data_soma_DC.hdf5',
-        context.binned_x, context.binned_extra_x, context.extended_binned_x, context.reference_delta_t,
-        context.track_length, context.dt, context.debug, label='Depolarized', color='purple', tmax=context.tmax,
-        induction=1, group='exp1')
+plot_ramp_prediction_from_interpolation(
+    context.gp, ['data/20190711_biBTSP_data_calibrated_input.hdf5',
+                 'data/20190825_biBTSP_data_soma_DC.hdf5'], context.binned_x, context.binned_extra_x,
+    context.extended_binned_x, context.reference_delta_t, context.track_length, context.dt, context.debug,
+    labels=['Control', 'Depolarized'], colors=['k', 'purple'], tmax=context.tmax, induction=1, group='exp1',
+    truncate=context.truncate, show_std=False)
+
+To reproduce panels from Figure S6:
 boxplot_compare_ramp_summary_features(
         {'Control': 'data/20190812_biBTSP_SRL_B_90cm_all_cells_merged_exported_model_output.hdf5',
          'Depolarized': 'data/20190825_biBTSP_SRL_B_90cm_soma_DC_cells_exported_model_output.hdf5'},
@@ -36,13 +36,13 @@ mpl.rcParams['mathtext.default'] = 'regular'
 context = Context()
 
 
-def plot_ramp_prediction_from_interpolation(regressor, data_file_path, binned_x, binned_extra_x, extended_binned_x,
-                                            reference_delta_t, track_length, dt, debug, label, color='k', tmax=5.,
-                                            induction=1, group='exp1', show_std=True):
+def plot_ramp_prediction_from_interpolation(regressor, data_file_path_list, binned_x, binned_extra_x, extended_binned_x,
+                                            reference_delta_t, track_length, dt, debug, labels, colors='k', tmax=5.,
+                                            induction=1, group='exp1', show_std=False, truncate=True):
     """
 
     :param regressor: :class:'GaussianProcessRegressor'
-    :param data_file_path: str (path)
+    :param data_file_path_list: list of str (path)
     :param binned_x: array
     :param binned_extra_x: array
     :param extended_binned_x: array
@@ -50,38 +50,42 @@ def plot_ramp_prediction_from_interpolation(regressor, data_file_path, binned_x,
     :param track_length: float
     :param dt: float
     :param debug: bool
-    :param label: str
-    :param color: str
+    :param labels: str
+    :param colors: str
     :param tmax: float
     :param induction: int
     :param show_std: bool
+    :param truncate: bool
     """
-    if not os.path.isfile(data_file_path):
-        raise IOError('plot_ramp_prediction_from_interpolation: invalid data_file_path: %s' % data_file_path)
+    fig, axes = plt.subplots(1, 3, figsize=(8.5, 2.75))
 
-    peak_ramp_amp, total_induction_dur, depo_soma, group_indexes, exp_ramp, extended_exp_ramp, delta_exp_ramp, \
-    mean_induction_loc, extended_min_delta_t, extended_delta_exp_ramp, interp_initial_exp_ramp, \
-    interp_delta_exp_ramp, interp_final_exp_ramp = \
-        get_biBTSP_analysis_results(data_file_path, binned_x, binned_extra_x, extended_binned_x, reference_delta_t,
-                                    track_length, dt, debug, truncate=truncate)
+    for i, data_file_path in enumerate(data_file_path_list):
+        if not os.path.isfile(data_file_path):
+            raise IOError('plot_ramp_prediction_from_interpolation: invalid data_file_path: %s' % data_file_path)
+        label = labels[i]
+        color = colors[i]
+        peak_ramp_amp, total_induction_dur, depo_soma, group_indexes, exp_ramp, extended_exp_ramp, delta_exp_ramp, \
+        mean_induction_loc, extended_min_delta_t, extended_delta_exp_ramp, interp_initial_exp_ramp, \
+        interp_delta_exp_ramp, interp_final_exp_ramp = \
+            get_biBTSP_analysis_results(data_file_path, binned_x, binned_extra_x, extended_binned_x, reference_delta_t,
+                                        track_length, dt, debug, truncate=truncate)
 
-    fig, axes = plt.subplots(1, 3, figsize=(8, 2.75))
-
-    this_axis = axes[1]
-    this_axis.set_xlim(-tmax, tmax)
-    induction_key = str(induction)
-    ramp_list = []
-    for cell_key in interp_delta_exp_ramp:
-        if induction_key in interp_delta_exp_ramp[cell_key]:
-            ramp_list.append(interp_delta_exp_ramp[cell_key][induction_key])
-            this_axis.plot(np.divide(reference_delta_t, 1000.), interp_delta_exp_ramp[cell_key][induction_key],
-                           c='darkgrey', linewidth=1., alpha=0.75)
-    this_axis.plot(np.divide(reference_delta_t, 1000.), np.nanmean(ramp_list, axis=0), c=color)
-    this_axis.set_title(label, fontsize=mpl.rcParams['font.size'], y=1.1)
-    this_axis.set_ylabel('Change in ramp\namplitude (mV)')
-    this_axis.set_xlabel('Time relative to\nplateau onset (s)')
-    this_axis.set_yticks(np.arange(-4., 17., 4.))
-    this_axis.set_xticks(np.arange(-4., 5., 2.))
+        this_axis = axes[i]
+        this_axis.set_xlim(-tmax, tmax)
+        induction_key = str(induction)
+        ramp_list = []
+        for cell_key in interp_delta_exp_ramp:
+            if induction_key in interp_delta_exp_ramp[cell_key]:
+                ramp_list.append(interp_delta_exp_ramp[cell_key][induction_key])
+                this_axis.plot(np.divide(reference_delta_t, 1000.), interp_delta_exp_ramp[cell_key][induction_key],
+                               c='darkgrey', linewidth=1., alpha=0.75)
+        this_axis.plot(np.divide(reference_delta_t, 1000.), np.nanmean(ramp_list, axis=0), c=color)
+        this_axis.set_title(label, fontsize=mpl.rcParams['font.size'], y=1.1)
+        this_axis.set_ylabel('Change in ramp\namplitude (mV)')
+        this_axis.set_xlabel('Time relative to\nplateau onset (s)')
+        this_axis.set_yticks(np.arange(-5., 16., 5.))
+        this_axis.set_ylim([-6., 16.])
+        this_axis.set_xticks(np.arange(-4., 5., 2.))
 
     res = 50
     t_range = np.linspace(-tmax, tmax, res)
@@ -103,23 +107,28 @@ def plot_ramp_prediction_from_interpolation(regressor, data_file_path, binned_x,
             len(group_indexes[group]) == len(depo_soma[group]):
         vals = np.array(depo_soma[group])
     else:
-        vals = np.ones(len(group_indexes[group])) * 10.
-    ramp_list = []
-    std_list = []
-    for val in vals:
+        vals = np.array([10.])
+
+    if len(vals) > 1:
+        ramp_list = []
+        for val in vals:
+            interp_points = np.vstack((t_range, np.ones(res) * val)).T
+            voltage_dependent_prediction = regressor.predict(interp_points)
+            ramp_list.append(voltage_dependent_prediction)
+        voltage_dependent_prediction = np.mean(ramp_list, axis=0)
+        if show_std:
+            voltage_dependent_prediction_std = np.std(ramp_list, axis=0)
+    else:
+        val = vals[0]
         interp_points = np.vstack((t_range, np.ones(res) * val)).T
         if show_std:
             voltage_dependent_prediction, voltage_dependent_prediction_std = \
                 regressor.predict(interp_points, return_std=True)
-            std_list.append(voltage_dependent_prediction_std)
         else:
             voltage_dependent_prediction = regressor.predict(interp_points)
-        ramp_list.append(voltage_dependent_prediction)
-        # this_axis.plot(t_range, voltage_dependent_prediction, c='darkgrey', linewidth=1., alpha=0.75)
-    voltage_dependent_prediction = np.mean(ramp_list, axis=0)
+
     this_axis.plot(t_range, voltage_dependent_prediction, c='r', label='Voltage-dependent')
     if show_std:
-        voltage_dependent_prediction_std = np.mean(std_list, axis=0)
         this_axis.fill_between(t_range, np.add(voltage_dependent_prediction, voltage_dependent_prediction_std),
                                np.subtract(voltage_dependent_prediction, voltage_dependent_prediction_std),
                                color='r', alpha=0.25, linewidth=0)
@@ -128,10 +137,13 @@ def plot_ramp_prediction_from_interpolation(regressor, data_file_path, binned_x,
     this_axis.set_title('Kernel prediction', fontsize=mpl.rcParams['font.size'], y=1.1)
     this_axis.set_ylabel('Change in ramp\namplitude (mV)')
     this_axis.set_xlabel('Time relative to\nplateau onset (s)')
-    this_axis.set_yticks(np.arange(-4., 17., 4.))
+    this_axis.set_yticks(np.arange(-5., 16., 5.))
+    this_axis.set_ylim([-6., 16.])
     this_axis.set_xticks(np.arange(-4., 5., 2.))
+    this_axis.axhspan(0., 16., facecolor='c', alpha=0.15)
+    this_axis.axhspan(-6., 0., facecolor='r', alpha=0.15)
     clean_axes(axes)
-    fig.subplots_adjust(left=0.1, wspace=0.6, right=0.975, bottom=0.25, top=0.85)
+    fig.subplots_adjust(left=0.1, wspace=0.55, right=0.98, bottom=0.25, top=0.85)
     fig.show()
 
 

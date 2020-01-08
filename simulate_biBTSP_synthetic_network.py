@@ -93,8 +93,8 @@ def init_context():
         context.input_field_width = float(context.input_field_width)
         input_field_width_key = str(int(context.input_field_width))
         if 'calibrated_input' not in f or input_field_width_key not in f['calibrated_input']:
-            raise RuntimeError('simulate_biBTSP_synthetic_network: init context: data for input_field_width: %.1f not found in the '
-                               'provided data_file_path: %s' %
+            raise RuntimeError('simulate_biBTSP_synthetic_network: init context: data for input_field_width: %.1f not '
+                               'found in the provided data_file_path: %s' %
                                (float(context.input_field_width), context.data_file_path))
         input_field_width = f['calibrated_input'][input_field_width_key].attrs['input_field_width']  # cm
         input_rate_maps, peak_locs = \
@@ -114,9 +114,9 @@ def init_context():
     reward_dur = 500.  # ms
     plateau_dur = 300.  # ms
     peak_basal_plateau_prob_per_dt = \
-        context.peak_basal_plateau_prob_per_lap / len(default_interp_t)
+        context.peak_basal_plateau_prob_per_sec / 1000. * dt
     peak_reward_plateau_prob_per_dt = \
-        context.peak_reward_plateau_prob_per_lap / int(reward_dur / dt)
+        context.peak_reward_plateau_prob_per_sec / 1000. * dt
 
     context.update(locals())
 
@@ -453,8 +453,8 @@ def simulate_network(export=False, plot=False):
             group.attrs['initial_fraction_active'] = context.initial_fraction_active
             group.attrs['basal_target_representation_density'] = context.basal_target_representation_density
             group.attrs['reward_target_representation_density'] = context.reward_target_representation_density
-            group.attrs['peak_basal_plateau_prob_per_lap'] = context.peak_basal_plateau_prob_per_lap
-            group.attrs['peak_reward_plateau_prob_per_lap'] = context.peak_reward_plateau_prob_per_lap
+            group.attrs['peak_basal_plateau_prob_per_sec'] = context.peak_basal_plateau_prob_per_sec
+            group.attrs['peak_reward_plateau_prob_per_sec'] = context.peak_reward_plateau_prob_per_sec
             group.attrs['basal_plateau_prob_ramp_sensitivity'] = context.basal_plateau_prob_ramp_sensitivity
             group.attrs['reward_plateau_prob_ramp_sensitivity'] = context.reward_plateau_prob_ramp_sensitivity
             group.attrs['seed_offset'] = int(context.seed_offset)
@@ -562,19 +562,16 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
 
     fig1, axes1 = plt.subplots(3, 3, figsize=(11, 9))
 
-    norm_basal_plateau_prob = context.basal_plateau_prob_f(context.basal_representation_xscale)
-    norm_basal_plateau_prob /= np.max(norm_basal_plateau_prob)
-    norm_basal_plateau_prob *= context.peak_basal_plateau_prob_per_lap
-    norm_reward_plateau_prob = context.reward_plateau_prob_f(context.reward_representation_xscale)
-    norm_reward_plateau_prob /= np.max(norm_reward_plateau_prob)
-    norm_reward_plateau_prob *= context.peak_reward_plateau_prob_per_lap
+    norm_basal_plateau_prob = context.basal_plateau_prob_f(context.basal_representation_xscale) / context.dt * 1000.
+    norm_reward_plateau_prob = context.reward_plateau_prob_f(context.reward_representation_xscale) / context.dt * 1000.
     axes1[0][1].plot(context.basal_representation_xscale, norm_basal_plateau_prob, label='No reward', c='k')
     axes1[0][1].plot(context.reward_representation_xscale, norm_reward_plateau_prob, label='Reward', c='r')
-    axes1[0][1].set_xticks([i * 0.15 for i in range(5)])
+    axes1[0][1].set_xticks([i * 0.1 for i in range(7)])
     axes1[0][1].set_xlim(0., 0.6)
     axes1[0][1].set_ylim(0., axes1[0][1].get_ylim()[1])
     axes1[0][1].set_xlabel('Normalized population activity')
-    axes1[0][1].set_ylabel('Plateau probability\nper lap')
+    # axes1[0][1].set_ylabel('Plateau probability\nper lap')
+    axes1[0][1].set_ylabel('Plateau probability / sec')
     axes1[0][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
     axes1[0][1].set_title('Modulation of plateau probability\nby feedback inhibition and reward',
                           fontsize=mpl.rcParams['font.size'], y=1.1)
@@ -624,6 +621,21 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
     axes1[2][2].set_xticks(np.arange(-90., 91., 45.))
     axes1[2][2].set_title('Translocation towards reward location', fontsize=mpl.rcParams['font.size'], y=1.1)
 
+    X, Y = np.meshgrid(context.default_interp_x, range(len(pop_rep_density_history)))
+    hm = axes1[0][2].pcolormesh(X, Y, pop_rep_density_history)
+    cb = plt.colorbar(hm, ax=axes1[0][2])
+    cb.ax.set_ylabel('Normalized\npopulation activity', rotation=270)
+    cb.ax.get_yaxis().labelpad = 25
+    axes1[0][2].set_ylim(len(pop_rep_density_history) - 1, 0)
+    axes1[0][2].set_ylabel('Lap #')
+    axes1[0][2].set_xlabel('Location (cm)')
+    axes1[0][2].set_xlim(0., context.track_length)
+    axes1[0][2].set_xticks(np.arange(0., context.track_length, 45.))
+    axes1[0][2].set_title('Summed population activity', fontsize=mpl.rcParams['font.size'], y=1.1)
+    clean_axes(axes1)
+    fig1.subplots_adjust(left=0.075, hspace=0.5, wspace=0.6, right=0.925)
+    fig1.show()
+
     max_count = len(initial_loc_by_cell)
     prev_sorted_cell_indexes = None
     for start_lap, end_lap, label in track_phase_summary:
@@ -649,7 +661,7 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
                 nonmodulated_cell_indexes.append(i)
         sorted_ramp_pop = modulated_ramp_pop + nonmodulated_ramp_pop
         X, Y = np.meshgrid(context.binned_x, range(len(sorted_ramp_pop)))
-        hm = axes2[0][2].pcolor(X, Y, sorted_ramp_pop)
+        hm = axes2[0][2].pcolormesh(X, Y, sorted_ramp_pop)
         cb = plt.colorbar(hm, ax=axes2[0][2])
         cb.ax.set_ylabel('Ramp amplitude (mV)', rotation=270, fontsize=mpl.rcParams['font.size'])
         cb.ax.get_yaxis().labelpad = 15
@@ -662,7 +674,7 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
         if prev_sorted_cell_indexes is not None:
             prev_sorted_ramp_pop = [ramp_pop[i] for i in prev_sorted_cell_indexes]
             X, Y = np.meshgrid(context.binned_x, range(len(prev_sorted_ramp_pop)))
-            hm = axes2[0][1].pcolor(X, Y, prev_sorted_ramp_pop)
+            hm = axes2[0][1].pcolormesh(X, Y, prev_sorted_ramp_pop)
             cb = plt.colorbar(hm, ax=axes2[0][1])
             cb.ax.set_ylabel('Ramp amplitude (mV)', rotation=270, fontsize=mpl.rcParams['font.size'])
             cb.ax.get_yaxis().labelpad = 15
@@ -688,21 +700,6 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
     axes3.set_xlabel('Location (cm)')
     clean_axes(axes3)
     fig3.show()
-
-    X, Y = np.meshgrid(context.default_interp_x, range(len(pop_rep_density_history)))
-    hm = axes1[0][2].pcolor(X, Y, pop_rep_density_history)
-    cb = plt.colorbar(hm, ax=axes1[0][2])
-    cb.ax.set_ylabel('Normalized\npopulation activity', rotation=270)
-    cb.ax.get_yaxis().labelpad = 25
-    axes1[0][2].set_ylim(len(pop_rep_density_history) - 1, 0)
-    axes1[0][2].set_ylabel('Lap #')
-    axes1[0][2].set_xlabel('Location (cm)')
-    axes1[0][2].set_xlim(0., context.track_length)
-    axes1[0][2].set_xticks(np.arange(0., context.track_length, 45.))
-    axes1[0][2].set_title('Summed population activity', fontsize=mpl.rcParams['font.size'], y=1.1)
-    clean_axes(axes1)
-    fig1.subplots_adjust(left=0.075, hspace=0.5, wspace=0.6, right=0.925)
-    fig1.show()
 
     context.update(locals())
 
