@@ -202,6 +202,8 @@ def boxplot_compare_ramp_summary_features(model_file_path_dict, ordered_labels, 
     fig.subplots_adjust(left=0.1, wspace=0.6, right=0.975, bottom=0.275, top=0.85)
     fig.show()
 
+    return ramp_amp, ramp_width, local_peak_shift
+
 
 @click.command()
 @click.option("--data-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),

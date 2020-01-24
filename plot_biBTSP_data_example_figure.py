@@ -78,12 +78,16 @@ def main(data_file_path, model_file_path, tmax, truncate, debug, cell):
         for row, cell_key in enumerate(cell_keys):
             mean_induction_start_loc = dict()
             mean_induction_stop_loc = dict()
+            track_start_times = dict()
+            track_stop_times = dict()
             for induction_key in exp_ramp[cell_key]:
 
                 with h5py.File(model_file_path, 'r') as g:
                     group = g['exported_data'][cell_key][induction_key]['model_ramp_features']
                     mean_induction_start_loc[induction_key] = group.attrs['mean_induction_start_loc']
                     mean_induction_stop_loc[induction_key] = group.attrs['mean_induction_stop_loc']
+                    track_start_times[induction_key] = group.attrs['track_start_times']
+                    track_stop_times[induction_key] = group.attrs['track_stop_times']
                 if induction_key == '1':
                     color = 'darkgrey'
                     label = 'Before induction 2'
@@ -140,8 +144,31 @@ def main(data_file_path, model_file_path, tmax, truncate, debug, cell):
                     end_index = i
                     passed_peak = False
 
+            start_indexes = np.where(this_complete_t[initial_peak_indexes] <
+                                     this_complete_t[induction_start_indexes][0])[0]
+            if len(start_indexes) > 0:
+                start_index = start_indexes[-1]
+            else:
+                start_index = 0
+            end_indexes = np.where(this_complete_t[initial_peak_indexes] >
+                                   this_complete_t[induction_start_indexes][-1])[0]
+            if len(end_indexes) > 0:
+                end_index = end_indexes[0] + 1
+            else:
+                end_index = len(initial_peak_indexes)
+
+            event_times = np.append(this_complete_t[initial_peak_indexes][start_index:end_index],
+                                    this_complete_t[induction_start_indexes])
+            event_times = np.sort(event_times)
+            event_intervals = np.diff(event_times)
+            mean_event_interval = np.mean(event_intervals)
+
+            print('Cell: %s' % cell_key)
+            print('Event intervals: %s' % str(event_intervals))
+            print('Mean event interval: %.1f s' % (mean_event_interval / 1000.))
+
             axes[row][0].plot(this_complete_t / 1000., pretty_position, c='darkgrey', zorder=1)
-            xmax = this_complete_t[end_index] / 1000.
+            xmax = max(event_times) / 1000.
             axes[row][0].set_xlim(-5., xmax + 5.)
             axes[row][0].scatter(this_complete_t[initial_peak_indexes] / 1000.,
                                  pretty_position[initial_peak_indexes], c='darkgrey', s=40, linewidth=0, zorder=2,
@@ -152,9 +179,11 @@ def main(data_file_path, model_file_path, tmax, truncate, debug, cell):
             axes[row][0].set_yticks(np.arange(0., track_length, 60.))
             axes[row][0].set_ylabel('Position (cm)')
             axes[row][0].set_xlabel('Time (s)')
-            axes[row][0].set_title('Cell: %s' % cell_key, fontsize=mpl.rcParams['font.size'], loc='left', y=1.1)
+            axes[row][0].set_title(r'Cell: %s' % cell_key, fontsize=mpl.rcParams['font.size'], loc='left', y=1.1)
+            axes[row][0].annotate(r'$\overline {\Delta t}$=%.1f s' % (mean_event_interval / 1000.),
+                                  fontsize=mpl.rcParams['font.size'], xy=(0.8, 1.1), xycoords='axes fraction')
             if row == 0:
-                axes[row][0].legend(loc=(0.1, 0.95), frameon=False, framealpha=0., fontsize=mpl.rcParams['font.size'],
+                axes[row][0].legend(loc=(0.2, 0.95), frameon=False, framealpha=0., fontsize=mpl.rcParams['font.size'],
                                     scatterpoints=1, handlelength=1., handletextpad=0.5)
     context.update(locals())
 

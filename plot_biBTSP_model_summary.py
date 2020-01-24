@@ -314,6 +314,7 @@ def plot_compare_models_boxplot(model_file_path_dict, ordered_keys=None, ymax=6.
     """
     mse_data = []
     sse_data = []
+    mse_dict = {}
     if ordered_keys is None:
         ordered_keys = list(model_file_path_dict.keys())
     for model in ordered_keys:
@@ -329,6 +330,7 @@ def plot_compare_models_boxplot(model_file_path_dict, ordered_keys=None, ymax=6.
             this_mse_list.extend(this_mse_dict[induction_key])
         sse_data.append(this_sse_list)
         mse_data.append(this_mse_list)
+        mse_dict[model] = this_mse_list
 
     fig, axes = plt.subplots(2, figsize=(8.25, 6))
     axes[0].boxplot(mse_data, showfliers=False)
@@ -340,6 +342,7 @@ def plot_compare_models_boxplot(model_file_path_dict, ordered_keys=None, ymax=6.
     fig.subplots_adjust(left=0.125, hspace=0.5, wspace=0.6, right=0.925)
     fig.show()
 
+    return mse_dict
 
 if __name__ == '__main__':
     main(args=sys.argv[(list_find(lambda s: s.find(os.path.basename(__file__)) != -1, sys.argv) + 1):],

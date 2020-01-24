@@ -1191,7 +1191,6 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
     if plot_summary_figure:
         context.interface.execute(plot_model_summary_figure, model_file_path)
     elif not debug:
-        context.x0_array = [4.993E-01, 1.032E-01, 6.791E-02, 4.672E-02, 1.525E+00, 1.239E+00, 1.317E+02, 8.392E+02, 4.589E+01, 5.499E+02, 2.640E+00]
         features = get_features_interactive(context.interface, context.x0_array, plot=plot)
         features, objectives = context.interface.execute(get_objectives, features, context.export)
         if export:
