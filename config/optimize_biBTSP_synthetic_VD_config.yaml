@@ -1,0 +1,131 @@
+bounds:
+  f_pot_peak: !!python/tuple
+  - 0.001
+  - 1.
+  f_pot_th: !!python/tuple
+  - 0.001
+  - 1.
+  f_dep_th: !!python/tuple
+  - 0.001
+  - 1.
+  f_dep_peak: !!python/tuple
+  - 0.001
+  - 1.
+  k_pot: !!python/tuple
+  - 0.01
+  - 10.
+  k_dep: !!python/tuple
+  - 0.01
+  - 10.
+  local_signal_rise: !!python/tuple
+  - 5.
+  - 200.
+  local_signal_decay: !!python/tuple
+  - 50.
+  - 2500.
+  global_signal_rise: !!python/tuple
+  - 5.
+  - 200.
+  global_signal_decay: !!python/tuple
+  - 50.
+  - 2500.
+  delta_peak_ramp_amp: !!python/tuple
+  - 0.
+  - 10.
+default_params:
+rel_bounds:
+- - local_signal_decay
+  - '>'
+  - 1.0
+  - local_signal_rise
+- - global_signal_decay
+  - '>'
+  - 1.0
+  - global_signal_rise
+- - local_signal_decay
+  - '>'
+  - 1.0
+  - global_signal_decay
+- - k_pot
+  - '>'
+  - 1.0
+  - k_dep
+feature_names:
+- induction1_delta_val_at_target_peak
+- induction1_delta_val_at_model_peak
+- induction1_delta_width
+- induction1_delta_peak_shift
+- induction1_delta_asymmetry
+- induction1_delta_min_loc
+- induction1_delta_val_at_target_min
+- induction1_delta_val_at_model_min
+- induction2_delta_val_at_target_peak
+- induction2_delta_val_at_model_peak
+- induction2_delta_width
+- induction2_delta_peak_shift
+- induction2_delta_asymmetry
+- induction2_delta_min_loc
+- induction2_delta_val_at_target_min
+- induction2_delta_val_at_model_min
+update_context:
+- - optimize_biBTSP_synthetic_VD
+  - update_model_params
+get_features_stages:
+- source: optimize_biBTSP_synthetic_VD
+  get_args_static: get_args_static_model_ramp
+  compute_features: compute_features_model_ramp
+  filter_features: filter_features_model_ramp
+get_objectives:
+  optimize_biBTSP_synthetic_VD: get_objectives
+kwargs:
+  data_file_name: 20190711_biBTSP_data_calibrated_input.hdf5
+  input_field_width: 90.  # cm
+  verbose: 1
+  min_delta_weight: -0.2
+  default_run_vel: 30.
+  induction_loc:
+    '1': 90.
+    '2': 0.
+  target_peak_weight: 3.
+  target_peak_shift_1: -10.
+  target_peak_shift_2: 0.
+  target_peak_val_1: 8.
+  target_peak_val_2: 8.
+  target_min_val_2: 3.
+objective_names:
+- induction1_residual_score
+- induction2_residual_score
+- self_consistent_delta_residual_score
+optimization_title: biBTSP_synthetic_VD
+param_gen: PopulationAnnealing
+param_names:
+- f_pot_peak
+- f_pot_th
+- f_dep_th
+- f_dep_peak
+- k_pot
+- k_dep
+- local_signal_rise
+- local_signal_decay
+- global_signal_rise
+- global_signal_decay
+- delta_peak_ramp_amp
+target_range:
+  ramp_offset: 0.01
+  delta_min_val: 0.01
+  delta_peak_val: 0.01
+  residuals: 0.1
+  weights_smoothness: 0.005
+target_val:
+x0:
+  delta_peak_ramp_amp: 3.295016E+00
+  global_signal_decay: 5.117370E+02
+  global_signal_rise: 5.805183E+01
+  k_dep: 2.577449E-01
+  k_pot: 2.691966E+00
+  local_signal_decay: 1.501610E+03
+  local_signal_rise: 7.840152E+00
+  f_dep_peak: 1.526457E-03
+  f_dep_th: 1.000023E-03
+  f_pot_peak: 3.882245E-02
+  f_pot_th: 1.593557E-01
