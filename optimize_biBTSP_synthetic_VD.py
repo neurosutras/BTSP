@@ -230,7 +230,7 @@ def load_data(induction):
                                       peak_locs=context.peak_locs, ramp_scaling_factor=context.ramp_scaling_factor,
                                       induction_start_loc=induction_loc_1, induction_stop_loc=induction_stop_loc_1,
                                       track_length=context.track_length, target_range=context.target_range,
-                                      bounds=(context.min_delta_weight, context.target_peak_weight),
+                                      bounds=(context.min_delta_weight, context.target_peak_delta_weight),
                                       verbose=context.verbose, plot=context.plot)
         if induction == 1:
             induction_context.target_ramp['before'] = np.zeros_like(context.binned_x)
@@ -253,7 +253,7 @@ def load_data(induction):
                                       induction_start_loc=induction_context.mean_induction_start_loc,
                                       induction_stop_loc=induction_context.mean_induction_stop_loc,
                                       track_length=context.track_length, target_range=context.target_range,
-                                      bounds=(context.min_delta_weight, context.target_peak_weight),
+                                      bounds=(context.min_delta_weight, context.target_peak_delta_weight),
                                       verbose=context.verbose, plot=context.plot)
         context.data_cache[induction] = induction_context
     context.update(induction_context())
@@ -352,6 +352,7 @@ def calculate_model_ramp(export=False, plot=False):
         axes2[1].set_xlabel('Location (cm)')
 
     this_peak_ramp_amp = max(context.target_peak_val_1, context.target_peak_val_2) + context.delta_peak_ramp_amp
+    result = {}
 
     for induction_lap in range(len(context.induction_start_times)):
         current_complete_ramp = get_complete_ramp(current_ramp, context.binned_x, context.position,
@@ -415,6 +416,9 @@ def calculate_model_ramp(export=False, plot=False):
 
         if plot:
             axes2[0].plot(context.binned_x, current_ramp)
+
+        if context.induction == 1 and induction_lap == 0:
+            result['ramp_amp_after_first_plateau'] = np.max(current_ramp)
         ramp_snapshots.append(current_ramp)
 
     if plot:
@@ -438,7 +442,6 @@ def calculate_model_ramp(export=False, plot=False):
                            induction_loc=context.mean_induction_start_loc, track_length=context.track_length,
                            target_range=context.target_range, full_output=True)
 
-    result = {}
     result['residual_score'] = model_residual_score
 
     if context.induction == 1:
@@ -699,15 +702,17 @@ def plot_model_summary_figure(model_file_path=None):
     target_ramp = context.target_ramp['after']
 
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
-    local_signals = \
-        np.divide(get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt),
-                  local_signal_peak)
 
     signal_xrange = np.linspace(0., 1., 10000)
+    pot_phi = np.vectorize(lambda x: min(1., max(0., (1. - x))))
+    dep_phi = np.vectorize(lambda x: min(1., max(0., x)))
+
     pot_rate = np.vectorize(scaled_single_sigmoid(
         context.f_pot_th, context.f_pot_th + context.f_pot_peak, signal_xrange))
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_peak, signal_xrange))
+
+    this_peak_ramp_amp = max(context.target_peak_val_1, context.target_peak_val_2) + context.delta_peak_ramp_amp
 
     resolution = 10
     input_sample_indexes = np.arange(0, len(context.peak_locs), resolution)
@@ -807,73 +812,7 @@ def plot_model_summary_figure(model_file_path=None):
     clean_axes(axes)
 
     colors = ['c', 'r']
-    """
-    axes1 = [[fig.add_subplot(gs1[row, col]) for col in xrange(2)] for row in xrange(2)]
-    axes1[0][0].get_shared_x_axes().join(axes1[0][0], axes1[0][1], axes1[1][0], axes1[1][1])
-    axes1[0][0].get_shared_y_axes().join(axes1[0][0], axes1[0][1])
-    axes1[1][0].get_shared_y_axes().join(axes1[1][0], axes1[1][1])
-    ymax1 = np.max(global_signal)
-    ymax2 = 0.
-    axes1_0_right = [axes1[0][0].twinx(), axes1[0][1].twinx()]
-    for i, (name, index) in enumerate(example_input_dict.iteritems()):
-        this_rate_map = context.complete_rate_maps[index]
-        this_local_signal = local_signal_history[index]
-        this_weight_dynamics = weight_dynamics_history[index]
-        ymax1 = max(ymax1, np.max(this_local_signal))
-        axes1[0][i].plot(context.complete_t / 1000., this_rate_map, c='grey', linewidth=1.,
-                         label='Presynaptic firing rate', linestyle='--')
-        axes1_0_right[i].plot(context.down_t / 1000., this_local_signal, c=colors[i], label='Synaptic eligibility signal')
-        axes1_0_right[i].plot(context.down_t / 1000., global_signal, c='k', label='Dendritic gating signal', linewidth=0.75)
-        axes1_0_right[i].set_title('%s:' % name, fontsize=mpl.rcParams['font.size'])
-        axes1_0_right[i].fill_between(context.down_t / 1000., 0., np.minimum(this_local_signal, global_signal), alpha=0.5,
-                                facecolor=colors[i], label='Signal overlap')
-        axes1[1][i].plot(context.down_t / 1000., this_weight_dynamics, c=colors[i])
-        ymax2 = max(ymax2, np.max(this_weight_dynamics))
-        axes1[0][i].set_xlabel('Time (s)')
-        for label in axes1[0][i].get_xticklabels():
-            label.set_visible(True)
-        axes1[1][i].set_xlabel('Time (s)')
-        axes1_0_right[i].legend(loc=(0.4, 1.), frameon=False, framealpha=0.5, handlelength=1,
-                           fontsize=mpl.rcParams['font.size'])
-        axes1[0][i].legend(loc=(-0.2, 1.2), frameon=False, framealpha=0.5, handlelength=1,
-                                fontsize=mpl.rcParams['font.size'])
-        end = min(2, len(context.induction_start_times) - 1)
-        axes1[0][i].set_xlim(-2., context.induction_start_times[end] / 1000. + 5.)
-        axes1[1][i].set_xlim(-2., context.induction_start_times[end] / 1000. + 5.)
-    ymax1_right = ymax1 / 0.9
-    ymax1_left = context.input_field_peak_rate / 0.9
-    ymax1 = max(ymax1_left, ymax1_right)
-    ymax2 = math.ceil(ymax2 / 0.95)
-    axes1[0][0].set_ylim([0., ymax1_left])
-    axes1[0][1].set_ylim([0., ymax1_left])
-    axes1[1][0].set_ylim([0., ymax2])
-    axes1[1][1].set_ylim([0., ymax2])
-    axes1_0_right[0].set_ylim([0., ymax1_right])
-    axes1_0_right[1].set_ylim([0., ymax1_right])
-    bar_loc0 = ymax1 * 0.95
-    bar_loc1 = ymax2 * 0.95
-    axes1[0][0].hlines([bar_loc0] * len(context.induction_start_times),
-                   xmin=context.induction_start_times / 1000.,
-                   xmax=context.induction_stop_times / 1000., linewidth=2)
-    axes1[0][1].hlines([bar_loc0] * len(context.induction_start_times),
-                      xmin=context.induction_start_times / 1000.,
-                      xmax=context.induction_stop_times / 1000., linewidth=2)
-    axes1[1][0].hlines([bar_loc1] * len(context.induction_start_times),
-                      xmin=context.induction_start_times / 1000.,
-                      xmax=context.induction_stop_times / 1000., linewidth=2)
-    axes1[1][1].hlines([bar_loc1] * len(context.induction_start_times),
-                      xmin=context.induction_start_times / 1000.,
-                      xmax=context.induction_stop_times / 1000., linewidth=2)
-    axes1[0][0].set_ylabel('Firing rate (Hz)')
-    axes1[1][0].set_ylabel('Synaptic weight')
-    axes1[0][0].set_yticks(np.arange(0., context.input_field_peak_rate + 1., 10.))
-    axes1[0][1].set_yticks(np.arange(0., context.input_field_peak_rate + 1., 10.))
-    axes1_0_right[0].set_ylabel('Plasticity signal amplitude', rotation=-90, labelpad=15)
-    axes1_0_right[0].set_yticklabels([i * 0.2 for i in range(5)])
-    axes1_0_right[1].set_yticklabels([i * 0.2 for i in range(5)])
-    clean_twin_right_axes(axes1_0_right)
-    clean_axes(np.array(axes1))
-    """
+
     axes2 = []
     ymax = 0.
     for row, weights in zip(range(1, 3), [initial_weights, final_weights]):
@@ -941,19 +880,6 @@ def plot_model_summary_figure(model_file_path=None):
     axes[0][1].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='q$_{+}$ (Potentiation)')
     axes[0][1].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='q$_{-}$ (Depression)')
     axes[0][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-
-    cmap = cm.jet
-    for w in np.linspace(0., 1., 10):
-        net_delta_weight = pot_rate(signal_xrange) * (1. - w) - dep_rate(signal_xrange) * dep_scale * w
-        axes[0][2].plot(signal_xrange, net_delta_weight, c=cmap(w))
-    axes[0][2].axhline(y=0., linestyle='--', c='grey')
-    axes[0][2].set_xlabel('Normalized eligibility signal')
-    axes[0][2].set_ylabel('Normalized rate')
-    axes[0][2].set_title('Net rate of change in synaptic weight', fontsize=mpl.rcParams['font.size'], pad=10.)
-    sm = cm.ScalarMappable(cmap=cmap)
-    sm.set_array([])
-    cbar = fig.colorbar(sm, ax=axes[0][2])
-    cbar.set_label('Initial synaptic weight\n(normalized)', rotation=270., labelpad=25.)
 
     bar_loc = max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.) * 0.95
     delta_weights = np.subtract(final_weights, initial_weights)
@@ -1046,7 +972,7 @@ def filter_features_model_ramp(primitives, current_features, export=False):
     grouped_feature_names = ['delta_val_at_target_peak', 'delta_val_at_model_peak', 'delta_width', 'delta_peak_shift',
                              'delta_asymmetry', 'delta_min_loc', 'delta_val_at_target_min', 'delta_val_at_model_min',
                              'residual_score']
-    feature_names = ['self_consistent_delta_residual_score']
+    feature_names = ['self_consistent_delta_residual_score', 'ramp_amp_after_first_plateau']
     for this_result_dict in primitives:
         if not this_result_dict:
             if context.verbose > 0:
@@ -1106,6 +1032,12 @@ def get_objectives(features, export=False):
     for feature_name in feature_names:
         if feature_name in context.objective_names and feature_name in features:
             objectives[feature_name] = features[feature_name]
+
+    feature_names = ['ramp_amp_after_first_plateau']
+    for feature_name in feature_names:
+        if feature_name in context.objective_names and feature_name in features:
+            objectives[feature_name] = ((features[feature_name] - context.target_val[feature_name]) /
+                                        context.target_range[feature_name]) ** 2.
 
     for objective_name in context.objective_names:
         if objective_name not in objectives:

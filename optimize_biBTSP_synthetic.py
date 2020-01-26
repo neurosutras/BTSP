@@ -229,7 +229,7 @@ def load_data(induction):
                                       peak_locs=context.peak_locs, ramp_scaling_factor=context.ramp_scaling_factor,
                                       induction_start_loc=induction_loc_1, induction_stop_loc=induction_stop_loc_1,
                                       track_length=context.track_length, target_range=context.target_range,
-                                      bounds=(context.min_delta_weight, context.target_peak_weight),
+                                      bounds=(context.min_delta_weight, context.target_peak_delta_weight),
                                       verbose=context.verbose, plot=context.plot)
         if induction == 1:
             induction_context.target_ramp['before'] = np.zeros_like(context.binned_x)
@@ -252,7 +252,7 @@ def load_data(induction):
                                       induction_start_loc=induction_context.mean_induction_start_loc,
                                       induction_stop_loc=induction_context.mean_induction_stop_loc,
                                       track_length=context.track_length, target_range=context.target_range,
-                                      bounds=(context.min_delta_weight, context.target_peak_weight),
+                                      bounds=(context.min_delta_weight, context.target_peak_delta_weight),
                                       verbose=context.verbose, plot=context.plot)
         context.data_cache[induction] = induction_context
     context.update(induction_context())
@@ -366,6 +366,8 @@ def calculate_model_ramp(export=False, plot=False):
         axes2[1].set_ylabel('Change in synaptic weight')
         axes2[1].set_xlabel('Location (cm)')
 
+    result = {}
+
     for induction_lap in range(len(context.induction_start_times)):
         if induction_lap == 0:
             start_time = context.down_t[0]
@@ -400,6 +402,9 @@ def calculate_model_ramp(export=False, plot=False):
 
         if plot:
             axes2[0].plot(context.binned_x, current_ramp)
+
+        if context.induction == 1 and induction_lap == 0:
+            result['ramp_amp_after_first_plateau'] = np.max(current_ramp)
         ramp_snapshots.append(current_ramp)
 
     if plot:
@@ -422,7 +427,6 @@ def calculate_model_ramp(export=False, plot=False):
                            induction_loc=context.mean_induction_start_loc, track_length=context.track_length,
                            target_range=context.target_range, full_output=True)
 
-    result = {}
     result['residual_score'] = model_residual_score
 
     if context.induction == 1:
@@ -1043,7 +1047,7 @@ def filter_features_model_ramp(primitives, current_features, export=False):
     grouped_feature_names = ['delta_val_at_target_peak', 'delta_val_at_model_peak', 'delta_width', 'delta_peak_shift',
                              'delta_asymmetry', 'delta_min_loc', 'delta_val_at_target_min', 'delta_val_at_model_min',
                              'residual_score']
-    feature_names = ['self_consistent_delta_residual_score']
+    feature_names = ['self_consistent_delta_residual_score', 'ramp_amp_after_first_plateau']
     for this_result_dict in primitives:
         if not this_result_dict:
             if context.verbose > 0:
@@ -1103,6 +1107,12 @@ def get_objectives(features, export=False):
     for feature_name in feature_names:
         if feature_name in context.objective_names and feature_name in features:
             objectives[feature_name] = features[feature_name]
+
+    feature_names = ['ramp_amp_after_first_plateau']
+    for feature_name in feature_names:
+        if feature_name in context.objective_names and feature_name in features:
+            objectives[feature_name] = ((features[feature_name] - context.target_val[feature_name]) /
+                                        context.target_range[feature_name]) ** 2.
 
     for objective_name in context.objective_names:
         if objective_name not in objectives:
