@@ -64,19 +64,19 @@ feature_names:
 - exp2_delta_val_at_target_min
 - exp2_delta_val_at_model_min
 update_context:
-- - optimize_biBTSP_SRL_A
+- - optimize_biBTSP_WD_A
   - update_model_params
 get_features_stages:
-- source: optimize_biBTSP_SRL_A
+- source: optimize_biBTSP_WD_A
   get_args_static: get_args_static_signal_amplitudes
   compute_features: compute_features_signal_amplitudes
   filter_features: filter_features_signal_amplitudes
-- source: optimize_biBTSP_SRL_A
+- source: optimize_biBTSP_WD_A
   get_args_dynamic: get_args_dynamic_model_ramp
   compute_features: compute_features_model_ramp
   filter_features: filter_features_model_ramp
 get_objectives:
-  optimize_biBTSP_SRL_A: get_objectives
+  optimize_biBTSP_WD_A: get_objectives
 kwargs:
   data_file_name: 20190711_biBTSP_data_calibrated_input.hdf5
   input_field_width: 90.  # cm
@@ -87,7 +87,7 @@ objective_names:
 - exp1_residual_score
 - exp2_residual_score
 - self_consistent_delta_residual_score
-optimization_title: biBTSP_SRL_A
+optimization_title: biBTSP_WD_A
 param_gen: PopulationAnnealing
 param_names:
 - k_pot
