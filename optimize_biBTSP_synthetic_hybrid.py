@@ -1193,14 +1193,12 @@ def filter_features_model_ramp(primitives, current_features, model_id=None, expo
                              'residual_score']
     feature_names = ['self_consistent_delta_residual_score', 'ramp_amp_after_first_plateau']
     for this_result_dict in primitives:
-        """
         if not this_result_dict:
             if context.verbose > 0:
                 print('optimize_biBTSP_%s: filter_features_model_ramp: pid: %i; model failed' %
                       (BTSP_model_name, os.getpid()))
                 sys.stdout.flush()
             return dict()
-        """
         for induction in this_result_dict:
             for condition in this_result_dict[induction]:
                 group = 'induction' + str(induction)
