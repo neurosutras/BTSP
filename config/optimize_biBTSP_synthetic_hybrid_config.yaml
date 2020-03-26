@@ -58,6 +58,10 @@ rel_bounds:
   - '>'
   - 1.0
   - global_signal_decay
+- - vd_th
+  - '<='
+  - 1.0
+  - peak_delta_ramp
 - - k_pot
   - '>'
   - 1.0
