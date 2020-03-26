@@ -1,23 +1,23 @@
 1:
   1:
-    current_laps:
+    current_columns:
     - 4
     - 5
     - 6
     - 7
     file_name: 151006_3i_1.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
       - 1
       - 2
       - 3
-    ramp_laps:
+    ramp_columns:
       after: 8
     sampling_rate: 1000.0
     spont: False
   2:
-    current_laps:
+    current_columns:
     - 9
     - 10
     - 11
@@ -27,7 +27,7 @@
     - 15
     - 16
     file_name: 151006_4ii.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
       - 1
@@ -39,46 +39,46 @@
       - 7
       pre:
       - 8
-    ramp_laps:
+    ramp_columns:
       after: 18
       before: 17
     sampling_rate: 20000.0
     spont: False
 2:
   1:
-    current_laps:
+    current_columns:
     - 5
     - 6
     - 7
     - 8
     - 9
     file_name: 160204_2i.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
       - 1
       - 2
       - 3
       - 4
-    ramp_laps:
+    ramp_columns:
       after: 10
     sampling_rate: 1000.0
     spont: False
 3:
   1:
-    current_laps:
+    current_columns:
     - 1
     file_name: 130925s.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
-    ramp_laps:
+    ramp_columns:
       after: 2
     sampling_rate: 20000.0
     spont: True
 4:
   1:
-    current_laps:
+    current_columns:
     - 7
     - 8
     - 9
@@ -87,7 +87,7 @@
     - 12
     - 13
     file_name: 160323_2i.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
       - 1
@@ -96,12 +96,12 @@
       - 4
       - 5
       - 6
-    ramp_laps:
+    ramp_columns:
       after: 14
     sampling_rate: 1000.0
     spont: False
   2:
-    current_laps:
+    current_columns:
     - 7
     - 8
     - 9
@@ -109,7 +109,7 @@
     - 11
     - 12
     file_name: 160323_2ii.txt
-    position_laps:
+    position_columns:
       pre:
       - 0
       induction:
@@ -119,40 +119,40 @@
       - 4
       - 5
       - 6
-    ramp_laps:
+    ramp_columns:
       before: 13
       after: 14
     sampling_rate: 20000.0
     spont: False
 5:
   1:
-    current_laps:
+    current_columns:
     - 5
     - 6
     - 7
     - 8
     - 9
     file_name: 160310_4i.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
       - 1
       - 2
       - 3
       - 4
-    ramp_laps:
+    ramp_columns:
       after: 10
     sampling_rate: 1000.0
     spont: False
   2:
-    current_laps:
+    current_columns:
     - 6
     - 7
     - 8
     - 9
     - 10
     file_name: 160310_4ii.txt
-    position_laps:
+    position_columns:
       pre:
       - 0
       induction:
@@ -161,21 +161,21 @@
       - 3
       - 4
       - 5
-    ramp_laps:
+    ramp_columns:
       before: 11
       after: 12
     sampling_rate: 20000.0
     spont: False
 6:
   1:
-    current_laps:
+    current_columns:
     - 7
     - 8
     - 9
     - 10
     - 11
     file_name: 150422.txt
-    position_laps:
+    position_columns:
       pre:
       - 0
       induction:
@@ -184,40 +184,40 @@
       - 3
       - 4
       - 5
-    ramp_laps:
+    ramp_columns:
       after: 6
     sampling_rate: 1000.0
     spont: False
 7:
   1:
-    current_laps:
+    current_columns:
     - 7
     - 8
     - 9
     - 10
     - 11
     file_name: 151203.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
       - 1
       - 2
       - 3
       - 4
-    ramp_laps:
+    ramp_columns:
       before: 5
       after: 6
     sampling_rate: 1000.0
     spont: False
   2:
-    current_laps:
+    current_columns:
     - 6
     - 7
     - 8
     - 9
     - 10
     file_name: 151203_4ii.txt
-    position_laps:
+    position_columns:
       pre:
       - 5
       induction:
@@ -226,40 +226,40 @@
       - 2
       - 3
       - 4
-    ramp_laps:
+    ramp_columns:
       before: 12
       after: 13
     sampling_rate: 20000.0
     spont: False
 9:
   1:
-    current_laps:
+    current_columns:
     - 6
     - 7
     - 8
     - 9
     - 10
     file_name: 160309.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
       - 1
       - 2
       - 3
       - 4
-    ramp_laps:
+    ramp_columns:
       after: 5
     sampling_rate: 1000.0
     spont: False
   2:
-    current_laps:
+    current_columns:
     - 7
     - 8
     - 9
     - 10
     - 11
     file_name: 160309_2ii.txt
-    position_laps:
+    position_columns:
       pre:
       - 0
       induction:
@@ -270,21 +270,21 @@
       - 5
       post:
       - 6
-    ramp_laps:
+    ramp_columns:
       before: 13
       after: 14
     sampling_rate: 20000.0
     spont: False
 10:
   1:
-    current_laps:
+    current_columns:
     - 8
     - 9
     - 10
     - 11
     - 12
     file_name: 160721.txt
-    position_laps:
+    position_columns:
       pre:
       - 0
       induction:
@@ -293,14 +293,14 @@
       - 3
       - 4
       - 5
-    ramp_laps:
+    ramp_columns:
       before: 6
       after: 7
     sampling_rate: 1000.0
     spont: False
 11:
   2:
-    current_laps:
+    current_columns:
     - 6
     - 7
     - 8
@@ -308,7 +308,7 @@
     - 10
     - 11
     file_name: 160826_2ii*.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
       - 1
@@ -316,85 +316,85 @@
       - 3
       - 4
       - 5
-    ramp_laps:
+    ramp_columns:
       before: 12
       after: 13
     sampling_rate: 20000.0
     spont: False
 12:
   1:
-    current_laps:
+    current_columns:
     - 0
     - 1
     - 2
     file_name: 140522_3i.txt
-    position_laps:
+    position_columns:
       induction:
       - 3
       - 4
       - 5
-    ramp_laps:
+    ramp_columns:
       after: 6
     sampling_rate: 1000.0
     spont: False
 13:
   1:
-    current_laps:
+    current_columns:
     - 3
     - 4
     - 5
     file_name: 140529_6i.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
       - 1
       - 2
-    ramp_laps:
+    ramp_columns:
       after: 6
     sampling_rate: 1000.0
     spont: False
 14:
   1:
-    current_laps:
+    current_columns:
     - 0
     - 1
     - 2
     - 3
     - 4
     file_name: 140609_4i.txt
-    position_laps:
+    position_columns:
       induction:
       - 5
       - 6
       - 7
       - 8
       - 9
-    ramp_laps:
+    ramp_columns:
       after: 10
     sampling_rate: 1000.0
     spont: False
 15:
   1:
-    current_laps:
+    current_columns:
     - 5
     - 6
     - 7
     - 8
     - 9
     file_name: 151007_2i.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
       - 1
       - 2
       - 3
       - 4
-    ramp_laps:
+    ramp_columns:
       after: 10
     sampling_rate: 1000.0
     spont: False
   2:
-    current_laps:
+    current_columns:
     - 8
     - 9
     - 10
@@ -402,7 +402,7 @@
     - 12
     - 13
     file_name: 151007_2ii.txt
-    position_laps:
+    position_columns:
       pre:
       - 0
       induction:
@@ -412,72 +412,72 @@
       - 4
       - 5
       - 6
-    ramp_laps:
+    ramp_columns:
       before: 14
       after: 15
     sampling_rate: 20000.0
     spont: False
 16:
   1:
-    current_laps:
+    current_columns:
     - 1
     file_name: 131210s.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
-    ramp_laps:
+    ramp_columns:
       after: 2
     sampling_rate: 20000.0
     spont: True
 17:
   1:
-    current_laps:
+    current_columns:
     - 5
     - 6
     - 7
     - 8
     - 9
     file_name: 160308_2i.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
       - 1
       - 2
       - 3
       - 4
-    ramp_laps:
+    ramp_columns:
       after: 10
     sampling_rate: 1000.0
     spont: False
 18:
   1:
-    current_laps:
+    current_columns:
     - 5
     - 6
     - 7
     - 8
     - 9
     file_name: 160318_2i.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
       - 1
       - 2
       - 3
       - 4
-    ramp_laps:
+    ramp_columns:
       after: 10
     sampling_rate: 1000.0
     spont: False
   2:
-    current_laps:
+    current_columns:
     - 6
     - 7
     - 8
     - 9
     - 10
     file_name: 160318_2ii*.txt
-    position_laps:
+    position_columns:
       pre:
       - 5
       induction:
@@ -486,88 +486,88 @@
       - 2
       - 3
       - 4
-    ramp_laps:
+    ramp_columns:
       before: 11
       after: 12
     sampling_rate: 20000.0
     spont: False
 19:
   1:
-    current_laps:
+    current_columns:
     - 5
     - 6
     - 7
     - 8
     - 9
     file_name: 140516_3i.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
       - 1
       - 2
       - 3
       - 4
-    ramp_laps:
+    ramp_columns:
       after: 10
     sampling_rate: 1000.0
     spont: False
 20:
   1:
-    current_laps:
+    current_columns:
     - 5
     - 6
     - 7
     - 8
     - 9
     file_name: 140520_4i.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
       - 1
       - 2
       - 3
       - 4
-    ramp_laps:
+    ramp_columns:
       after: 10
     sampling_rate: 1000.0
     spont: False
 21:
   1:
-    current_laps:
+    current_columns:
     - 3
     - 4
     - 5
     file_name: 140926_1i.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
       - 1
       - 2
-    ramp_laps:
+    ramp_columns:
       after: 6
     sampling_rate: 1000.0
     spont: False
 22:
   1:
-    current_laps:
+    current_columns:
     - 0
     - 1
     - 2
     - 3
     file_name: 150413i.txt
-    position_laps:
+    position_columns:
       induction:
       - 4
       - 5
       - 6
       - 7
-    ramp_laps:
+    ramp_columns:
       after: 8
     sampling_rate: 1000.0
     spont: False
 23:
   1:
-    current_laps:
+    current_columns:
     - 6
     - 7
     - 8
@@ -575,7 +575,7 @@
     - 10
     - 11
     file_name: 151013_6i.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
       - 1
@@ -583,67 +583,67 @@
       - 3
       - 4
       - 5
-    ramp_laps:
+    ramp_columns:
       after: 12
     sampling_rate: 1000.0
     spont: False
 24:
   1:
-    current_laps:
+    current_columns:
     - 2
     file_name: 140330s.txt
-    position_laps:
+    position_columns:
       pre:
       - 0
       induction:
       - 1
-    ramp_laps:
+    ramp_columns:
       after: 3
     sampling_rate: 20000.0
     spont: True
 25:
   1:
-    current_laps:
+    current_columns:
     - 1
     file_name: 140411s.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
-    ramp_laps:
+    ramp_columns:
       after: 2
     sampling_rate: 20000.0
     spont: True
 26:
   1:
-    current_laps:
+    current_columns:
     - 2
     file_name: 140730s.txt
-    position_laps:
+    position_columns:
       pre:
       - 0
       induction:
       - 1
-    ramp_laps:
+    ramp_columns:
       after: 3
     sampling_rate: 20000.0
     spont: True
 27:
   1:
-    current_laps:
+    current_columns:
     - 2
     file_name: 141221s.txt
-    position_laps:
+    position_columns:
       pre:
       - 0
       induction:
       - 1
-    ramp_laps:
+    ramp_columns:
       after: 3
     sampling_rate: 20000.0
     spont: True
 29:
   2:
-    current_laps:
+    current_columns:
     - 6
     - 7
     - 8
@@ -651,7 +651,7 @@
     - 10
     - 11
     file_name: 150604ni.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
       - 1
@@ -659,14 +659,14 @@
       - 3
       - 4
       - 5
-    ramp_laps:
+    ramp_columns:
       before: 12
       after: 13
     sampling_rate: 20000.0
     spont: False
 30:
   2:
-    current_laps:
+    current_columns:
     - 6
     - 7
     - 8
@@ -674,7 +674,7 @@
     - 10
     - 11
     file_name: 150625ni.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
       - 1
@@ -682,21 +682,21 @@
       - 3
       - 4
       - 5
-    ramp_laps:
+    ramp_columns:
       before: 12
       after: 13
     sampling_rate: 20000.0
     spont: False
 31:
   2:
-    current_laps:
+    current_columns:
     - 6
     - 7
     - 8
     - 9
     - 10
     file_name: 150827ni.txt
-    position_laps:
+    position_columns:
       pre:
       - 0
       induction:
@@ -705,14 +705,14 @@
       - 3
       - 4
       - 5
-    ramp_laps:
+    ramp_columns:
       before: 11
       after: 12
     sampling_rate: 20000.0
     spont: False
 28:
   2:
-    current_laps:
+    current_columns:
     - 0
     - 1
     - 2
@@ -720,7 +720,7 @@
     - 4
     - 5
     file_name: 151009_1ni.txt
-    position_laps:
+    position_columns:
       induction:
       - 6
       - 7
@@ -728,14 +728,14 @@
       - 9
       - 10
       - 11
-    ramp_laps:
+    ramp_columns:
       before: 12
       after: 13
     sampling_rate: 20000.0
     spont: False
 8:
   2:
-    current_laps:
+    current_columns:
     - 6
     - 7
     - 8
@@ -743,7 +743,7 @@
     - 10
     - 11
     file_name: 150805_b.txt
-    position_laps:
+    position_columns:
       induction:
       - 0
       - 1
@@ -751,7 +751,7 @@
       - 3
       - 4
       - 5
-    ramp_laps:
+    ramp_columns:
       before: 12
       after: 13
     sampling_rate: 1000.0

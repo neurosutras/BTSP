@@ -4,18 +4,24 @@ python -i plot_biBTSP_data_summary_figure.py --target-induction=2
 
 To reproduce panels from Figure 3:
 python -i plot_biBTSP_data_summary_figure.py --target-induction=1 --target-induction=2
-plot_ramp_prediction_from_interpolation(
-    context.gp, ['data/20190711_biBTSP_data_calibrated_input.hdf5',
-                 'data/20190825_biBTSP_data_soma_DC.hdf5'], context.binned_x, context.binned_extra_x,
-    context.extended_binned_x, context.reference_delta_t, context.track_length, context.dt, context.debug,
-    labels=['Control', 'Depolarized'], colors=['k', 'purple'], tmax=context.tmax, induction=1, group='exp1',
-    truncate=context.truncate, show_std=False)
 
-To reproduce panels from Figure S6:
-boxplot_compare_ramp_summary_features(
-        {'Control': 'data/20190812_biBTSP_SRL_B_90cm_all_cells_merged_exported_model_output.hdf5',
-         'Depolarized': 'data/20190825_biBTSP_SRL_B_90cm_soma_DC_cells_exported_model_output.hdf5'},
-        ['Control', 'Depolarized'], induction=1)
+plot_ramp_prediction_from_interpolation(context.gp,
+    ['data/20200316_biBTSP_data_DC_soma_depo.h5', 'data/20200316_biBTSP_data_DC_soma_hyper.h5'],
+    ['Depolarized', 'Hyperpolarized'], context.binned_x, context.binned_extra_x, context.extended_binned_x,
+    context.reference_delta_t, context.track_length, context.dt, tmax=context.tmax, colors=['k', 'k'],
+    induction_list=[1, 2], group_list=['exp1', 'exp2'], v_dep_show_std_list=['samples', 'samples'],
+    v_indep_show_std_list=['kernel', 'samples'], show_both_predictions_list=[True, True],
+    display_tmin_list=[-5., -1.], debug=False, truncate=True)
+
+To reproduce panels from Figure S1:
+plot_ramp_prediction_from_interpolation(context.gp,
+    ['data/20190711_biBTSP_data_calibrated_input.hdf5'],
+    ['Control'], context.binned_x, context.binned_extra_x, context.extended_binned_x,
+    context.reference_delta_t, context.track_length, context.dt, tmax=context.tmax, colors=['k'],
+    induction_list=[2], group_list=['exp2'], v_dep_show_std_list=['samples'],
+    v_indep_show_std_list=['samples'], show_both_predictions_list=[False],
+    debug=False, truncate=True)
+
 """
 from biBTSP_utils import *
 from nested.optimize_utils import *
@@ -36,115 +42,273 @@ mpl.rcParams['mathtext.default'] = 'regular'
 context = Context()
 
 
-def plot_ramp_prediction_from_interpolation(regressor, data_file_path_list, binned_x, binned_extra_x, extended_binned_x,
-                                            reference_delta_t, track_length, dt, debug, labels, colors='k', tmax=5.,
-                                            induction=1, group='exp1', show_std=False, truncate=True):
+def plot_ramp_prediction_from_interpolation(regressor, data_file_path_list, labels, binned_x, binned_extra_x,
+                                            extended_binned_x, reference_delta_t, track_length, dt, tmax=5.,
+                                            colors=['k'], induction_list=[1], group_list=['exp1'],
+                                            v_dep_show_std_list=['samples'], v_indep_show_std_list=['samples'],
+                                            show_both_predictions_list=[True], display_tmin_list=None, debug=False,
+                                            truncate=True):
     """
 
     :param regressor: :class:'GaussianProcessRegressor'
     :param data_file_path_list: list of str (path)
+    :param labels: list of str
     :param binned_x: array
     :param binned_extra_x: array
     :param extended_binned_x: array
     :param reference_delta_t: array
     :param track_length: float
     :param dt: float
-    :param debug: bool
-    :param labels: str
-    :param colors: str
     :param tmax: float
-    :param induction: int
-    :param show_std: bool
+    :param colors: list of str
+    :param induction_list: list of int
+    :param group_list: list of str
+    :param v_dep_show_std_list: list of str in ['samples', 'kernel'] or None
+    :param v_indep_show_std_list: list of str in ['samples', 'kernel'] or None
+    :param show_both_predictions_list: list of bool
+    :param display_tmin_list: list of float or None
+    :param debug: bool
     :param truncate: bool
     """
-    fig, axes = plt.subplots(1, 3, figsize=(8.5, 2.75))
-
-    for i, data_file_path in enumerate(data_file_path_list):
+    fig, axes = plt.subplots(2, 3, figsize=(9., 6.75))
+    for row, data_file_path in enumerate(data_file_path_list):
         if not os.path.isfile(data_file_path):
             raise IOError('plot_ramp_prediction_from_interpolation: invalid data_file_path: %s' % data_file_path)
-        label = labels[i]
-        color = colors[i]
-        peak_ramp_amp, total_induction_dur, depo_soma, group_indexes, exp_ramp, extended_exp_ramp, delta_exp_ramp, \
-        mean_induction_loc, extended_min_delta_t, extended_delta_exp_ramp, interp_initial_exp_ramp, \
-        interp_delta_exp_ramp, interp_final_exp_ramp = \
-            get_biBTSP_analysis_results(data_file_path, binned_x, binned_extra_x, extended_binned_x, reference_delta_t,
-                                        track_length, dt, debug, truncate=truncate)
+        label = labels[row]
+        color = colors[row]
+        induction = induction_list[row]
+        group = group_list[row]
+        v_dep_show_std = v_dep_show_std_list[row]
+        v_indep_show_std = v_indep_show_std_list[row]
+        show_both_predictions = show_both_predictions_list[row]
+        if display_tmin_list is None:
+            display_tmin = -tmax
+        else:
+            display_tmin = display_tmin_list[row]
+        initial_induction_delta_vm, initial_exp_ramp, delta_exp_ramp = \
+            get_biBTSP_DC_soma_analysis_results(data_file_path, binned_x, binned_extra_x, extended_binned_x,
+                                                reference_delta_t, track_length, dt, induction=induction,
+                                                group=group, debug=debug, truncate=truncate)
 
-        this_axis = axes[i]
-        this_axis.set_xlim(-tmax, tmax)
-        induction_key = str(induction)
+        this_axis = axes[row][0]
+        this_axis.set_xlim(display_tmin, tmax)
         ramp_list = []
-        for cell_key in interp_delta_exp_ramp:
-            if induction_key in interp_delta_exp_ramp[cell_key]:
-                ramp_list.append(interp_delta_exp_ramp[cell_key][induction_key])
-                this_axis.plot(np.divide(reference_delta_t, 1000.), interp_delta_exp_ramp[cell_key][induction_key],
-                               c='darkgrey', linewidth=1., alpha=0.75)
+        for this_delta_exp_ramp in delta_exp_ramp:
+            ramp_list.append(this_delta_exp_ramp)
+            this_axis.plot(np.divide(reference_delta_t, 1000.), this_delta_exp_ramp,
+                           c='grey', linewidth=1., alpha=0.5)
         this_axis.plot(np.divide(reference_delta_t, 1000.), np.nanmean(ramp_list, axis=0), c=color)
         this_axis.set_title(label, fontsize=mpl.rcParams['font.size'], y=1.1)
         this_axis.set_ylabel('Change in ramp\namplitude (mV)')
         this_axis.set_xlabel('Time relative to\nplateau onset (s)')
-        this_axis.set_yticks(np.arange(-5., 16., 5.))
-        this_axis.set_ylim([-6., 16.])
-        this_axis.set_xticks(np.arange(-4., 5., 2.))
+        this_axis.set_yticks(np.arange(-10., 16., 5.))
+        this_axis.set_ylim([-10., 16.])
+        if display_tmin <= -4.:
+            this_axis.set_xticks(np.arange(-4., tmax, 2.))
+        elif display_tmin <= -1.:
+            this_axis.set_xticks(np.arange(-1., tmax, 1.))
+        this_xlim = this_axis.get_xlim()
+        this_axis.plot([this_xlim[0], this_xlim[1]], [0., 0.], '--', c='darkgrey', alpha=0.75)
 
-    res = 50
-    t_range = np.linspace(-tmax, tmax, res)
-
-    this_axis = axes[2]
-    this_axis.set_xlim(-tmax, tmax)
-    interp_points = np.vstack((t_range, np.zeros(res))).T
-    if show_std:
-        voltage_independent_prediction, voltage_independent_prediction_std = \
-            regressor.predict(interp_points, return_std=True)
-    else:
-        voltage_independent_prediction = regressor.predict(interp_points)
-    this_axis.plot(t_range, voltage_independent_prediction, c='c', label='Voltage-independent')
-    if show_std:
-        this_axis.fill_between(t_range, np.add(voltage_independent_prediction, voltage_independent_prediction_std),
-                               np.subtract(voltage_independent_prediction, voltage_independent_prediction_std),
-                               color='c', alpha=0.25, linewidth=0)
-    if group in depo_soma and len(depo_soma[group]) > 0 and group in group_indexes and \
-            len(group_indexes[group]) == len(depo_soma[group]):
-        vals = np.array(depo_soma[group])
-    else:
-        vals = np.array([10.])
-
-    if len(vals) > 1:
-        ramp_list = []
-        for val in vals:
-            interp_points = np.vstack((t_range, np.ones(res) * val)).T
-            voltage_dependent_prediction = regressor.predict(interp_points)
-            ramp_list.append(voltage_dependent_prediction)
-        voltage_dependent_prediction = np.mean(ramp_list, axis=0)
-        if show_std:
-            voltage_dependent_prediction_std = np.std(ramp_list, axis=0)
-    else:
-        val = vals[0]
-        interp_points = np.vstack((t_range, np.ones(res) * val)).T
-        if show_std:
-            voltage_dependent_prediction, voltage_dependent_prediction_std = \
-                regressor.predict(interp_points, return_std=True)
+        this_axis = axes[row][1]
+        this_axis.set_xlim(display_tmin, tmax)
+        if not len(initial_induction_delta_vm) > 0:
+            raise RuntimeError(
+                'plot_ramp_prediction_from_interpolation: problem loading initial_induction_delta_vm for '
+                'DC_soma experiments in group: %s' % group)
+        flat_actual = []
+        flat_v_dep_prediction = []
+        flat_v_indep_prediction = []
+        if len(initial_induction_delta_vm) > 1:
+            v_dep_prediction_list = []
+            v_dep_prediction_std_list = []
+            v_indep_prediction_list = []
+            v_indep_prediction_std_list = []
+            for i in range(len(initial_induction_delta_vm)):
+                this_initial_induction_delta_vm = initial_induction_delta_vm[i]
+                this_initial_exp_ramp = initial_exp_ramp[i]
+                indexes = np.where(~np.isnan(this_initial_exp_ramp))[0]
+                flat_actual.extend(delta_exp_ramp[i][indexes])
+                v_dep_points = np.vstack((reference_delta_t[indexes] / 1000.,
+                                          this_initial_induction_delta_vm[indexes])).T
+                v_indep_points = np.vstack((reference_delta_t[indexes] / 1000.,
+                                            this_initial_exp_ramp[indexes])).T
+                this_v_dep_prediction, this_v_dep_prediction_std = regressor.predict(v_dep_points, return_std=True)
+                this_v_indep_prediction, this_v_indep_prediction_std = \
+                    regressor.predict(v_indep_points, return_std=True)
+                flat_v_dep_prediction.extend(this_v_dep_prediction)
+                flat_v_indep_prediction.extend(this_v_indep_prediction)
+                this_v_dep_prediction = \
+                    np.interp(reference_delta_t, reference_delta_t[indexes], this_v_dep_prediction)
+                bad_indexes = np.where(np.isnan(this_initial_exp_ramp))[0]
+                this_v_dep_prediction[bad_indexes] = np.nan
+                this_v_indep_prediction = \
+                    np.interp(reference_delta_t, reference_delta_t[indexes], this_v_indep_prediction)
+                this_v_indep_prediction[bad_indexes] = np.nan
+                v_dep_prediction_list.append(this_v_dep_prediction)
+                v_indep_prediction_list.append(this_v_indep_prediction)
+                if v_dep_show_std == 'kernel':
+                    this_v_dep_prediction_std = \
+                        np.interp(reference_delta_t, reference_delta_t[indexes], this_v_dep_prediction_std)
+                    v_dep_prediction_std_list.append(this_v_dep_prediction_std)
+                if v_indep_show_std == 'kernel':
+                    this_v_indep_prediction_std = \
+                        np.interp(reference_delta_t, reference_delta_t[indexes], this_v_indep_prediction_std)
+                    v_indep_prediction_std_list.append(this_v_indep_prediction_std)
+            v_dep_prediction = np.nanmean(v_dep_prediction_list, axis=0)
+            v_indep_prediction = np.nanmean(v_indep_prediction_list, axis=0)
+            if v_dep_show_std == 'kernel':
+                v_dep_prediction_std = np.nanmax(v_dep_prediction_std_list, axis=0)
+            elif v_dep_show_std == 'samples':
+                v_dep_prediction_std = np.nanstd(v_dep_prediction_list, axis=0)
+            elif v_dep_show_std is None:
+                v_dep_prediction_std = None
+            else:
+                raise RuntimeError('plot_ramp_prediction_from_interpolation: v_dep_show_std parameter not recognized: '
+                                   '%s' % (v_dep_show_std))
+            if v_indep_show_std == 'kernel':
+                v_indep_prediction_std = np.nanmax(v_indep_prediction_std_list, axis=0)
+            elif v_indep_show_std == 'samples':
+                v_indep_prediction_std = np.nanstd(v_indep_prediction_list, axis=0)
+            elif v_indep_show_std is None:
+                v_indep_prediction_std = None
+            else:
+                raise RuntimeError('plot_ramp_prediction_from_interpolation: v_indep_show_std parameter not '
+                                   'recognized: %s' % (v_indep_show_std))
         else:
-            voltage_dependent_prediction = regressor.predict(interp_points)
+            this_initial_induction_delta_vm = initial_induction_delta_vm[0]
+            this_initial_exp_ramp = initial_exp_ramp[0]
+            indexes = np.where(~np.isnan(this_initial_exp_ramp))[0]
+            flat_actual.extend(delta_exp_ramp[i][indexes])
+            v_dep_points = np.vstack((reference_delta_t[indexes] / 1000.,
+                                      this_initial_induction_delta_vm[indexes])).T
+            v_indep_points = np.vstack(
+                (reference_delta_t[indexes] / 1000., this_initial_exp_ramp[indexes])).T
+            v_dep_prediction, v_dep_prediction_std = \
+                regressor.predict(v_dep_points, return_std=True)
+            flat_v_dep_prediction.extend(v_dep_prediction)
+            v_dep_prediction = \
+                np.interp(reference_delta_t, reference_delta_t[indexes], v_dep_prediction)
+            bad_indexes = np.where(np.isnan(this_initial_exp_ramp))[0]
+            v_dep_prediction[bad_indexes] = np.nan
+            v_dep_prediction_std = \
+                np.interp(reference_delta_t, reference_delta_t[indexes], v_dep_prediction_std)
+            v_dep_prediction_std[bad_indexes] = np.nan
+            v_indep_prediction, v_indep_prediction_std = \
+                regressor.predict(v_indep_points, return_std=True)
+            flat_v_indep_prediction.extend(v_indep_prediction)
+            v_indep_prediction = \
+                np.interp(reference_delta_t, reference_delta_t[indexes], v_indep_prediction)
+            v_indep_prediction[bad_indexes] = np.nan
+            v_indep_prediction_std = \
+                np.interp(reference_delta_t, reference_delta_t[indexes], v_indep_prediction_std)
+            v_indep_prediction_std[bad_indexes] = np.nan
+            if v_dep_show_std is None:
+                v_dep_prediction_std = None
+            elif v_dep_show_std not in ['kernel', 'samples']:
+                raise RuntimeError('plot_ramp_prediction_from_interpolation: v_dep_show_std parameter not recognized: '
+                                   '%s' % (v_dep_show_std))
+            if v_indep_show_std is None:
+                v_indep_prediction_std = None
+            elif v_indep_show_std not in ['kernel', 'samples']:
+                raise RuntimeError('plot_ramp_prediction_from_interpolation: v_indep_show_std parameter not '
+                                   'recognized: %s' % (v_dep_show_std))
 
-    this_axis.plot(t_range, voltage_dependent_prediction, c='r', label='Voltage-dependent')
-    if show_std:
-        this_axis.fill_between(t_range, np.add(voltage_dependent_prediction, voltage_dependent_prediction_std),
-                               np.subtract(voltage_dependent_prediction, voltage_dependent_prediction_std),
-                               color='r', alpha=0.25, linewidth=0)
-    this_axis.legend(loc='best', frameon=False, framealpha=0.5, fontsize=mpl.rcParams['font.size'], handletextpad=0.3,
-                     handlelength=1.)
-    this_axis.set_title('Kernel prediction', fontsize=mpl.rcParams['font.size'], y=1.1)
-    this_axis.set_ylabel('Change in ramp\namplitude (mV)')
-    this_axis.set_xlabel('Time relative to\nplateau onset (s)')
-    this_axis.set_yticks(np.arange(-5., 16., 5.))
-    this_axis.set_ylim([-6., 16.])
-    this_axis.set_xticks(np.arange(-4., 5., 2.))
-    this_axis.axhspan(0., 16., facecolor='c', alpha=0.15)
-    this_axis.axhspan(-6., 0., facecolor='r', alpha=0.15)
-    clean_axes(axes)
-    fig.subplots_adjust(left=0.1, wspace=0.55, right=0.98, bottom=0.25, top=0.85)
-    fig.show()
+        if show_both_predictions:
+            this_axis.plot(reference_delta_t / 1000., v_indep_prediction, c='c', label='Voltage-independent')
+            if v_indep_prediction_std is not None:
+                this_axis.fill_between(reference_delta_t / 1000.,
+                                       np.add(v_indep_prediction, v_indep_prediction_std),
+                                       np.subtract(v_indep_prediction, v_indep_prediction_std),
+                                       color='c', alpha=0.25, linewidth=0)
+
+            this_axis.plot(reference_delta_t / 1000., v_dep_prediction, c='r', label='Voltage-dependent')
+            if v_dep_prediction_std is not None:
+                this_axis.fill_between(reference_delta_t / 1000.,
+                                       np.add(v_dep_prediction, v_dep_prediction_std),
+                                       np.subtract(v_dep_prediction, v_dep_prediction_std),
+                                       color='r', alpha=0.25, linewidth=0)
+            this_axis.legend(loc='best', frameon=False, framealpha=0.5, fontsize=mpl.rcParams['font.size'],
+                             handletextpad=0.3,
+                             handlelength=1.)
+            this_axis.set_title('Prediction', fontsize=mpl.rcParams['font.size'], y=1.1)
+            this_axis.set_ylabel('Change in ramp\namplitude (mV)')
+            this_axis.set_xlabel('Time relative to\nplateau onset (s)')
+            this_axis.set_yticks(np.arange(-10., 16., 5.))
+            this_axis.set_ylim([-10., 16.])
+            if display_tmin <= -4.:
+                this_axis.set_xticks(np.arange(-4., tmax, 2.))
+            elif display_tmin <= -1.:
+                this_axis.set_xticks(np.arange(-1., tmax, 1.))
+            this_xlim = this_axis.get_xlim()
+            this_axis.plot([this_xlim[0], this_xlim[1]], [0., 0.], '--', c='darkgrey', alpha=0.5)
+            # this_axis.axhspan(0., 16., facecolor='c', alpha=0.15)
+            # this_axis.axhspan(-6., 0., facecolor='r', alpha=0.15)
+
+            this_axis = axes[row][2]
+            this_axis.scatter(flat_actual, flat_v_dep_prediction, c='r', label='Voltage-dependent', linewidth=0,
+                              alpha=0.25, s=10)
+            this_axis.scatter(flat_actual, flat_v_indep_prediction, c='c', label='Voltage-independent',
+                              linewidth=0,
+                              alpha=0.25, s=10)
+            this_axis.set_xlabel('Actual (mV)')
+            this_axis.set_ylabel('Predicted (mV)')
+            this_axis.set_yticks(np.arange(-10., 16., 5.))
+            this_axis.set_ylim([-10., 16.])
+            this_axis.set_xticks(np.arange(-10., 16., 5.))
+            this_axis.set_xlim([-10., 16.])
+            this_xlim = this_axis.get_xlim()
+            this_axis.plot([this_xlim[0], this_xlim[1]], [this_xlim[0], this_xlim[1]], '--', c='darkgrey', alpha=0.75)
+            this_axis.set_title('Change in\nramp amplitude', fontsize=mpl.rcParams['font.size'], y=1.1)
+
+            r_val, p_val = pearsonr(flat_v_indep_prediction, flat_actual)
+            this_axis.annotate('R$^{2}$ = %.3f; p %s %.3f' %
+                               (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001),
+                               xy=(0.1, 0.9),
+                               xycoords='axes fraction', color='c')
+            r_val, p_val = pearsonr(flat_v_dep_prediction, flat_actual)
+            this_axis.annotate('R$^{2}$ = %.3f; p %s %.3f' %
+                               (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001),
+                               xy=(0.3, 0.025), xycoords='axes fraction', color='r')
+        else:
+            this_axis.plot(reference_delta_t / 1000., v_indep_prediction, c='k')
+            if v_indep_prediction_std is not None:
+                this_axis.fill_between(reference_delta_t / 1000.,
+                                       np.add(v_indep_prediction, v_indep_prediction_std),
+                                       np.subtract(v_indep_prediction, v_indep_prediction_std),
+                                       color='grey', alpha=0.25, linewidth=0)
+
+            this_axis.set_title('Prediction', fontsize=mpl.rcParams['font.size'], y=1.1)
+            this_axis.set_ylabel('Change in ramp\namplitude (mV)')
+            this_axis.set_xlabel('Time relative to\nplateau onset (s)')
+            this_axis.set_yticks(np.arange(-10., 16., 5.))
+            this_axis.set_ylim([-10., 16.])
+            if display_tmin <= -4.:
+                this_axis.set_xticks(np.arange(-4., tmax, 2.))
+            elif display_tmin <= -1.:
+                this_axis.set_xticks(np.arange(-1., tmax, 1.))
+            this_xlim = this_axis.get_xlim()
+            this_axis.plot([this_xlim[0], this_xlim[1]], [0., 0.], '--', c='darkgrey', alpha=0.5)
+
+            this_axis = axes[row][2]
+            this_axis.scatter(flat_actual, flat_v_indep_prediction, c='k', linewidth=0, alpha=0.25, s=10)
+            this_axis.set_xlabel('Actual (mV)')
+            this_axis.set_ylabel('Predicted (mV)')
+            this_axis.set_yticks(np.arange(-10., 16., 5.))
+            this_axis.set_ylim([-10., 16.])
+            this_axis.set_xticks(np.arange(-10., 16., 5.))
+            this_axis.set_xlim([-10., 16.])
+            this_xlim = this_axis.get_xlim()
+            this_axis.plot([this_xlim[0], this_xlim[1]], [this_xlim[0], this_xlim[1]], '--', c='darkgrey', alpha=0.75)
+            this_axis.set_title('Change in\nramp amplitude', fontsize=mpl.rcParams['font.size'], y=1.1)
+
+            r_val, p_val = pearsonr(flat_v_indep_prediction, flat_actual)
+            this_axis.annotate('R$^{2}$ = %.3f; p %s %.3f' %
+                               (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001),
+                               xy=(0.1, 0.9), xycoords='axes fraction', color='k')
+        clean_axes(axes)
+        fig.subplots_adjust(left=0.1, wspace=0.55, hspace=0.7, right=0.95, bottom=0.15, top=0.9)
+        fig.show()
 
 
 def boxplot_compare_ramp_summary_features(model_file_path_dict, ordered_labels, induction=1):
@@ -237,19 +401,19 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
 
     mpl.rcParams['font.size'] = font_size
 
-    peak_ramp_amp, total_induction_dur, depo_soma, group_indexes, exp_ramp, extended_exp_ramp, delta_exp_ramp, \
-        mean_induction_loc, extended_min_delta_t, extended_delta_exp_ramp, interp_initial_exp_ramp, \
+    peak_ramp_amp, total_induction_dur, initial_induction_delta_vm, group_indexes, exp_ramp, extended_exp_ramp, \
+        delta_exp_ramp, mean_induction_loc, extended_min_delta_t, extended_delta_exp_ramp, interp_initial_exp_ramp, \
         interp_delta_exp_ramp, interp_final_exp_ramp = \
         get_biBTSP_analysis_results(data_file_path, binned_x, binned_extra_x, extended_binned_x, reference_delta_t,
                                     track_length, dt, debug, truncate=truncate)
 
     context.update(locals())
 
-    fig, axesgrid = plt.subplots(2, 2, figsize=(8.25, 6))
+    fig, axesgrid = plt.subplots(3, 3, figsize=(12, 8.25))
     axes = []
-    for row in range(2):
-        for col in range(2):
-            axes.append(axesgrid[col][row])
+    axes.append(axesgrid[1][0])
+    for col in range(3):
+        axes.append(axesgrid[2][col])
 
     axes[0].scatter(total_induction_dur[group_indexes['exp1'] + group_indexes['spont']],
                     peak_ramp_amp[group_indexes['exp1'] + group_indexes['spont']], c='darkgrey', s=40., alpha=0.5,
@@ -269,7 +433,7 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
     axes[0].set_xlim(xlim)
     handles = [mlines.Line2D([0], [0], linestyle='none', mfc=color, mew=0, alpha=0.5, marker='o', ms=math.sqrt(40.))
                for color in ['darkgrey', 'k']]
-    labels = ['After induction 1', 'After induction 2']
+    labels = ['After Induction 1', 'After Induction 2']
     axes[0].legend(handles=handles, labels=labels, loc=(0.05, 0.95), frameon=False, framealpha=0.5, handletextpad=0.3,
                    handlelength=1.)
     r_val, p_val = pearsonr(total_induction_dur, peak_ramp_amp)
@@ -283,6 +447,7 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
     flat_final_ramp = []
     target_flat_delta_ramp = []
     target_flat_initial_ramp = []
+    target_flat_min_t = []
 
     for cell_key in interp_delta_exp_ramp:
         for induction in target_induction:
@@ -292,6 +457,7 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
                     print('Including cell: %s, induction: %s' % (cell_key, induction_key))
                 indexes = np.where(~np.isnan(interp_delta_exp_ramp[cell_key][induction_key]))[0]
                 flat_min_t.extend(np.divide(reference_delta_t[indexes], 1000.))
+                target_flat_min_t.extend(np.divide(reference_delta_t[indexes], 1000.))
                 flat_delta_ramp.extend(interp_delta_exp_ramp[cell_key][induction_key][indexes])
                 target_flat_delta_ramp.extend(interp_delta_exp_ramp[cell_key][induction_key][indexes])
                 flat_initial_ramp.extend(interp_initial_exp_ramp[cell_key][induction_key][indexes])
@@ -314,7 +480,7 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
     lines_cmap = 'jet'
     interp_cmap = 'bwr_r'
 
-    axes[1].set_xlim(-tmax, tmax)
+    axes[2].set_xlim(-tmax, tmax)
     for cell_key in interp_delta_exp_ramp:
         for induction in target_induction:
             induction_key = str(induction)
@@ -324,27 +490,32 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
                                interp_delta_exp_ramp[cell_key][induction_key][indexes],
                                interp_initial_exp_ramp[cell_key][induction_key][indexes],
                                vmin=ymin, vmax=ymax, cmap=lines_cmap)
-                cax = axes[1].add_collection(lc)
-    cbar = plt.colorbar(cax, ax=axes[1])
+                cax = axes[2].add_collection(lc)
+    cbar = plt.colorbar(cax, ax=axes[2])
     cbar.set_label('Initial ramp\namplitude (mV)', rotation=270., labelpad=23.)
-    axes[1].set_ylabel('Change in ramp\namplitude (mV)')
-    axes[1].set_xlabel('Time relative to plateau onset (s)')
-    axes[1].set_yticks(np.arange(-10., 16., 5.))
-    axes[1].set_xticks(np.arange(-4., 5., 2.))
+    axes[2].set_ylabel('Change in ramp\namplitude (mV)')
+    axes[2].set_xlabel('Time relative to plateau onset (s)')
+    axes[2].set_yticks(np.arange(-10., 16., 5.))
+    axes[2].set_xticks(np.arange(-4., 5., 2.))
 
     if np.any(np.array(target_induction) != 1):
-        axes[2].scatter(target_flat_initial_ramp, target_flat_delta_ramp, c='grey', s=5., alpha=0.5, linewidth=0.)
+        axes[1].scatter(target_flat_initial_ramp, target_flat_delta_ramp, c='grey', s=5., alpha=0.5, linewidth=0.)
         fit_params = np.polyfit(target_flat_initial_ramp, target_flat_delta_ramp, 1)
         fit_f = np.vectorize(lambda x: fit_params[0] * x + fit_params[1])
         xlim = [0., math.ceil(np.max(target_flat_initial_ramp))]
-        axes[2].plot(xlim, fit_f(xlim), c='k', alpha=0.75, zorder=1, linestyle='--')
+        axes[1].plot(xlim, fit_f(xlim), c='k', alpha=0.75, zorder=1, linestyle='--')
         r_val, p_val = pearsonr(target_flat_initial_ramp, target_flat_delta_ramp)
-        axes[2].annotate('R$^{2}$ = %.3f;\np %s %.3f' %
+        axes[1].annotate('R$^{2}$ = %.3f;\np %s %.3f' %
                          (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001), xy=(0.6, 0.7),
                          xycoords='axes fraction')
-        axes[2].set_xlim(xlim)
-        axes[2].set_xlabel('Initial ramp amplitude (mV)')
-        axes[2].set_ylabel('Change in ramp\namplitude (mV)')
+        axes[1].set_xlim(xlim)
+        axes[1].set_xlabel('Initial ramp amplitude (mV)')
+        axes[1].set_ylabel('Change in ramp\namplitude (mV)')
+
+        target_flat_delta_ramp = np.array(target_flat_delta_ramp)
+        target_flat_initial_ramp = np.array(target_flat_initial_ramp)
+        target_flat_min_t = np.array(target_flat_min_t)
+        indexes = np.where(target_flat_delta_ramp <= 1.)[0]
 
         points = np.array([flat_min_t, flat_initial_ramp]).transpose()
         data = np.array(flat_delta_ramp)
@@ -354,32 +525,33 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
             print('New max detected for 3D data color legend: vmax: %.5f' % this_vmax)
             sys.stdout.flush()
             vmax = this_vmax
+        if not debug:
+            res = 50
+            t_range = np.linspace(np.min(flat_min_t), np.max(flat_min_t), res)
+            initial_ramp_range = np.linspace(np.min(flat_initial_ramp), np.max(flat_initial_ramp), res)
 
-        res = 50
-        t_range = np.linspace(np.min(flat_min_t), np.max(flat_min_t), res)
-        initial_ramp_range = np.linspace(np.min(flat_initial_ramp), np.max(flat_initial_ramp), res)
+            t_grid, initial_ramp_grid = np.meshgrid(t_range, initial_ramp_range)
+            interp_points = np.vstack((t_grid.flatten(), initial_ramp_grid.flatten())).T
 
-        t_grid, initial_ramp_grid = np.meshgrid(t_range, initial_ramp_range)
-        interp_points = np.vstack((t_grid.flatten(), initial_ramp_grid.flatten())).T
+            kernel = RationalQuadratic(1., length_scale_bounds=(1e-10, 10.))
+            gp = GaussianProcessRegressor(kernel=kernel, alpha=3., n_restarts_optimizer=20, normalize_y=True)
+            start_time = time.time()
+            print('Starting Gaussian Process Regression with %i samples' % len(data))
+            gp.fit(points, data)
+            interp_data = gp.predict(interp_points).reshape(-1, res)
+            print('Gaussian Process Regression took %.1f s' % (time.time() - start_time))
 
-        kernel = RationalQuadratic(1., length_scale_bounds=(1e-10, 10.))
-        gp = GaussianProcessRegressor(kernel=kernel, alpha=3., n_restarts_optimizer=20, normalize_y=True)
-        start_time = time.time()
-        print('Starting Gaussian Process Regression with %i samples' % len(data))
-        gp.fit(points, data)
-        interp_data = gp.predict(interp_points).reshape(-1, res)
-        print('Gaussian Process Regression took %.1f s' % (time.time() - start_time))
-
-        cax = axes[3].pcolor(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax, zorder=0)
-        axes[3].set_ylabel('Initial ramp\namplitude (mV)')
-        axes[3].set_xlabel('Time relative to plateau onset (s)')
-        axes[3].set_ylim(0., ymax)
-        axes[3].set_xlim(-tmax, tmax)
-        axes[3].set_xticks(np.arange(-4., 5., 2.))
-        cbar = plt.colorbar(cax, ax=axes[3])
-        cbar.set_label('Change in ramp\namplitude (mV)', rotation=270., labelpad=23.)
+            cax = axes[3].pcolor(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax,
+                                 zorder=0)
+            axes[3].set_ylabel('Initial ramp\namplitude (mV)')
+            axes[3].set_xlabel('Time relative to plateau onset (s)')
+            axes[3].set_ylim(0., ymax)
+            axes[3].set_xlim(-tmax, tmax)
+            axes[3].set_xticks(np.arange(-4., 5., 2.))
+            cbar = plt.colorbar(cax, ax=axes[3])
+            cbar.set_label('Change in ramp\namplitude (mV)', rotation=270., labelpad=23.)
     clean_axes(axes)
-    fig.subplots_adjust(left=0.125, hspace=0.5, wspace=0.6, right=0.925)
+    fig.subplots_adjust(hspace=0.6, wspace=0.66, left=0.085, right=0.945, top=0.9, bottom=0.11)
     fig.show()
 
     context.update(locals())

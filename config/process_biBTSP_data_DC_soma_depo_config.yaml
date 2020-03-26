@@ -19,6 +19,7 @@
     sampling_rate: 1000.0
     spont: False
     DC_soma: True
+    DC_soma_val: 10.
 33:
   1:
     current_laps:
@@ -40,6 +41,7 @@
     sampling_rate: 1000.0
     spont: False
     DC_soma: True
+    DC_soma_val: 10.
 34:
   1:
     current_laps:
@@ -59,6 +61,7 @@
     sampling_rate: 1000.0
     spont: False
     DC_soma: True
+    DC_soma_val: 10.
 35:
   1:
     current_laps:
@@ -80,6 +83,7 @@
     sampling_rate: 1000.0
     spont: False
     DC_soma: True
+    DC_soma_val: 10.
 36:
   1:
     current_laps:
@@ -101,3 +105,4 @@
     sampling_rate: 1000.0
     spont: False
     DC_soma: True
+    DC_soma_val: 10.

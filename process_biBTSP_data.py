@@ -100,8 +100,8 @@ def main(cell_id, induction, config_file_path, data_dir, plot, export, export_fi
 
     if plot>1:
         fig, axes = plt.subplots(2)
-    for group in context.position_laps:
-        for i, p in enumerate(context.position_laps[group]):
+    for group in context.position_columns:
+        for i, p in enumerate(context.position_columns[group]):
             if group not in position:
                 raw_position[group] = []
                 position[group] = []
@@ -211,11 +211,11 @@ def main(cell_id, induction, config_file_path, data_dir, plot, export, export_fi
         fig.tight_layout()
         fig.show()
 
-    exp_ramp_raw = {'after': context.data[context.ramp_laps['after']][:100] * context.ramp_scale}
+    exp_ramp_raw = {'after': context.data[context.ramp_columns['after']][:100] * context.ramp_scale}
     exp_ramp = {'after': signal.savgol_filter(exp_ramp_raw['after'], 21, 3, mode='wrap')}
     exp_ramp_vs_t = {}
-    if 'before' in context.ramp_laps:
-        exp_ramp_raw['before'] = context.data[context.ramp_laps['before']][:100] * context.ramp_scale
+    if 'before' in context.ramp_columns:
+        exp_ramp_raw['before'] = context.data[context.ramp_columns['before']][:100] * context.ramp_scale
         exp_ramp['before'] = signal.savgol_filter(exp_ramp_raw['before'], 21, 3, mode='wrap')
         ramp_baseline = np.min(exp_ramp['before'])
         exp_ramp_raw['before'] -= ramp_baseline
@@ -231,7 +231,7 @@ def main(cell_id, induction, config_file_path, data_dir, plot, export, export_fi
     if plot>0:
         fig, axes = plt.subplots(2, 2)
         axes[1][0].plot(context.binned_x, exp_ramp['after'])
-        if 'before' in context.ramp_laps:
+        if 'before' in context.ramp_columns:
             axes[1][0].plot(context.binned_x, exp_ramp['before'])
             axes[1][0].plot(context.binned_x, exp_ramp_raw['before'])
         axes[1][0].plot(context.binned_x, exp_ramp_raw['after'])
@@ -246,7 +246,7 @@ def main(cell_id, induction, config_file_path, data_dir, plot, export, export_fi
     for i in range(len(position['pre'])):
         induction_gate = np.append(induction_gate, np.zeros_like(position['pre'][i]))
     for i, this_position in enumerate(position['induction']):
-        c = context.current_laps[i]
+        c = context.current_columns[i]
         this_current = context.data[c]
         raw_current.append(this_current)
         this_raw_t = raw_t['induction'][i]
@@ -289,7 +289,7 @@ def main(cell_id, induction, config_file_path, data_dir, plot, export, export_fi
         axes[1][1].plot(this_shifted_t, exp_ramp_vs_t['after'])
         axes[1][1].scatter(this_shifted_t[[start_index, peak_index, end_index]],
                            exp_ramp_vs_t['after'][[start_index, peak_index, end_index]])
-        if 'before' in context.ramp_laps:
+        if 'before' in context.ramp_columns:
             axes[1][1].plot(this_shifted_t, exp_ramp_vs_t['before'])
         axes[0][0].legend(loc='best', frameon=False, framealpha=0.5)
         clean_axes(axes)
@@ -350,14 +350,19 @@ def initialize():
 
     # True for spontaneously-occurring field, False for or induced field
     spont = meta_data[context.cell_id][context.induction]['spont']
-    if 'depo_soma' in meta_data[context.cell_id][context.induction]:
-        depo_soma = float(meta_data[context.cell_id][context.induction]['depo_soma'])
+    if 'DC_soma' in meta_data[context.cell_id][context.induction]:
+        DC_soma = meta_data[context.cell_id][context.induction]['DC_soma']
+        if 'DC_soma_val' in meta_data[context.cell_id][context.induction]:
+            DC_soma_val = float(meta_data[context.cell_id][context.induction]['DC_soma_val'])
+        else:
+            DC_soma_val = None
     else:
-        depo_soma = None
+        DC_soma = None
+        DC_soma_val = None
 
-    position_laps = meta_data[context.cell_id][context.induction]['position_laps']
-    current_laps = meta_data[context.cell_id][context.induction]['current_laps']
-    ramp_laps = meta_data[context.cell_id][context.induction]['ramp_laps']
+    position_columns = meta_data[context.cell_id][context.induction]['position_columns']
+    current_columns = meta_data[context.cell_id][context.induction]['current_columns']
+    ramp_columns = meta_data[context.cell_id][context.induction]['ramp_columns']
 
     context.update(locals())
     context.spatial_rate_maps, context.peak_locs = \
@@ -403,8 +408,10 @@ def export_data(export_file_path=None):
             f['data'][cell_key].create_group(induction_key)
         f['data'][cell_key].attrs['spont'] = context.spont
         this_group = f['data'][cell_key][induction_key]
-        if context.depo_soma is not None:
-            this_group.attrs['depo_soma'] = context.depo_soma
+        if context.DC_soma is not None:
+            this_group.attrs['DC_soma'] = context.DC_soma
+        if context.DC_soma_val is not None:
+            this_group.attrs['DC_soma_val'] = context.DC_soma_val
         this_group.attrs['induction_locs'] = context.induction_locs
         this_group.attrs['induction_durs'] = context.induction_durs
         this_group.create_group('raw')
@@ -426,7 +433,7 @@ def export_data(export_file_path=None):
             this_group['raw']['current'].create_dataset(lap_key, compression='gzip', data=context.raw_current[i])
         this_group['raw'].create_group('exp_ramp')
         this_group['raw']['exp_ramp'].create_dataset('after', compression='gzip', data=context.exp_ramp_raw['after'])
-        if 'before' in context.ramp_laps:
+        if 'before' in context.ramp_columns:
             this_group['raw']['exp_ramp'].create_dataset('before', compression='gzip',
                                                          data=context.exp_ramp_raw['before'])
         this_group.create_group('processed')
@@ -452,7 +459,7 @@ def export_data(export_file_path=None):
         this_group['processed'].create_group('exp_ramp_vs_t')
         this_group['processed']['exp_ramp_vs_t'].create_dataset('after', compression='gzip',
                                                                 data=context.exp_ramp_vs_t['after'])
-        if 'before' in context.ramp_laps:
+        if 'before' in context.ramp_columns:
             this_group['processed']['exp_ramp'].create_dataset('before', compression='gzip',
                                                                data=context.exp_ramp['before'])
             this_group['processed']['exp_ramp_vs_t'].create_dataset('before', compression='gzip',

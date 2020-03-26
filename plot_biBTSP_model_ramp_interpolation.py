@@ -4,6 +4,7 @@ import matplotlib as mpl
 import click
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RationalQuadratic
+from scipy.stats import pearsonr
 from collections import defaultdict
 
 mpl.rcParams['svg.fonttype'] = 'none'
@@ -26,7 +27,7 @@ context = Context()
 @click.option("--debug", is_flag=True)
 @click.option("--label", type=str, default=None)
 @click.option("--target-induction", type=int, multiple=True, default=[2])
-@click.option("--font-size", type=float, default=11.)
+@click.option("--font-size", type=float, default=12.)
 def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, target_induction, font_size):
     """
 
@@ -134,13 +135,13 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
 
     context.update(locals())
 
-    fig, axesgrid = plt.subplots(2, 2, figsize=(8.25, 6))
+    fig, axesgrid = plt.subplots(2, 2, figsize=(8.25, 6.25))
     axes = []
     for row in range(2):
         for col in range(2):
             axes.append(axesgrid[col][row])
 
-    axes[1].set_xlim(-tmax, tmax)
+    axes[2].set_xlim(-tmax, tmax)
     for cell_key in interp_delta_model_ramp:
         for induction in target_induction:
             induction_key = str(induction)
@@ -150,13 +151,13 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
                                interp_delta_model_ramp[cell_key][induction_key][indexes],
                                interp_initial_exp_ramp[cell_key][induction_key][indexes],
                                vmin=ymin, vmax=ymax, cmap=lines_cmap)
-                cax = axes[1].add_collection(lc)
-    cbar = plt.colorbar(cax, ax=axes[1])
+                cax = axes[2].add_collection(lc)
+    cbar = plt.colorbar(cax, ax=axes[2])
     cbar.set_label('Initial ramp\namplitude (mV)', rotation=270., labelpad=23.)
-    axes[1].set_ylabel('Change in ramp\namplitude (mV)')
-    axes[1].set_xlabel('Time relative to plateau onset (s)')
-    axes[1].set_yticks(np.arange(-10., 16., 5.))
-    axes[1].set_xticks(np.arange(-4., 5., 2.))
+    axes[2].set_ylabel('Change in ramp\namplitude (mV)')
+    axes[2].set_xlabel('Time relative to plateau onset (s)')
+    axes[2].set_yticks(np.arange(-10., 16., 5.))
+    axes[2].set_xticks(np.arange(-4., 5., 2.))
 
     if np.any(np.array(target_induction) != 1):
         points = np.array([flat_min_t, flat_initial_ramp]).transpose()
@@ -183,16 +184,44 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
         interp_data = gp.predict(interp_points).reshape(-1, res)
         print('Gaussian Process Regression took %.1f s' % (time.time() - start_time))
 
-        cax = axes[3].pcolor(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax, zorder=0)
-        axes[3].set_ylabel('Initial ramp\namplitude (mV)')
-        axes[3].set_xlabel('Time relative to plateau onset (s)')
-        axes[3].set_ylim(0., ymax)
-        axes[3].set_xlim(-tmax, tmax)
-        axes[3].set_xticks(np.arange(-4., 5., 2.))
-        cbar = plt.colorbar(cax, ax=axes[3])
+        cax = axes[1].pcolor(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax, zorder=0)
+        axes[1].set_ylabel('Initial ramp\namplitude (mV)')
+        axes[1].set_xlabel('Time relative to plateau onset (s)')
+        axes[1].set_ylim(0., ymax)
+        axes[1].set_xlim(-tmax, tmax)
+        axes[1].set_xticks(np.arange(-4., 5., 2.))
+        cbar = plt.colorbar(cax, ax=axes[1])
         cbar.set_label('Change in ramp\namplitude (mV)', rotation=270., labelpad=23.)
     clean_axes(axes)
-    fig.subplots_adjust(left=0.125, hspace=0.5, wspace=0.6, right=0.925)
+
+    flat_actual = []
+    flat_predicted = []
+    for cell_key in delta_exp_ramp:
+        for induction in target_induction:
+            induction_key = str(induction)
+            if induction_key in delta_exp_ramp[cell_key]:
+                flat_actual.extend(delta_exp_ramp[cell_key][induction_key])
+                flat_predicted.extend(delta_model_ramp[cell_key][induction_key])
+    this_axis = axes[3]
+    this_axis.scatter(flat_actual, flat_predicted, c='k', linewidth=0, alpha=0.25, s=10)
+    this_axis.set_xlabel('Actual (mV)')
+    this_axis.set_ylabel('Predicted (mV)')
+    this_axis.set_yticks(np.arange(-10., 16., 5.))
+    this_axis.set_ylim([-10., 16.])
+    this_axis.set_xticks(np.arange(-10., 16., 5.))
+    this_axis.set_xlim([-10., 16.])
+    this_xlim = this_axis.get_xlim()
+    this_axis.plot([this_xlim[0], this_xlim[1]], [this_xlim[0], this_xlim[1]], '--', c='darkgrey', alpha=0.75)
+    this_axis.set_title('Change in\nramp amplitude', fontsize=mpl.rcParams['font.size'], y=1.1)
+    cbar = plt.colorbar(cax, ax=this_axis)
+    cbar.ax.set_visible(False)
+
+    r_val, p_val = pearsonr(flat_predicted, flat_actual)
+    this_axis.annotate('R$^{2}$ = %.3f; p %s %.3f' %
+                       (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001),
+                       xy=(0.1, 0.9), xycoords='axes fraction', color='k')
+
+    fig.subplots_adjust(left=0.125, hspace=0.65, wspace=0.6, right=0.925, top=0.975)
     fig.suptitle(label, x=0.05, y=0.95, ha='left', fontsize=mpl.rcParams['font.size'])
     fig.show()
 

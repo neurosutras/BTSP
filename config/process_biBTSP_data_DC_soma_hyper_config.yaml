@@ -1,0 +1,126 @@
+37:
+  1:
+    induction_vm_columns:
+    - 6
+    - 5
+    - 4
+    file_name: yl200203_base.txt
+    induction_t_column: 3
+    ramp_columns:
+      before: 1
+      after: 0
+      delta: 2
+    spont: False
+    DC_soma: False
+  2:
+    induction_vm_columns:
+      - 6
+      - 5
+      - 4
+    file_name: yl200203_beforehyp.txt
+    induction_t_column: 3
+    ramp_columns:
+      before: 1
+      after: 0
+      delta: 2
+    spont: False
+    DC_soma: True
+  3:
+    induction_vm_columns:
+      - 8
+      - 7
+      - 6
+      - 5
+      - 4
+    file_name: yl200203_before.txt
+    induction_t_column: 3
+    ramp_columns:
+      before: 1
+      after: 0
+      delta: 2
+    spont: False
+    DC_soma: False
+38:
+  1:
+    induction_vm_columns:
+      - 4
+    file_name: yl200211_base.txt
+    induction_t_column: 3
+    ramp_columns:
+      before: 1
+      after: 0
+      delta: 2
+    spont: False
+    DC_soma: False
+  2:
+    induction_vm_columns:
+      - 5
+      - 4
+    file_name: yl200211_beforehyp.txt
+    induction_t_column: 3
+    ramp_columns:
+      before: 1
+      after: 0
+      delta: 2
+    spont: False
+    DC_soma: True
+39:
+  2:
+    induction_vm_columns:
+      - 5
+      - 4
+    file_name: yl200212_beforehyp.txt
+    induction_t_column: 3
+    ramp_columns:
+      before: 1
+      after: 0
+      delta: 2
+    spont: False
+    DC_soma: True
+40:
+  2:
+    induction_delta_vm_column: 6
+    file_name: yl200213_beforehyp.txt
+    induction_t_column: 3
+    ramp_columns:
+      before: 1
+      after: 0
+      delta: 2
+    spont: False
+    DC_soma: True
+41:
+  1:
+    induction_vm_columns:
+      - 4
+    file_name: yl200214_spontbefore.txt
+    induction_t_column: 3
+    ramp_columns:
+      before: 1
+      after: 0
+      delta: 2
+    spont: True
+    DC_soma: False
+  2:
+    induction_vm_columns:
+      - 5
+      - 4
+    file_name: yl200214_beforehyp.txt
+    induction_t_column: 3
+    ramp_columns:
+      before: 1
+      after: 0
+      delta: 2
+    spont: False
+    DC_soma: True
+  3:
+    induction_vm_columns:
+      - 5
+      - 4
+    file_name: yl200214_after.txt
+    induction_t_column: 3
+    ramp_columns:
+      before: 1
+      after: 0
+      delta: 2
+    spont: False
+    DC_soma: False

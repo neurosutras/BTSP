@@ -1,7 +1,6 @@
 from biBTSP_utils import *
 from nested.optimize_utils import *
 import matplotlib as mpl
-import matplotlib.gridspec as gridspec
 import click
 
 mpl.rcParams['svg.fonttype'] = 'none'
@@ -37,17 +36,14 @@ def main(data_file_path, model_file_path, tmax, truncate, debug, cell):
         raise IOError('plot_biBTSP_data_example_figure: invalid data_file_path: %s' % data_file_path)
     if not os.path.isfile(model_file_path):
         raise IOError('plot_biBTSP_data_example_figure: invalid model_file_path: %s' % model_file_path)
-
     cell_keys = [str(cell_id) for cell_id in cell[:3]]
     with h5py.File(data_file_path, 'r') as f:
         with h5py.File(model_file_path, 'r') as g:
             for cell_key in cell_keys:
-                if cell_key not in g['exported_data'] or '1' not in g['exported_data'][cell_key] or \
-                        '2' not in g['exported_data'][cell_key]:
+                if cell_key not in g['exported_data'] or '2' not in g['exported_data'][cell_key]:
                     raise KeyError('plot_biBTSP_data_example_figure: problem loading data for provided cell_id: %s' %
                                    cell_key)
-                if cell_key not in f['data'] or '1' not in f['data'][cell_key] or \
-                        '2' not in f['data'][cell_key]:
+                if cell_key not in f['data'] or '2' not in f['data'][cell_key]:
                     raise KeyError('plot_biBTSP_data_example_figure: problem loading data for provided cell_id: %s' %
                                    cell_key)
         binned_x = f['defaults']['binned_x'][:]
@@ -57,69 +53,54 @@ def main(data_file_path, model_file_path, tmax, truncate, debug, cell):
     extended_binned_x = np.concatenate([binned_x - track_length, binned_x, binned_x + track_length])
     reference_delta_t = np.linspace(-5000., 5000., 100)
 
-    peak_ramp_amp, total_induction_dur, depo_soma, group_indexes, exp_ramp, extended_exp_ramp, delta_exp_ramp, \
-    mean_induction_loc, extended_min_delta_t, extended_delta_exp_ramp, interp_initial_exp_ramp, \
+    peak_ramp_amp, total_induction_dur, initial_induction_delta_vm, group_indexes, exp_ramp, extended_exp_ramp, \
+    delta_exp_ramp, mean_induction_loc, extended_min_delta_t, extended_delta_exp_ramp, interp_initial_exp_ramp, \
     interp_delta_exp_ramp, interp_final_exp_ramp = \
         get_biBTSP_analysis_results(data_file_path, binned_x, binned_extra_x, extended_binned_x, reference_delta_t,
                                     track_length, dt, debug, truncate=truncate)
 
     context.update(locals())
 
-    fig, axes = plt.figure(figsize=(11, 7.5)), []
-    gs0 = gridspec.GridSpec(3, 7, wspace=3.9, hspace=0.8, left=0.075, right=0.95)
-    for row in range(len(cell_keys)):
-        this_axes_row = []
-        this_axes_row.append(fig.add_subplot(gs0[row, :3]))
-        this_axes_row.append(fig.add_subplot(gs0[row, 3:5]))
-        this_axes_row.append(fig.add_subplot(gs0[row, 5:]))
-        axes.append(this_axes_row)
+    fig, axes = plt.subplots(3, 3, figsize=(12, 8.25))
+
+    induction_key = '2'
 
     with h5py.File(data_file_path, 'r') as f:
-        for row, cell_key in enumerate(cell_keys):
+        for col, cell_key in enumerate(cell_keys):
             mean_induction_start_loc = dict()
             mean_induction_stop_loc = dict()
-            track_start_times = dict()
-            track_stop_times = dict()
-            for induction_key in exp_ramp[cell_key]:
 
-                with h5py.File(model_file_path, 'r') as g:
-                    group = g['exported_data'][cell_key][induction_key]['model_ramp_features']
-                    mean_induction_start_loc[induction_key] = group.attrs['mean_induction_start_loc']
-                    mean_induction_stop_loc[induction_key] = group.attrs['mean_induction_stop_loc']
-                    track_start_times[induction_key] = group.attrs['track_start_times']
-                    track_stop_times[induction_key] = group.attrs['track_stop_times']
-                if induction_key == '1':
-                    color = 'darkgrey'
-                    label = 'Before induction 2'
-                else:
-                    color = 'k'
-                    label = 'After induction 2'
-                axes[row][1].plot(binned_x, exp_ramp[cell_key][induction_key]['after'], c=color, label=label)
-                indexes = np.where(~np.isnan(interp_delta_exp_ramp[cell_key][induction_key]))[0]
-                axes[row][2].plot(reference_delta_t[indexes] / 1000.,
-                                  interp_delta_exp_ramp[cell_key][induction_key][indexes], c=color)
+            with h5py.File(model_file_path, 'r') as g:
+                group = g['exported_data'][cell_key][induction_key]['model_ramp_features']
+                mean_induction_start_loc[induction_key] = group.attrs['mean_induction_start_loc']
+                mean_induction_stop_loc[induction_key] = group.attrs['mean_induction_stop_loc']
 
-            this_ylim = axes[row][1].get_ylim()
+            axes[0][col].plot(binned_x, exp_ramp[cell_key][induction_key]['before'], c='darkgrey',
+                              label='Before Induction 2')
+            axes[0][col].plot(binned_x, exp_ramp[cell_key][induction_key]['after'], c='k', label='After Induction 2')
+            indexes = np.where(~np.isnan(interp_delta_exp_ramp[cell_key][induction_key]))[0]
+            axes[1][col].plot(reference_delta_t[indexes] / 1000.,
+                              interp_delta_exp_ramp[cell_key][induction_key][indexes], c='k')
+            axes[1][col].plot(reference_delta_t[indexes] / 1000., np.zeros_like(indexes), c='darkgrey', alpha=0.75,
+                              zorder=1, linestyle='--')
+
+            this_ylim = axes[0][col].get_ylim()
             this_ymax = this_ylim[1] * 1.1
-            axes[row][1].set_ylim(this_ylim[0], this_ymax)
-            if row == 0:
-                axes[row][1].legend(loc=(0.1, 0.95), frameon=False, framealpha=0.5, handlelength=1., handletextpad=0.5)
-            axes[row][1].set_ylabel('Ramp amplitude (mV)')
-            axes[row][1].set_xlabel('Position (cm)')
-            axes[row][1].set_xticks(np.arange(0., track_length, 45.))
-            axes[row][2].set_ylabel('Change in ramp\namplitude (mV)')
-            axes[row][2].set_xlabel('Time relative to plateau onset (s)')
-            axes[row][2].set_xlim(-4., 4.)
-            axes[row][2].set_xticks([-4., -2., 0., 2., 4.])
-            axes[row][2].set_yticks(np.arange(-10., 16., 5.))
-            for induction_key in mean_induction_start_loc:
-                if induction_key == '1':
-                    color = 'darkgrey'
-                else:
-                    color = 'k'
-                axes[row][1].hlines(this_ymax * 0.95, xmin=mean_induction_start_loc[induction_key],
-                                    xmax=mean_induction_stop_loc[induction_key], color=color)
-            induction_key = '2'
+            axes[0][col].set_ylim(this_ylim[0], this_ymax)
+            if col == 0:
+                axes[0][col].legend(loc=(0.4, 1.05), frameon=False, framealpha=0.5, handlelength=1., handletextpad=0.5)
+            axes[0][col].set_ylabel('Ramp amplitude (mV)')
+            axes[0][col].set_xlabel('Position (cm)')
+            axes[0][col].set_xticks(np.arange(0., track_length, 45.))
+            axes[1][col].set_ylabel('Change in ramp\namplitude (mV)')
+            axes[1][col].set_xlabel('Time relative to plateau onset (s)')
+            axes[1][col].set_xlim(-4., 4.)
+            axes[1][col].set_xticks([-4., -2., 0., 2., 4.])
+            axes[1][col].set_yticks(np.arange(-10., 16., 5.))
+            # axes[1][col].hlines(this_ymax * 0.95, xmin=mean_induction_start_loc[induction_key],
+            #                    xmax=mean_induction_stop_loc[induction_key], color='k')
+            axes[0][col].scatter([mean_induction_start_loc[induction_key]], [this_ymax * 0.95], color='k', marker=1)
+
             this_complete_position = f['data'][cell_key][induction_key]['complete']['position'][:]
             this_complete_t = f['data'][cell_key][induction_key]['complete']['t'][:]
             with h5py.File(model_file_path, 'r') as g:
@@ -133,6 +114,7 @@ def main(data_file_path, model_file_path, tmax, truncate, debug, cell):
             end_index = len(pretty_position) - 1
             initial_peak_index = np.argmax(exp_ramp[cell_key][induction_key]['before'])
             initial_peak_loc = binned_x[initial_peak_index]
+            axes[0][col].scatter([initial_peak_loc], [this_ymax * 0.95], color='darkgrey', marker='_')
             initial_peak_indexes = []
             passed_peak = False
             for i in range(1, len(pretty_position)):
@@ -157,37 +139,42 @@ def main(data_file_path, model_file_path, tmax, truncate, debug, cell):
             else:
                 end_index = len(initial_peak_indexes)
 
-            event_times = np.append(this_complete_t[initial_peak_indexes][start_index:end_index],
-                                    this_complete_t[induction_start_indexes])
-            event_times = np.sort(event_times)
-            event_intervals = np.diff(event_times)
-            mean_event_interval = np.mean(event_intervals)
-
+            initial_peak_times = this_complete_t[initial_peak_indexes][start_index:end_index]
+            forward_intervals = []
+            backward_intervals = []
+            for event in this_complete_t[induction_start_indexes]:
+                this_intervals = np.subtract(event, initial_peak_times)
+                this_backward_interval = np.min(this_intervals[np.where(this_intervals > 0.)[0]])
+                backward_intervals.append(this_backward_interval)
+                this_forward_interval = -np.max(this_intervals[np.where(this_intervals < 0.)[0]])
+                forward_intervals.append(this_forward_interval)
+            mean_event_interval = min(np.mean(backward_intervals), np.mean(forward_intervals))
+            annotation = 'Cell: %s\n' % cell_key
+            annotation += r'${\Delta t}$=%.1f s' % (mean_event_interval / 1000.)
+            axes[0][col].annotate(annotation, linespacing=1.8,
+                                  fontsize=mpl.rcParams['font.size'], xy=(0., 1.1), xycoords='axes fraction')
             print('Cell: %s' % cell_key)
-            print('Event intervals: %s' % str(event_intervals))
-            print('Mean event interval: %.1f s' % (mean_event_interval / 1000.))
+            print('Mean inter-field interval: %.1f s' % (mean_event_interval / 1000.))
 
-            axes[row][0].plot(this_complete_t / 1000., pretty_position, c='darkgrey', zorder=1)
-            xmax = max(event_times) / 1000.
-            axes[row][0].set_xlim(-5., xmax + 5.)
-            axes[row][0].scatter(this_complete_t[initial_peak_indexes] / 1000.,
+            axes[2][col].plot(this_complete_t / 1000., pretty_position, c='darkgrey', zorder=1)
+            xmax = max(np.max(initial_peak_times), np.max(this_complete_t[induction_start_indexes])) / 1000.
+            axes[2][col].set_xlim(-5., xmax + 5.)
+            axes[2][col].scatter(this_complete_t[initial_peak_indexes] / 1000.,
                                  pretty_position[initial_peak_indexes], c='darkgrey', s=40, linewidth=0, zorder=2,
                                  label='Initial peak location', edgecolor='none')
-            axes[row][0].scatter(this_complete_t[induction_start_indexes] / 1000.,
+            axes[2][col].scatter(this_complete_t[induction_start_indexes] / 1000.,
                                  pretty_position[induction_start_indexes], c='k', s=40, linewidth=0, zorder=2,
                                  label='Induction 2 location', edgecolor='none')
-            axes[row][0].set_yticks(np.arange(0., track_length, 60.))
-            axes[row][0].set_ylabel('Position (cm)')
-            axes[row][0].set_xlabel('Time (s)')
-            axes[row][0].set_title(r'Cell: %s' % cell_key, fontsize=mpl.rcParams['font.size'], loc='left', y=1.1)
-            axes[row][0].annotate(r'$\overline {\Delta t}$=%.1f s' % (mean_event_interval / 1000.),
-                                  fontsize=mpl.rcParams['font.size'], xy=(0.8, 1.1), xycoords='axes fraction')
-            if row == 0:
-                axes[row][0].legend(loc=(0.2, 0.95), frameon=False, framealpha=0., fontsize=mpl.rcParams['font.size'],
+            axes[2][col].set_yticks(np.arange(0., track_length, 60.))
+            axes[2][col].set_ylabel('Position (cm)')
+            axes[2][col].set_xlabel('Time (s)')
+            if col == 0:
+                axes[2][col].legend(loc=(0.2, 0.95), frameon=False, framealpha=0., fontsize=mpl.rcParams['font.size'],
                                     scatterpoints=1, handlelength=1., handletextpad=0.5)
     context.update(locals())
 
-    clean_axes(np.array(axes))
+    clean_axes(axes)
+    fig.subplots_adjust(hspace=0.6, wspace=0.66, left=0.085, right=0.945, top=0.9, bottom=0.11)
     fig.show()
 
 

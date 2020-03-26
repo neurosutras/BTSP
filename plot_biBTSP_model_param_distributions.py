@@ -46,9 +46,9 @@ ordered_param_names = ['local_signal_rise', 'local_signal_decay', 'pot_signal_ri
 
 @click.command()
 @click.option("--param-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/20190812_biBTSP_SRL_B_90cm_best_params.yaml')
+              default='config/20190812_biBTSP_WD_B_90cm_best_params.yaml')
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/optimize_biBTSP_SRL_B_cli_config.yaml')
+              default='config/optimize_biBTSP_WD_B_cli_config.yaml')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--pcadim", type=int, default=None)
 @click.option("--export", is_flag=True)
