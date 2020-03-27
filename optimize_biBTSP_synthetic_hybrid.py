@@ -111,7 +111,7 @@ def init_context():
         ramp_scaling_factor = f['calibrated_input'][input_field_width_key].attrs['ramp_scaling_factor']
 
     down_dt = 10.  # ms, to speed up optimization
-    num_induction_laps = 5
+    num_induction_laps = 1
     induction_dur = 300.  # ms
     context.update(locals())
 
@@ -225,11 +225,11 @@ def load_data(induction):
                 induction_stop_loc = context.default_interp_x[induction_stop_index]
 
                 target_ramp = get_target_synthetic_ramp(induction_loc, ramp_x=context.binned_x,
-                                                          track_length=context.track_length,
-                                                          target_peak_val=context.target_peak_val_1, target_min_val=0.,
-                                                          target_asymmetry=1.8,
-                                                          target_peak_shift=context.target_peak_shift_1,
-                                                          target_ramp_width=187., plot=context.plot)
+                                                        track_length=context.track_length,
+                                                        target_peak_val=context.target_peak_val_1, target_min_val=0.,
+                                                        target_asymmetry=1.8,
+                                                        target_peak_shift=context.target_peak_shift_1,
+                                                        target_ramp_width=187.)
                 induction_context.target_ramp['before']['control'], \
                 induction_context.LSA_weights['before']['control'], _, _ = \
                     get_delta_weights_LSA(target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
@@ -238,7 +238,7 @@ def load_data(induction):
                                           induction_start_loc=induction_loc, induction_stop_loc=induction_stop_loc,
                                           track_length=context.track_length, target_range=context.target_range,
                                           bounds=(context.min_delta_weight, context.target_peak_delta_weight),
-                                          verbose=context.verbose, plot=context.plot)
+                                          verbose=context.verbose)
 
             target_ramp_2 = get_target_synthetic_ramp(this_induction_loc, ramp_x=context.binned_x,
                                                       track_length=context.track_length,
@@ -255,7 +255,7 @@ def load_data(induction):
                                       induction_stop_loc=induction_context.mean_induction_stop_loc,
                                       track_length=context.track_length, target_range=context.target_range,
                                       bounds=(context.min_delta_weight, context.target_peak_delta_weight),
-                                      verbose=context.verbose, plot=context.plot)
+                                      verbose=context.verbose)
             induction_context.target_ramp['after']['hyper'] = induction_context.target_ramp['after']['control']
             induction_context.ramp_offset['control'] = np.zeros_like(context.binned_x)
             induction_context.ramp_offset['hyper'] = np.zeros_like(context.binned_x)
@@ -272,6 +272,34 @@ def load_data(induction):
                 offset_stop_index = np.where(context.binned_x >= offset_stop_loc - context.track_length)[0][0]
                 offset_indexes.extend(list(range(offset_stop_index)))
             induction_context.ramp_offset['hyper'][offset_indexes] = context.target_ramp_offset_2_hyper
+            if context.plot:
+                x_start = induction_context.mean_induction_start_loc
+                x_end = induction_context.mean_induction_stop_loc
+                ylim = 13.
+                fig, axes = plt.subplots(2)
+                axes[0].plot(context.binned_x, induction_context.target_ramp['after']['control'],
+                             label='Control', color='k')
+                axes[0].hlines(ylim + 0.2, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
+                axes[0].set_xlabel('Location (cm)')
+                axes[0].set_ylabel('Ramp amplitude (mV)')
+                axes[0].set_xlim([0., context.track_length])
+                axes[0].set_ylim([-5., 15.])
+                axes[0].legend(loc='best', frameon=False, framealpha=0.5)
+                axes[0].set_title('Target: Induction 2')
+
+                ylim = 13.
+                axes[1].plot(context.binned_x, induction_context.ramp_offset['control'], c='k',
+                             label='Control')
+                axes[1].plot(context.binned_x, induction_context.ramp_offset['hyper'], c='r',
+                             label='Hyper')
+                axes[1].hlines(ylim + 0.2, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
+                axes[1].set_xlabel('Location (cm)')
+                axes[1].set_ylabel('Vm offset (mV)')
+                axes[1].set_xlim([0., context.track_length])
+                axes[1].set_ylim([-45., 15.])
+                clean_axes(axes)
+                fig.tight_layout()
+                fig.show()
 
         else:
             induction_context.target_ramp['before']['control'] = np.zeros_like(context.binned_x)
@@ -284,7 +312,7 @@ def load_data(induction):
                                                     target_peak_val=context.target_peak_val_1, target_min_val=0.,
                                                     target_asymmetry=1.8,
                                                     target_peak_shift=context.target_peak_shift_1,
-                                                    target_ramp_width=187., plot=context.plot)
+                                                    target_ramp_width=187.)
             induction_context.target_ramp['after']['control'], \
             induction_context.LSA_weights['after']['control'], _, _ = \
                 get_delta_weights_LSA(target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
@@ -293,14 +321,14 @@ def load_data(induction):
                                       induction_start_loc=induction_loc, induction_stop_loc=induction_stop_loc,
                                       track_length=context.track_length, target_range=context.target_range,
                                       bounds=(context.min_delta_weight, context.target_peak_delta_weight),
-                                      verbose=context.verbose, plot=context.plot, label='Control')
+                                      verbose=context.verbose)
 
             target_ramp = get_target_synthetic_ramp(induction_loc, ramp_x=context.binned_x,
                                                     track_length=context.track_length,
                                                     target_peak_val=context.target_peak_val_1_depo, target_min_val=0.,
                                                     target_asymmetry=1.8,
                                                     target_peak_shift=context.target_peak_shift_1,
-                                                    target_ramp_width=187., plot=context.plot)
+                                                    target_ramp_width=187.)
             induction_context.target_ramp['after']['depo'], \
             induction_context.LSA_weights['after']['depo'], _, _ = \
                 get_delta_weights_LSA(target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
@@ -309,7 +337,7 @@ def load_data(induction):
                                       induction_start_loc=induction_loc, induction_stop_loc=induction_stop_loc,
                                       track_length=context.track_length, target_range=context.target_range,
                                       bounds=(context.min_delta_weight, context.target_peak_delta_weight),
-                                      verbose=context.verbose, plot=context.plot, label='Depo')
+                                      verbose=context.verbose)
 
             induction_context.ramp_offset['control'] = np.zeros_like(context.binned_x)
             induction_context.ramp_offset['depo'] = np.ones_like(context.binned_x) * context.target_ramp_offset_1_depo
@@ -336,35 +364,41 @@ def load_data(induction):
             induction_context.ramp_offset['hyper'][offset_indexes] = context.target_ramp_offset_1_hyper
             induction_context.LSA_weights['after']['hyper'] = \
                 np.array(induction_context.LSA_weights['after']['control'])
-            induction_context.LSA_weights['after']['hyper'][delta_weights_offset_indexes] /= 8.
+            induction_context.LSA_weights['after']['hyper'][delta_weights_offset_indexes] /= 4.
             induction_context.target_ramp['after']['hyper'], _ = \
                 get_model_ramp(induction_context.LSA_weights['after']['hyper'], context.binned_x, context.peak_locs,
                                context.input_rate_maps, context.ramp_scaling_factor)
             if context.plot:
-                x_start = induction_loc
-                x_end = induction_stop_loc
-                ylim = np.max(induction_context.target_ramp['after']['hyper'])
-                ymin = np.min(induction_context.target_ramp['after']['hyper'])
-                fig, axes = plt.subplots(1, 2)
+                x_start = induction_context.mean_induction_start_loc
+                x_end = induction_context.mean_induction_stop_loc
+                ylim = 13.
+                fig, axes = plt.subplots(2)
+                axes[0].plot(context.binned_x, induction_context.target_ramp['after']['control'],
+                             label='Control', color='k')
+                axes[0].plot(context.binned_x, induction_context.target_ramp['after']['depo'],
+                             label='Depo', color='c')
                 axes[0].plot(context.binned_x, induction_context.target_ramp['after']['hyper'],
-                             label='Model (LSA)', color='c')
+                             label='Hyper', color='r')
                 axes[0].hlines(ylim + 0.2, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
                 axes[0].set_xlabel('Location (cm)')
                 axes[0].set_ylabel('Ramp amplitude (mV)')
                 axes[0].set_xlim([0., context.track_length])
-                axes[0].set_ylim([math.floor(ymin), max(math.ceil(ylim), ylim + 0.4)])
+                axes[0].set_ylim([-5., 15.])
                 axes[0].legend(loc='best', frameon=False, framealpha=0.5)
-                axes[0].set_title('Hyper')
+                axes[0].set_title('Target: Induction 1')
 
-                ylim = np.max(induction_context.LSA_weights['after']['hyper']) + 1.
-                ymin = np.min(induction_context.LSA_weights['after']['hyper']) + 1.
-                axes[1].plot(context.peak_locs, induction_context.LSA_weights['after']['hyper'] + 1., c='c',
-                             label='Model (LSA)')
+                ylim = 13.
+                axes[1].plot(context.binned_x, induction_context.ramp_offset['control'], c='k',
+                             label='Control')
+                axes[1].plot(context.binned_x, induction_context.ramp_offset['depo'], c='c',
+                             label='Depo')
+                axes[1].plot(context.binned_x, induction_context.ramp_offset['hyper'], c='r',
+                             label='Hyper')
                 axes[1].hlines(ylim + 0.2, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
                 axes[1].set_xlabel('Location (cm)')
-                axes[1].set_ylabel('Candidate synaptic weights (a.u.)')
+                axes[1].set_ylabel('Vm offset (mV)')
                 axes[1].set_xlim([0., context.track_length])
-                axes[1].set_ylim([math.floor(ymin), max(math.ceil(ylim), ylim + 0.4)])
+                axes[1].set_ylim([-45., 15.])
                 clean_axes(axes)
                 fig.tight_layout()
                 fig.show()

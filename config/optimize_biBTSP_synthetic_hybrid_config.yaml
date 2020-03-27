@@ -6,7 +6,7 @@ bounds:
   - -40
   - 25.
   vd_min: !!python/tuple
-  - 0.5
+  - 0.
   - 1.
   f_pot_peak: !!python/tuple
   - 0.001
@@ -132,7 +132,7 @@ kwargs:
   target_peak_shift_1: -10.
   target_peak_shift_2: 0.
   target_peak_val_1: 8.
-  target_peak_val_1_depo: 12.
+  target_peak_val_1_depo: 10.
   target_peak_val_2: 8.
   target_min_val_2: 3.
   target_ramp_offset_1_depo: 10.
@@ -143,9 +143,9 @@ objective_names:
 - induction1_depo_residual_score
 - induction1_hyper_residual_score
 - induction2_residual_score
-- induction2_hyper_residual_score
+# - induction2_hyper_residual_score
 - self_consistent_delta_residual_score
-- ramp_amp_after_first_plateau
+# - ramp_amp_after_first_plateau
 optimization_title: biBTSP_synthetic_hybrid
 param_gen: PopulationAnnealing
 param_names:
