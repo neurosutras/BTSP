@@ -123,7 +123,7 @@ kwargs:
   min_delta_weight: -0.2
   min_delta_ramp: -60.
   plateau_delta_vm: 15.
-  peak_delta_ramp: 25.
+  peak_delta_ramp: 40.
   default_run_vel: 25.
   induction_loc:
     '1': 120.
