@@ -1,7 +1,7 @@
 bounds:
   vd_peak: !!python/tuple
   - 0.001
-  - 40.
+  - 100.
   vd_th: !!python/tuple
   - -40
   - 25.
@@ -124,17 +124,17 @@ kwargs:
   verbose: 1
   min_delta_weight: -0.2
   min_delta_ramp: -40.
-  default_run_vel: 30.
+  default_run_vel: 25.
   induction_loc:
-    '1': 90.
-    '2': 30.
+    '1': 120.
+    '2': 60.
   target_peak_delta_weight: 3.
   target_peak_shift_1: -10.
   target_peak_shift_2: 0.
   target_peak_val_1: 8.
   target_peak_val_1_depo: 10.
   target_peak_val_2: 8.
-  target_min_val_2: 3.
+  target_min_val_2: 4.
   target_ramp_offset_1_depo: 10.
   target_ramp_offset_1_hyper: -40.
   target_ramp_offset_2_hyper: -25.
@@ -174,18 +174,18 @@ target_range:
 target_val:
   ramp_amp_after_first_plateau: 5.
 x0:
+  f_dep_peak: 8.036030E-03
+  f_dep_th: 2.855647E-02
+  f_pot_peak: 7.600603E-01
+  f_pot_th: 1.385298E-01
+  global_signal_decay: 3.570670E+02
+  global_signal_rise: 3.555186E+01
+  k_dep: 3.126094E-01
+  k_pot: 2.280166E+00
+  local_signal_decay: 1.191872E+03
+  local_signal_rise: 1.939650E+02
+  peak_delta_ramp: 15.
+  peak_delta_weight: 2.
+  vd_min: 0.1
   vd_peak: 10.
   vd_th: 0.
-  vd_min: 0.8
-  f_dep_peak: 1.194999E-01
-  f_dep_th: 7.820899E-03
-  f_pot_peak: 9.828062E-01
-  f_pot_th: 5.262555E-01
-  global_signal_decay: 2.232987E+02
-  global_signal_rise: 3.183521E+01
-  k_dep: 3.498200E-01
-  k_pot: 1.172080E+00
-  local_signal_decay: 1.127795E+03
-  local_signal_rise: 1.597686E+02
-  peak_delta_weight: 2.400251E+00
-  peak_delta_ramp: 25.

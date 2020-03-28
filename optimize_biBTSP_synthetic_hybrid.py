@@ -83,18 +83,23 @@ def init_context():
         track_length = f['defaults'].attrs['track_length']  # cm
         binned_dx = f['defaults'].attrs['binned_dx']  # cm
         generic_dx = f['defaults'].attrs['generic_dx']  # cm
-        if 'default_run_vel' not in context() or context.default_run_vel is None:
-            default_run_vel = f['defaults'].attrs['default_run_vel']  # cm/s
-        else:
-            context.default_run_vel = float(context.default_run_vel)
-        generic_position_dt = f['defaults'].attrs['generic_position_dt']  # ms
-        default_interp_dx = f['defaults'].attrs['default_interp_dx']  # cm
         binned_x = f['defaults']['binned_x'][:]
         generic_x = f['defaults']['generic_x'][:]
-        generic_t = f['defaults']['generic_t'][:]
-        default_interp_t = f['defaults']['default_interp_t'][:]
-        default_interp_x = f['defaults']['default_interp_x'][:]
         extended_x = f['defaults']['extended_x'][:]
+        if 'default_run_vel' not in context() or context.default_run_vel is None:
+            default_run_vel = f['defaults'].attrs['default_run_vel']  # cm/s
+            generic_position_dt = f['defaults'].attrs['generic_position_dt']  # ms
+            default_interp_dx = f['defaults'].attrs['default_interp_dx']  # cm
+            generic_t = f['defaults']['generic_t'][:]
+            default_interp_t = f['defaults']['default_interp_t'][:]
+            default_interp_x = f['defaults']['default_interp_x'][:]
+        else:
+            default_run_vel = float(context.default_run_vel)
+            generic_position_dt = generic_dx / default_run_vel * 1000.  # ms
+            generic_t = np.arange(0., len(generic_x) * generic_position_dt, generic_position_dt)[:len(generic_x)]
+            default_interp_t = np.arange(0., generic_t[-1], dt)
+            default_interp_x = np.interp(default_interp_t, generic_t, generic_x)
+            default_interp_dx = dt * default_run_vel / 1000.  # cm
 
         if 'input_field_width' not in context() or context.input_field_width is None:
             raise RuntimeError('optimize_biBTSP_%s: init context: missing required parameter: input_field_width' %
@@ -259,11 +264,11 @@ def load_data(induction):
             induction_context.target_ramp['after']['hyper'] = induction_context.target_ramp['after']['control']
             induction_context.ramp_offset['control'] = np.zeros_like(context.binned_x)
             induction_context.ramp_offset['hyper'] = np.zeros_like(context.binned_x)
-            offset_start_loc = induction_context.mean_induction_start_loc + 30.
+            offset_start_loc = induction_context.mean_induction_start_loc + 1. * context.default_run_vel
             if offset_start_loc >= context.track_length:
                 offset_start_loc -= context.track_length
             offset_start_index = np.where(context.binned_x >= offset_start_loc)[0][0]
-            offset_stop_loc = offset_start_loc + 90.
+            offset_stop_loc = offset_start_loc + 2. * context.default_run_vel
             if offset_stop_loc <= context.track_length:
                 offset_stop_index = np.where(context.binned_x >= offset_stop_loc)[0][0]
                 offset_indexes = list(range(offset_start_index, offset_stop_index + 1))
@@ -272,7 +277,7 @@ def load_data(induction):
                 offset_stop_index = np.where(context.binned_x >= offset_stop_loc - context.track_length)[0][0]
                 offset_indexes.extend(list(range(offset_stop_index)))
             induction_context.ramp_offset['hyper'][offset_indexes] = context.target_ramp_offset_2_hyper
-            if context.plot:
+            if context.plot and context.condition == 'control':
                 x_start = induction_context.mean_induction_start_loc
                 x_end = induction_context.mean_induction_stop_loc
                 ylim = 13.
@@ -343,12 +348,12 @@ def load_data(induction):
             induction_context.ramp_offset['depo'] = np.ones_like(context.binned_x) * context.target_ramp_offset_1_depo
             induction_context.ramp_offset['hyper'] = np.zeros_like(context.binned_x)
 
-            offset_stop_loc = induction_loc - 30.
+            offset_stop_loc = induction_loc - 1. * context.default_run_vel
             if offset_stop_loc <= 0.:
                 offset_stop_loc += context.track_length
             offset_stop_index = np.where(context.binned_x >= offset_stop_loc)[0][0]
             delta_weights_stop_index = np.where(context.peak_locs >= offset_stop_loc)[0][0]
-            offset_start_loc = offset_stop_loc - 90.
+            offset_start_loc = offset_stop_loc - 3. * context.default_run_vel
             if offset_start_loc >= 0.:
                 offset_start_index = np.where(context.binned_x >= offset_start_loc)[0][0]
                 delta_weights_start_index = np.where(context.peak_locs >= offset_start_loc)[0][0]
@@ -368,7 +373,7 @@ def load_data(induction):
             induction_context.target_ramp['after']['hyper'], _ = \
                 get_model_ramp(induction_context.LSA_weights['after']['hyper'], context.binned_x, context.peak_locs,
                                context.input_rate_maps, context.ramp_scaling_factor)
-            if context.plot:
+            if context.plot and context.condition == 'control':
                 x_start = induction_context.mean_induction_start_loc
                 x_end = induction_context.mean_induction_stop_loc
                 ylim = 13.
@@ -444,7 +449,8 @@ def calculate_model_ramp(export=False, plot=False):
     """
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
         get_dual_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
-                                context.global_signal_decay, context.down_dt, plot)
+                                context.global_signal_decay, context.down_dt,
+                                plot and context.induction == 1 and context.condition == 'control')
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
     global_signal_peak = np.max(global_signal)
     global_signal /= global_signal_peak
@@ -460,7 +466,7 @@ def calculate_model_ramp(export=False, plot=False):
     phi = np.vectorize(scaled_single_sigmoid(
         context.vd_th, context.vd_th + context.vd_peak, vrange, [context.vd_min, 1.]))
 
-    if plot:
+    if plot and context.induction == 1 and context.condition == 'control':
         fig, axes = plt.subplots(1, 2)
         dep_scale = context.k_dep / context.k_pot
         axes[0].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='Potentiation rate')
@@ -507,15 +513,16 @@ def calculate_model_ramp(export=False, plot=False):
 
     if plot:
         fig, axes = plt.subplots(2, sharex=True)
-        fig.suptitle('Induction: %i' % context.induction)
-        axes[0].plot(context.down_t / 1000., global_signal)
-        axes[0].set_ylabel('Plasticity gating signal')
+        fig.suptitle('Induction: %i (%s)' % (context.induction, context.condition), y=1.)
+        axes[0].plot(context.down_t / 1000., global_signal, label='Instructive signal')
+        # axes[0].set_ylabel('Plasticity gating signal')
         axes[1].set_xlabel('Time (s)')
         axes[1].set_ylabel('Relative ramp amplitude (mV)')
 
         fig2, axes2 = plt.subplots(1, 2, sharex=True)
-        fig2.suptitle('Induction: %i' % context.induction)
+        fig2.suptitle('Induction: %i (%s)' % (context.induction, context.condition))
         axes2[0].plot(context.binned_x, initial_ramp, c='k', label='Before')
+        axes2[0].plot(context.binned_x, target_ramp, c='r', label='After (Target)')
         axes2[0].set_ylabel('Ramp amplitude (mV)')
         axes2[0].set_xlabel('Location (cm)')
         axes2[1].set_ylabel('Change in synaptic weight')
@@ -561,6 +568,7 @@ def calculate_model_ramp(export=False, plot=False):
             this_next_normalized_weight = max(0., min(1., current_normalized_weights[i] + this_normalized_delta_weight))
             next_normalized_weights.append(this_next_normalized_weight)
         if plot:
+            axes[0].plot(context.down_t[indexes] / 1000., vd_mod[indexes], label='Voltage-dependent modulation')
             axes[1].plot(context.down_t[indexes] / 1000., current_complete_down_ramp[indexes],
                          label='Induction lap: %i' % (induction_lap + 1))
             axes2[1].plot(context.peak_locs,
@@ -574,19 +582,23 @@ def calculate_model_ramp(export=False, plot=False):
                            input_rate_maps=context.input_rate_maps, ramp_scaling_factor=context.ramp_scaling_factor)
 
         if plot:
-            axes2[0].plot(context.binned_x, current_ramp)
+            axes2[0].plot(context.binned_x, current_ramp, c='c', label='After (Model)')
 
         if context.induction == 1 and context.condition == 'control' and induction_lap == 0:
             result['ramp_amp_after_first_plateau'] = np.max(current_ramp)
         ramp_snapshots.append(current_ramp)
 
     if plot:
+        axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
         axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        axes2[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
         axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
         clean_axes(axes)
         clean_axes(axes2)
         fig.tight_layout()
+        fig.subplots_adjust(top=0.9)
         fig2.tight_layout()
+        fig2.subplots_adjust(top=0.9)
         fig.show()
         fig2.show()
 
@@ -703,27 +715,6 @@ def calculate_model_ramp(export=False, plot=False):
         else:
             delta_min_loc = abs_delta_min_loc
     result['delta_min_loc'] = delta_min_loc
-    if plot:
-        bar_loc = max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.) * 0.95
-        fig, axes = plt.subplots(2)
-        axes[1].plot(context.peak_locs, delta_weights)
-        axes[1].hlines(context.peak_delta_weight * 1.05, xmin=context.mean_induction_start_loc,
-                       xmax=context.mean_induction_stop_loc)
-        axes[0].plot(context.binned_x, target_ramp, label='Experiment')
-        axes[0].plot(context.binned_x, model_ramp, label='Model')
-        axes[0].hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
-        axes[1].set_ylabel('Change in\nsynaptic weight')
-        axes[1].set_xlabel('Location (cm)')
-        axes[0].set_ylabel('Subthreshold\ndepolarization (mV)')
-        axes[0].set_xlabel('Location (cm)')
-        axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-        axes[0].set_ylim([min(-1., np.min(model_ramp) - 1., np.min(target_ramp) - 1.),
-                          max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.)])
-        axes[1].set_ylim([-context.peak_delta_weight * 1.05, context.peak_delta_weight * 1.1])
-        clean_axes(axes)
-        fig.suptitle('Induction: %i' % context.induction)
-        fig.tight_layout()
-        fig.show()
 
     local_peak_loc, local_peak_shift = {}, {}
     local_peak_loc['target'], local_peak_shift['target'] = \
@@ -1181,7 +1172,8 @@ def get_args_static_model_ramp():
     :return: list of list
     """
 
-    return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
+    # return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
+    return [[1, 1, 1, 2], ['control', 'depo', 'hyper', 'control']]
 
 
 def compute_features_model_ramp(x, induction=None, condition=None, model_id=None, export=False, plot=False):
@@ -1195,18 +1187,18 @@ def compute_features_model_ramp(x, induction=None, condition=None, model_id=None
     :param plot: bool
     :return: dict
     """
-    load_data(induction)
     context.condition = condition
+    load_data(induction)
     update_source_contexts(x, context)
     start_time = time.time()
     if context.disp:
-        print('Process: %i: computing model_ramp features for induction: %s with x: %s' % \
-              (os.getpid(), induction, ', '.join('%.3E' % i for i in x)))
+        print('Process: %i: computing model_ramp features for induction: %s, condition: %s with x: %s' % \
+              (os.getpid(), induction, condition, ', '.join('%.3E' % i for i in x)))
         sys.stdout.flush()
     result = calculate_model_ramp(export=export, plot=plot)
     if context.disp:
-        print('Process: %i: computing model_ramp features for induction: %s took %.1f s' % \
-              (os.getpid(), induction, time.time() - start_time))
+        print('Process: %i: computing model_ramp features for induction: %s, condition: %s took %.1f s' % \
+              (os.getpid(), induction, condition, time.time() - start_time))
         sys.stdout.flush()
     return result
 
@@ -1297,7 +1289,7 @@ def get_objectives(features, model_id=None, export=False):
 
     for objective_name in context.objective_names:
         if objective_name not in objectives:
-            objectives[objective_name] = 0.
+            return dict(), dict()
         else:
             objectives[objective_name] = np.mean(objectives[objective_name])
 
