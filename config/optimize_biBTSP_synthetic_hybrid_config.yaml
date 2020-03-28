@@ -2,13 +2,13 @@ bounds:
   vd_peak: !!python/tuple
   - 0.001
   - 100.
-  vd_th: !!python/tuple
-  - -40
-  - 25.
-  vd_pot_min: !!python/tuple
-  - 0.
-  - 1.
-  vd_dep_min: !!python/tuple
+  vd_th_pot: !!python/tuple
+  - -40.
+  - 15.
+  vd_th_dep: !!python/tuple
+  - -40.
+  - 15.
+  vd_min: !!python/tuple
   - 0.
   - 1.
   f_pot_peak: !!python/tuple
@@ -44,12 +44,9 @@ bounds:
   peak_delta_weight: !!python/tuple
   - 1.5
   - 4.
-  peak_delta_ramp: !!python/tuple
-  - 10.
-  - 40.
 default_params:
-  peak_delta_weight: 2.
-  peak_delta_ramp: 15.
+  peak_delta_weight: 2.5
+  vd_min: 0.
 rel_bounds:
 - - local_signal_decay
   - '>'
@@ -63,10 +60,6 @@ rel_bounds:
   - '>'
   - 1.0
   - global_signal_decay
-- - vd_th
-  - '<='
-  - 1.0
-  - peak_delta_ramp
 - - k_pot
   - '>'
   - 1.0
@@ -128,7 +121,9 @@ kwargs:
   input_field_width: 90.  # cm
   verbose: 1
   min_delta_weight: -0.2
-  min_delta_ramp: -40.
+  min_delta_ramp: -60.
+  plateau_delta_vm: 15.
+  peak_delta_ramp: 25.
   default_run_vel: 25.
   induction_loc:
     '1': 120.
@@ -137,7 +132,7 @@ kwargs:
   target_peak_shift_1: -10.
   target_peak_shift_2: 0.
   target_peak_val_1: 8.
-  target_peak_val_1_depo: 10.
+  target_peak_val_1_depo: 12.
   target_peak_val_2: 8.
   target_min_val_2: 4.
   target_ramp_offset_1_depo: 10.
@@ -148,16 +143,15 @@ objective_names:
 - induction1_depo_residual_score
 - induction1_hyper_residual_score
 - induction2_residual_score
-# - induction2_hyper_residual_score
+- induction2_hyper_residual_score
 - self_consistent_delta_residual_score
-# - ramp_amp_after_first_plateau
 optimization_title: biBTSP_synthetic_hybrid
 param_gen: PopulationAnnealing
 param_names:
 - vd_peak
-- vd_th
-- vd_pot_min
-- vd_dep_min
+- vd_th_pot
+- vd_th_dep
+- vd_min
 - f_pot_peak
 - f_pot_th
 - f_dep_th
@@ -169,7 +163,6 @@ param_names:
 - global_signal_rise
 - global_signal_decay
 - peak_delta_weight
-- peak_delta_ramp
 target_range:
   ramp_offset: 0.01
   delta_min_val: 0.01
@@ -192,7 +185,7 @@ x0:
   local_signal_rise: 1.939650E+02
   peak_delta_ramp: 15.
   peak_delta_weight: 2.
-  vd_pot_min: 0.1
-  vd_dep_min: 0.9
+  vd_min: 0.
   vd_peak: 10.
-  vd_th: 0.
+  vd_th_pot: 0.
+  vd_th_dep: -40.

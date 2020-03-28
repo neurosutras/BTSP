@@ -124,12 +124,13 @@ def init_context():
     context.data_cache = defaultdict(dict)
 
 
-def load_data(induction):
+def load_data(induction, condition='control'):
     """
 
     :param induction: int
     """
     induction = int(induction)
+    context.condition = str(condition)
 
     if induction == context.induction:
         return
@@ -408,7 +409,6 @@ def load_data(induction):
                 fig.tight_layout()
                 fig.show()
 
-
         context.data_cache[induction] = induction_context
     context.update(induction_context())
 
@@ -464,9 +464,10 @@ def calculate_model_ramp(export=False, plot=False):
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_peak, signal_xrange))
     phi_pot = np.vectorize(scaled_single_sigmoid(
-        context.vd_th, context.vd_th + context.vd_peak, vrange, [context.vd_pot_min, 1.]))
+        context.vd_th_pot, context.vd_th_pot + context.vd_peak, vrange, [context.vd_min, 1.]))
+    # phi_dep = np.vectorize(lambda x: 1.)
     phi_dep = np.vectorize(scaled_single_sigmoid(
-        context.vd_th, context.vd_th + context.vd_peak, vrange, [context.vd_dep_min, 1.]))
+        context.vd_th_dep, context.vd_th_dep + context.vd_peak, vrange, [context.vd_min, 1.]))
 
     if plot and context.induction == 1 and context.condition == 'control':
         fig, axes = plt.subplots(1, 2)
@@ -534,16 +535,14 @@ def calculate_model_ramp(export=False, plot=False):
 
     result = {}
 
-    this_peak_ramp_amp = context.peak_delta_ramp
-
     this_ramp_offset = context.ramp_offset[context.condition]
 
     for induction_lap in range(len(context.induction_start_times)):
         current_complete_ramp = \
-            np.maximum(context.min_delta_ramp, np.minimum(this_peak_ramp_amp,
+            np.maximum(context.min_delta_ramp, np.minimum(context.peak_delta_ramp,
                        get_complete_ramp(np.add(current_ramp, this_ramp_offset), context.binned_x,
                                          context.position, context.complete_run_vel_gate, context.induction_gate,
-                                         this_peak_ramp_amp)))
+                                         context.plateau_delta_vm)))
         current_complete_down_ramp = np.interp(context.down_t, context.complete_t, current_complete_ramp)
         vd_mod_pot = np.minimum(1., np.maximum(0., phi_pot(current_complete_down_ramp)))
         vd_mod_dep = np.minimum(1., np.maximum(0., phi_dep(current_complete_down_ramp)))
@@ -578,7 +577,7 @@ def calculate_model_ramp(export=False, plot=False):
         if plot:
             axes[0].plot(context.down_t[indexes] / 1000., vd_mod_pot[indexes], c='c',
                          label='Voltage-dependence (potentiation)')
-            axes[0].plot(context.down_t[indexes] / 1000., vd_mod_pot[indexes], c='r',
+            axes[0].plot(context.down_t[indexes] / 1000., vd_mod_dep[indexes], c='r',
                          label='Voltage-dependence (depression)')
             axes[1].plot(context.down_t[indexes] / 1000., current_complete_down_ramp[indexes],
                          label='Induction lap: %i' % (induction_lap + 1))
@@ -1184,7 +1183,7 @@ def get_args_static_model_ramp():
     """
 
     # return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
-    return [[1, 1, 1, 2], ['control', 'depo', 'hyper', 'control']]
+    return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
 
 
 def compute_features_model_ramp(x, induction=None, condition=None, model_id=None, export=False, plot=False):
@@ -1198,8 +1197,7 @@ def compute_features_model_ramp(x, induction=None, condition=None, model_id=None
     :param plot: bool
     :return: dict
     """
-    context.condition = condition
-    load_data(induction)
+    load_data(induction, condition)
     update_source_contexts(x, context)
     start_time = time.time()
     if context.disp:
