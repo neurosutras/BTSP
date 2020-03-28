@@ -463,8 +463,10 @@ def calculate_model_ramp(export=False, plot=False):
         context.f_pot_th, context.f_pot_th + context.f_pot_peak, signal_xrange))
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_peak, signal_xrange))
-    phi = np.vectorize(scaled_single_sigmoid(
-        context.vd_th, context.vd_th + context.vd_peak, vrange, [context.vd_min, 1.]))
+    phi_pot = np.vectorize(scaled_single_sigmoid(
+        context.vd_th, context.vd_th + context.vd_peak, vrange, [context.vd_pot_min, 1.]))
+    phi_dep = np.vectorize(scaled_single_sigmoid(
+        context.vd_th, context.vd_th + context.vd_peak, vrange, [context.vd_dep_min, 1.]))
 
     if plot and context.induction == 1 and context.condition == 'control':
         fig, axes = plt.subplots(1, 2)
@@ -473,10 +475,12 @@ def calculate_model_ramp(export=False, plot=False):
         axes[0].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='Depression rate')
         axes[0].set_xlabel('Normalized eligibility signal amplitude (a.u.)')
         axes[0].set_ylabel('Normalized rate')
-        axes[1].plot(vrange, phi(vrange), c='k')
+        axes[1].plot(vrange, phi_pot(vrange), c='c', label='Potentiation')
+        axes[1].plot(vrange, phi_dep(vrange), c='r', label='Depression')
         axes[1].set_xlabel('Relative ramp amplitude')
-        axes[1].set_ylabel('Voltage-dependent modulation')
+        axes[1].set_ylabel('Voltage-dependent modulation factor')
         axes[0].legend(loc='best', frameon=False, framealpha=0.5)
+        axes[1].legend(loc='best', frameon=False, framealpha=0.5)
         clean_axes(axes)
         fig.tight_layout()
         fig.show()
@@ -541,10 +545,14 @@ def calculate_model_ramp(export=False, plot=False):
                                          context.position, context.complete_run_vel_gate, context.induction_gate,
                                          this_peak_ramp_amp)))
         current_complete_down_ramp = np.interp(context.down_t, context.complete_t, current_complete_ramp)
-        vd_mod = np.minimum(1., np.maximum(0., phi(current_complete_down_ramp)))
+        vd_mod_pot = np.minimum(1., np.maximum(0., phi_pot(current_complete_down_ramp)))
+        vd_mod_dep = np.minimum(1., np.maximum(0., phi_dep(current_complete_down_ramp)))
 
-        local_signals = np.divide(
-            get_local_signal_population(local_signal_filter, np.multiply(context.down_rate_maps, vd_mod),
+        local_signals_pot = np.divide(
+            get_local_signal_population(local_signal_filter, np.multiply(context.down_rate_maps, vd_mod_pot),
+                                        context.down_dt), local_signal_peak)
+        local_signals_dep = np.divide(
+            get_local_signal_population(local_signal_filter, np.multiply(context.down_rate_maps, vd_mod_dep),
                                         context.down_dt), local_signal_peak)
 
         if induction_lap == 0:
@@ -558,17 +566,20 @@ def calculate_model_ramp(export=False, plot=False):
         indexes = np.where((context.down_t >= start_time) & (context.down_t <= stop_time))
 
         next_normalized_weights = []
-        for i, this_local_signal in enumerate(local_signals):
-            this_pot_rate = np.trapz(np.multiply(pot_rate(this_local_signal[indexes]), global_signal[indexes]),
+        for i, (this_local_signal_pot, this_local_signal_dep) in enumerate(zip(local_signals_pot, local_signals_dep)):
+            this_pot_rate = np.trapz(np.multiply(pot_rate(this_local_signal_pot[indexes]), global_signal[indexes]),
                                      dx=context.down_dt / 1000.)
-            this_dep_rate = np.trapz(np.multiply(dep_rate(this_local_signal[indexes]), global_signal[indexes]),
+            this_dep_rate = np.trapz(np.multiply(dep_rate(this_local_signal_dep[indexes]), global_signal[indexes]),
                                      dx=context.down_dt / 1000.)
             this_normalized_delta_weight = context.k_pot * this_pot_rate * (1. - current_normalized_weights[i]) - \
                                            context.k_dep * this_dep_rate * current_normalized_weights[i]
             this_next_normalized_weight = max(0., min(1., current_normalized_weights[i] + this_normalized_delta_weight))
             next_normalized_weights.append(this_next_normalized_weight)
         if plot:
-            axes[0].plot(context.down_t[indexes] / 1000., vd_mod[indexes], label='Voltage-dependent modulation')
+            axes[0].plot(context.down_t[indexes] / 1000., vd_mod_pot[indexes], c='c',
+                         label='Voltage-dependence (potentiation)')
+            axes[0].plot(context.down_t[indexes] / 1000., vd_mod_pot[indexes], c='r',
+                         label='Voltage-dependence (depression)')
             axes[1].plot(context.down_t[indexes] / 1000., current_complete_down_ramp[indexes],
                          label='Induction lap: %i' % (induction_lap + 1))
             axes2[1].plot(context.peak_locs,
