@@ -45,7 +45,7 @@ bounds:
   - 1.5
   - 4.
 default_params:
-  peak_delta_weight: 2.5
+  # peak_delta_weight: 2.5
   vd_min: 0.
 rel_bounds:
 - - local_signal_decay
@@ -132,7 +132,7 @@ kwargs:
   target_peak_shift_1: -10.
   target_peak_shift_2: 0.
   target_peak_val_1: 8.
-  target_peak_val_1_depo: 12.
+  target_peak_val_1_depo: 10.
   target_peak_val_2: 8.
   target_min_val_2: 4.
   target_ramp_offset_1_depo: 10.
