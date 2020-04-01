@@ -284,6 +284,23 @@ def get_exp_rise_decay_filter(rise, decay, max_time_scale, dt):
     return filter_t, filter
 
 
+def get_exp_decay_filter(decay, max_time_scale, dt):
+    """
+    :param decay: float
+    :param max_time_scale: float
+    :param dt: float
+    :return: array, array
+    """
+    filter_t = np.arange(0., 6. * max_time_scale, dt)
+    filter = np.exp(-filter_t / decay)
+    decay_indexes = np.where(filter < 0.001 * np.max(filter))[0]
+    if np.any(decay_indexes):
+        filter = filter[:decay_indexes[0]]
+    filter /= np.sum(filter)
+    filter_t = filter_t[:len(filter)]
+    return filter_t, filter
+
+
 def get_dual_signal_filters(local_signal_rise, local_signal_decay, global_signal_rise, global_signal_decay, dt,
                             plot=False):
     """
@@ -300,6 +317,36 @@ def get_dual_signal_filters(local_signal_rise, local_signal_decay, global_signal
         get_exp_rise_decay_filter(local_signal_rise, local_signal_decay, max_time_scale, dt)
     global_filter_t, global_filter = \
         get_exp_rise_decay_filter(global_signal_rise, global_signal_decay, max_time_scale, dt)
+    if plot:
+        fig, axes = plt.subplots(1)
+        axes.plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='r',
+                  label='Local plasticity signal filter')
+        axes.plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
+                  label='Global plasticity signal filter')
+        axes.set_xlabel('Time (s)')
+        axes.set_ylabel('Normalized filter amplitude')
+        axes.set_title('Plasticity signal filters')
+        axes.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        axes.set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
+        clean_axes(axes)
+        fig.tight_layout()
+        fig.show()
+    return local_signal_filter_t, local_signal_filter, global_filter_t, global_filter
+
+
+def get_dual_exp_decay_signal_filters(local_signal_decay, global_signal_decay, dt, plot=False):
+    """
+    :param local_signal_decay: float
+    :param global_signal_decay: float
+    :param dt: float
+    :param plot: bool
+    :return: array, array
+    """
+    max_time_scale = max(local_signal_decay, global_signal_decay)
+    local_signal_filter_t, local_signal_filter = \
+        get_exp_decay_filter(local_signal_decay, max_time_scale, dt)
+    global_filter_t, global_filter = \
+        get_exp_decay_filter(global_signal_decay, max_time_scale, dt)
     if plot:
         fig, axes = plt.subplots(1)
         axes.plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='r',

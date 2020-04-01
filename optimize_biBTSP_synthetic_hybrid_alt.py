@@ -369,7 +369,7 @@ def load_data(induction, condition='control'):
             induction_context.ramp_offset['hyper'][offset_indexes] = context.target_ramp_offset_1_hyper
             induction_context.LSA_weights['after']['hyper'] = \
                 np.array(induction_context.LSA_weights['after']['control'])
-            induction_context.LSA_weights['after']['hyper'][delta_weights_offset_indexes] /= 4.
+            induction_context.LSA_weights['after']['hyper'][delta_weights_offset_indexes] /= 2.
             induction_context.target_ramp['after']['hyper'], _ = \
                 get_model_ramp(induction_context.LSA_weights['after']['hyper'], context.binned_x, context.peak_locs,
                                context.input_rate_maps, context.ramp_scaling_factor)
@@ -448,9 +448,8 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     :return: dict
     """
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
-        get_dual_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
-                                context.global_signal_decay, context.down_dt,
-                                plot and context.induction == 1 and context.condition == 'control')
+        get_dual_exp_decay_signal_filters(context.local_signal_decay, context.global_signal_decay, context.down_dt,
+                                          plot and context.induction == 1 and context.condition == 'control')
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
     global_signal_peak = np.max(global_signal)
     global_signal /= global_signal_peak
@@ -460,14 +459,14 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     signal_xrange = np.linspace(0., 1., 10000)
     vrange = np.linspace(context.min_delta_ramp, context.peak_delta_ramp, 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_pot_th, context.f_pot_th + context.f_pot_peak, signal_xrange))
+        context.f_pot_th, context.f_pot_th + context.f_pot_half_width, signal_xrange))
     dep_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_dep_th, context.f_dep_th + context.f_dep_peak, signal_xrange))
+        context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
     phi_pot = np.vectorize(scaled_single_sigmoid(
-        context.vd_th_pot, context.vd_th_pot + context.vd_peak, vrange, [context.vd_min, 1.]))
+        context.vd_th_pot, context.vd_th_pot + context.vd_half_width, vrange, [context.vd_min, 1.]))
     # phi_dep = np.vectorize(lambda x: 1.)
     phi_dep = np.vectorize(scaled_single_sigmoid(
-        context.vd_th_dep, context.vd_th_dep + context.vd_peak, vrange, [context.vd_min, 1.]))
+        context.vd_th_dep, context.vd_th_dep + context.vd_half_width, vrange, [context.vd_min, 1.]))
 
     if plot and context.induction == 1 and context.condition == 'control':
         fig, axes = plt.subplots(1, 2)
@@ -875,14 +874,14 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     signal_xrange = np.linspace(0., 1., 10000)
     vrange = np.linspace(context.min_delta_ramp, context.peak_delta_ramp, 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_pot_th, context.f_pot_th + context.f_pot_peak, signal_xrange))
+        context.f_pot_th, context.f_pot_th + context.f_pot_half_width, signal_xrange))
     dep_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_dep_th, context.f_dep_th + context.f_dep_peak, signal_xrange))
+        context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
     phi_pot = np.vectorize(scaled_single_sigmoid(
-        context.vd_th_pot, context.vd_th_pot + context.vd_peak, vrange, [context.vd_min, 1.]))
+        context.vd_th_pot, context.vd_th_pot + context.vd_half_width, vrange, [context.vd_min, 1.]))
     # phi_dep = np.vectorize(lambda x: 1.)
     phi_dep = np.vectorize(scaled_single_sigmoid(
-        context.vd_th_dep, context.vd_th_dep + context.vd_peak, vrange, [context.vd_min, 1.]))
+        context.vd_th_dep, context.vd_th_dep + context.vd_half_width, vrange, [context.vd_min, 1.]))
 
     fig, axes = plt.subplots(1, 3, figsize=(10, 3.5))
     dep_scale = context.k_dep / context.k_pot
@@ -1268,8 +1267,6 @@ def get_args_static_model_ramp():
     :param x: array
     :return: list of list
     """
-
-    # return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
     return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
 
 
@@ -1415,7 +1412,7 @@ def get_features_interactive(interface, x, model_id=None, plot=False):
 
 @click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True, ))
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/optimize_biBTSP_synthetic_hybrid_config.yaml')
+              default='config/optimize_biBTSP_synthetic_hybrid_alt_config.yaml')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
 @click.option("--export-file-path", type=str, default=None)
