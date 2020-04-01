@@ -108,7 +108,8 @@ kwargs:
   induction_loc:
     '1': 120.
     '2': 45.
-  target_peak_delta_weight: 2.5
+  target_ramp_width: 160.
+  target_peak_delta_weight: 3.
   target_peak_shift_1: -10.
   target_peak_shift_2: 0.
   target_peak_val_1: 8.

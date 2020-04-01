@@ -235,7 +235,7 @@ def load_data(induction, condition='control'):
                                                         target_peak_val=context.target_peak_val_1, target_min_val=0.,
                                                         target_asymmetry=1.8,
                                                         target_peak_shift=context.target_peak_shift_1,
-                                                        target_ramp_width=187.)
+                                                        target_ramp_width=context.target_ramp_width)
                 induction_context.target_ramp['before']['control'], \
                 induction_context.LSA_weights['before']['control'], _, _ = \
                     get_delta_weights_LSA(target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
@@ -251,7 +251,7 @@ def load_data(induction, condition='control'):
                                                       target_peak_val=context.target_peak_val_2,
                                                       target_min_val=context.target_min_val_2, target_asymmetry=1.8,
                                                       target_peak_shift=context.target_peak_shift_2,
-                                                      target_ramp_width=187.)
+                                                      target_ramp_width=context.target_ramp_width)
             induction_context.target_ramp['after']['control'], \
             induction_context.LSA_weights['after']['control'], _, _ = \
                 get_delta_weights_LSA(target_ramp_2, ramp_x=context.binned_x, input_x=context.binned_x,
@@ -317,7 +317,7 @@ def load_data(induction, condition='control'):
                                                     target_peak_val=context.target_peak_val_1, target_min_val=0.,
                                                     target_asymmetry=1.8,
                                                     target_peak_shift=context.target_peak_shift_1,
-                                                    target_ramp_width=187.)
+                                                    target_ramp_width=context.target_ramp_width)
             induction_context.target_ramp['after']['control'], \
             induction_context.LSA_weights['after']['control'], _, _ = \
                 get_delta_weights_LSA(target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
@@ -333,7 +333,7 @@ def load_data(induction, condition='control'):
                                                     target_peak_val=context.target_peak_val_1_depo, target_min_val=0.,
                                                     target_asymmetry=1.8,
                                                     target_peak_shift=context.target_peak_shift_1,
-                                                    target_ramp_width=187.)
+                                                    target_ramp_width=context.target_ramp_width)
             induction_context.target_ramp['after']['depo'], \
             induction_context.LSA_weights['after']['depo'], _, _ = \
                 get_delta_weights_LSA(target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
