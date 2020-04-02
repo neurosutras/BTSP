@@ -1,5 +1,5 @@
 bounds:
-  vd_peak: !!python/tuple
+  vd_half_width: !!python/tuple
   - 0.001
   - 100.
   vd_th_pot: !!python/tuple
@@ -8,7 +8,7 @@ bounds:
   vd_th_dep: !!python/tuple
   - -40.
   - 15.
-  f_pot_peak: !!python/tuple
+  f_pot_half_width: !!python/tuple
   - 0.001
   - 1.
   f_pot_th: !!python/tuple
@@ -17,7 +17,7 @@ bounds:
   f_dep_th: !!python/tuple
   - 0.001
   - 1.
-  f_dep_peak: !!python/tuple
+  f_dep_half_width: !!python/tuple
   - 0.001
   - 1.
   k_pot: !!python/tuple
@@ -116,17 +116,18 @@ kwargs:
   min_delta_ramp: -60.
   plateau_delta_vm: 25.
   peak_delta_ramp: 40.
-  peak_delta_weight: 2.5
+  peak_delta_weight: 3.
   vd_min: 0.
   default_run_vel: 25.
   induction_loc:
     '1': 120.
     '2': 45.
+  target_ramp_width: 160.
   target_peak_delta_weight: 3.
   target_peak_shift_1: -10.
   target_peak_shift_2: 0.
   target_peak_val_1: 8.
-  target_peak_val_1_depo: 10.
+  target_peak_val_1_depo: 12.
   target_peak_val_2: 8.
   target_min_val_2: 4.
   target_ramp_offset_1_depo: 10.
@@ -142,13 +143,13 @@ objective_names:
 optimization_title: biBTSP_synthetic_hybrid
 param_gen: PopulationAnnealing
 param_names:
-- vd_peak
+- vd_half_width
 - vd_th_pot
 - vd_th_dep
-- f_pot_peak
+- f_pot_half_width
 - f_pot_th
 - f_dep_th
-- f_dep_peak
+- f_dep_half_width
 - k_pot
 - k_dep
 - local_signal_rise
@@ -165,9 +166,9 @@ target_range:
 target_val:
   ramp_amp_after_first_plateau: 5.
 x0:
-  f_dep_peak: 8.036030E-03
+  f_dep_half_width: 8.036030E-03
   f_dep_th: 2.855647E-02
-  f_pot_peak: 7.600603E-01
+  f_pot_half_width: 7.600603E-01
   f_pot_th: 1.385298E-01
   global_signal_decay: 3.570670E+02
   global_signal_rise: 3.555186E+01
@@ -175,6 +176,6 @@ x0:
   k_pot: 2.280166E+00
   local_signal_decay: 1.191872E+03
   local_signal_rise: 1.939650E+02
-  vd_peak: 10.
+  vd_half_width: 10.
   vd_th_pot: 0.
   vd_th_dep: -40.

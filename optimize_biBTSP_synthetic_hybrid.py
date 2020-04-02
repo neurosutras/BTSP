@@ -235,7 +235,7 @@ def load_data(induction, condition='control'):
                                                         target_peak_val=context.target_peak_val_1, target_min_val=0.,
                                                         target_asymmetry=1.8,
                                                         target_peak_shift=context.target_peak_shift_1,
-                                                        target_ramp_width=187.)
+                                                        target_ramp_width=context.target_ramp_width)
                 induction_context.target_ramp['before']['control'], \
                 induction_context.LSA_weights['before']['control'], _, _ = \
                     get_delta_weights_LSA(target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
@@ -251,7 +251,7 @@ def load_data(induction, condition='control'):
                                                       target_peak_val=context.target_peak_val_2,
                                                       target_min_val=context.target_min_val_2, target_asymmetry=1.8,
                                                       target_peak_shift=context.target_peak_shift_2,
-                                                      target_ramp_width=187.)
+                                                      target_ramp_width=context.target_ramp_width)
             induction_context.target_ramp['after']['control'], \
             induction_context.LSA_weights['after']['control'], _, _ = \
                 get_delta_weights_LSA(target_ramp_2, ramp_x=context.binned_x, input_x=context.binned_x,
@@ -317,7 +317,7 @@ def load_data(induction, condition='control'):
                                                     target_peak_val=context.target_peak_val_1, target_min_val=0.,
                                                     target_asymmetry=1.8,
                                                     target_peak_shift=context.target_peak_shift_1,
-                                                    target_ramp_width=187.)
+                                                    target_ramp_width=context.target_ramp_width)
             induction_context.target_ramp['after']['control'], \
             induction_context.LSA_weights['after']['control'], _, _ = \
                 get_delta_weights_LSA(target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
@@ -333,7 +333,7 @@ def load_data(induction, condition='control'):
                                                     target_peak_val=context.target_peak_val_1_depo, target_min_val=0.,
                                                     target_asymmetry=1.8,
                                                     target_peak_shift=context.target_peak_shift_1,
-                                                    target_ramp_width=187.)
+                                                    target_ramp_width=context.target_ramp_width)
             induction_context.target_ramp['after']['depo'], \
             induction_context.LSA_weights['after']['depo'], _, _ = \
                 get_delta_weights_LSA(target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
@@ -369,7 +369,7 @@ def load_data(induction, condition='control'):
             induction_context.ramp_offset['hyper'][offset_indexes] = context.target_ramp_offset_1_hyper
             induction_context.LSA_weights['after']['hyper'] = \
                 np.array(induction_context.LSA_weights['after']['control'])
-            induction_context.LSA_weights['after']['hyper'][delta_weights_offset_indexes] /= 4.
+            induction_context.LSA_weights['after']['hyper'][delta_weights_offset_indexes] /= 2.
             induction_context.target_ramp['after']['hyper'], _ = \
                 get_model_ramp(induction_context.LSA_weights['after']['hyper'], context.binned_x, context.peak_locs,
                                context.input_rate_maps, context.ramp_scaling_factor)
@@ -460,14 +460,14 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     signal_xrange = np.linspace(0., 1., 10000)
     vrange = np.linspace(context.min_delta_ramp, context.peak_delta_ramp, 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_pot_th, context.f_pot_th + context.f_pot_peak, signal_xrange))
+        context.f_pot_th, context.f_pot_th + context.f_pot_half_width, signal_xrange))
     dep_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_dep_th, context.f_dep_th + context.f_dep_peak, signal_xrange))
+        context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
     phi_pot = np.vectorize(scaled_single_sigmoid(
-        context.vd_th_pot, context.vd_th_pot + context.vd_peak, vrange, [context.vd_min, 1.]))
+        context.vd_th_pot, context.vd_th_pot + context.vd_half_width, vrange, [context.vd_min, 1.]))
     # phi_dep = np.vectorize(lambda x: 1.)
     phi_dep = np.vectorize(scaled_single_sigmoid(
-        context.vd_th_dep, context.vd_th_dep + context.vd_peak, vrange, [context.vd_min, 1.]))
+        context.vd_th_dep, context.vd_th_dep + context.vd_half_width, vrange, [context.vd_min, 1.]))
 
     if plot and context.induction == 1 and context.condition == 'control':
         fig, axes = plt.subplots(1, 2)
@@ -875,14 +875,14 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     signal_xrange = np.linspace(0., 1., 10000)
     vrange = np.linspace(context.min_delta_ramp, context.peak_delta_ramp, 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_pot_th, context.f_pot_th + context.f_pot_peak, signal_xrange))
+        context.f_pot_th, context.f_pot_th + context.f_pot_half_width, signal_xrange))
     dep_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_dep_th, context.f_dep_th + context.f_dep_peak, signal_xrange))
+        context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
     phi_pot = np.vectorize(scaled_single_sigmoid(
-        context.vd_th_pot, context.vd_th_pot + context.vd_peak, vrange, [context.vd_min, 1.]))
+        context.vd_th_pot, context.vd_th_pot + context.vd_half_width, vrange, [context.vd_min, 1.]))
     # phi_dep = np.vectorize(lambda x: 1.)
     phi_dep = np.vectorize(scaled_single_sigmoid(
-        context.vd_th_dep, context.vd_th_dep + context.vd_peak, vrange, [context.vd_min, 1.]))
+        context.vd_th_dep, context.vd_th_dep + context.vd_half_width, vrange, [context.vd_min, 1.]))
 
     fig, axes = plt.subplots(1, 3, figsize=(10, 3.5))
     dep_scale = context.k_dep / context.k_pot
@@ -1268,8 +1268,6 @@ def get_args_static_model_ramp():
     :param x: array
     :return: list of list
     """
-
-    # return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
     return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
 
 
