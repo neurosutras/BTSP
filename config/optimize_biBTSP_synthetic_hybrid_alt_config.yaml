@@ -126,7 +126,7 @@ objective_names:
 - induction2_residual_score
 - induction2_hyper_residual_score
 - self_consistent_delta_residual_score
-optimization_title: biBTSP_synthetic_hybrid
+optimization_title: biBTSP_synthetic_hybrid_alt
 param_gen: PopulationAnnealing
 param_names:
 - vd_half_width

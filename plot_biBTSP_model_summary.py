@@ -344,6 +344,7 @@ def plot_compare_models_boxplot(model_file_path_dict, ordered_keys=None, ymax=6.
 
     return mse_dict
 
+
 if __name__ == '__main__':
     main(args=sys.argv[(list_find(lambda s: s.find(os.path.basename(__file__)) != -1, sys.argv) + 1):],
          standalone_mode=False)

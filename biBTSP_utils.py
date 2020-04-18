@@ -1495,6 +1495,120 @@ def get_circular_distance(start_loc, end_loc, track_length):
     return delta_loc
 
 
+def get_min_induction_t(complete_t, complete_position, binned_x, track_length, induction_loc, num_induction_laps,
+                        plot=False):
+    """
+
+    :param complete_t:
+    :param complete_position:
+    :param binned_x:
+    :param track_length:
+    :param induction_loc:
+    :param num_induction_laps:
+    :param plot:
+    :return:
+    """
+    induction_loc_start_times = []
+    target_loc = induction_loc
+    for i in range(num_induction_laps):
+        this_start_index = np.where(complete_position >= target_loc)[0][0]
+        induction_loc_start_times.append(complete_t[this_start_index])
+        target_loc += track_length
+        loc_offset = 0
+
+    backward_intervals = np.empty((len(binned_x), len(induction_loc_start_times)))
+    forward_intervals = np.empty((len(binned_x), len(induction_loc_start_times)))
+
+    for j, start_time in enumerate(induction_loc_start_times):
+        offset_t = np.subtract(complete_t, start_time)
+        for i, loc in enumerate(binned_x):
+            next_indexes = np.where(complete_position >= loc + loc_offset)[0]
+            if len(next_indexes) > 0:
+                next_t = offset_t[next_indexes[0]]
+                if next_t > 0.:
+                    prev_indexes = np.where(complete_position < loc + loc_offset - track_length)[0]
+                    if len(prev_indexes) > 0:
+                        prev_t = offset_t[prev_indexes[-1]]
+                    else:
+                        prev_t = np.nan
+                else:
+                    prev_indexes = np.where(complete_position < loc + loc_offset)[0]
+                    if len(prev_indexes) > 0:
+                        prev_t = offset_t[prev_indexes[-1]]
+                    else:
+                        prev_t = np.nan
+                    next_indexes = np.where(complete_position >= loc + loc_offset + track_length)[0]
+                    if len(next_indexes) > 0:
+                        next_t = offset_t[next_indexes[0]]
+                    else:
+                        next_t = np.nan
+            else:
+                next_t = np.nan
+                prev_indexes = np.where(complete_position < loc + loc_offset - track_length)[0]
+                if len(prev_indexes) > 0:
+                    prev_t = offset_t[prev_indexes[-1]]
+                else:
+                    prev_t = np.nan
+            # if prev_t > 0. or next_t < 0.:
+            #     print('j: %i, loc: %.1f, prev_t: %.1f, next_t: %.1f' % (j, loc, prev_t, next_t))
+            if prev_t > 0.:
+                prev_t = np.nan
+            if next_t < 0.:
+                next_t = np.nan
+            forward_intervals[i, j] = next_t
+            backward_intervals[i, j] = prev_t
+        loc_offset += track_length
+
+    backward = np.nanmax(backward_intervals, axis=1)
+    forward = np.nanmin(forward_intervals, axis=1)
+
+    nearest = []
+    for i in range(len(backward)):
+        if np.isnan(backward[i]):
+            if np.isnan(forward[i]):
+                nearest.append(np.nan)
+            else:
+                nearest.append(forward[i])
+        elif np.isnan(forward[i]):
+            nearest.append(backward[i])
+        elif -backward[i] < forward[i]:
+            nearest.append(backward[i])
+        else:
+            nearest.append(forward[i])
+
+    nearest = np.array(nearest)
+    if plot:
+        fig, axes = plt.subplots()
+        for j in range(len(induction_loc_start_times)):
+            axes.plot(binned_x, backward_intervals[:, j] / 1000., c='grey', alpha=0.5)
+            axes.plot(binned_x, forward_intervals[:, j] / 1000., c='grey', alpha=0.5)
+        axes.plot(binned_x, backward / 1000., c='r')
+        axes.plot(binned_x, forward / 1000., c='c')
+        axes.plot(binned_x, nearest / 1000., c='k')
+        axes.set_xlabel('Location (cm)')
+        axes.set_ylabel('Time (s)')
+        clean_axes(axes)
+        fig.tight_layout()
+        fig.show()
+
+    return nearest
+
+
+def get_clean_induction_t_indexes(t, max_delta_t=1000.):
+    t = np.copy(t)
+    sorted_indexes = np.argsort(t)
+    for i, val in enumerate(np.diff(t[sorted_indexes])):
+        if val >= max_delta_t:
+            if t[sorted_indexes[i]] < 0.:
+                t[sorted_indexes[:i + 1]] = np.nan
+            else:
+                t[sorted_indexes[i + 1:]] = np.nan
+    sorted_indexes = np.argsort(t)
+    valid_indexes = ~np.isnan(t[sorted_indexes])
+
+    return sorted_indexes[valid_indexes]
+
+
 def get_biBTSP_analysis_results(data_file_path, binned_x, binned_extra_x, extended_binned_x, reference_delta_t,
                                 track_length, dt, debug=False, truncate=False):
     """
