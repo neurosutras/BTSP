@@ -531,12 +531,15 @@ def filter_features_signal_amplitudes(primitives, current_features, model_id=Non
                 global_signal_peaks.append(this_dict[cell_id][induction_id]['global_signal_peak'])
                 local_signal_peaks.append(this_dict[cell_id][induction_id]['local_signal_peak'])
                 data_key_list.append((cell_id, induction_id))
-    index = np.argmax(global_signal_peaks)
-    this_data_key = data_key_list[index]
-    print('cell: %i, induction: %i has largest global_signal_peak' % (this_data_key[0], this_data_key[1]))
-    index = np.argmax(local_signal_peaks)
-    this_data_key = data_key_list[index]
-    print('cell: %i, induction: %i has largest local_signal_peak' % (this_data_key[0], this_data_key[1]))
+    if context.verbose > 1:
+        index = np.argmax(global_signal_peaks)
+        this_data_key = data_key_list[index]
+        if this_data_key[0] not in [24] or this_data_key[1] != 1:
+            print('cell: %i, induction: %i has largest global_signal_peak' % (this_data_key[0], this_data_key[1]))
+        index = np.argmax(local_signal_peaks)
+        this_data_key = data_key_list[index]
+    if this_data_key[0] not in [6, 18, 23, 25] or this_data_key[1] != 1:
+        print('cell: %i, induction: %i has largest local_signal_peak' % (this_data_key[0], this_data_key[1]))
     if plot:
         fig, axes = plt.subplots(1)
         hist, edges = np.histogram(local_signal_peaks, bins=min(10, len(primitives)), density=True)
