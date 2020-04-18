@@ -1,0 +1,163 @@
+bounds:
+  vd_half_width: !!python/tuple
+  - 0.001
+  - 100.
+  vd_th_pot: !!python/tuple
+  - -40.
+  - 15.
+  vd_th_dep: !!python/tuple
+  - -40.
+  - 15.
+  f_pot_half_width: !!python/tuple
+  - 0.001
+  - 1.
+  f_pot_th: !!python/tuple
+  - 0.001
+  - 1.
+  f_dep_th: !!python/tuple
+  - 0.001
+  - 1.
+  f_dep_half_width: !!python/tuple
+  - 0.001
+  - 1.
+  k_pot: !!python/tuple
+  - 0.01
+  - 10.
+  k_dep: !!python/tuple
+  - 0.01
+  - 10.
+  local_signal_decay: !!python/tuple
+  - 50.
+  - 2500.
+  global_signal_decay: !!python/tuple
+  - 50.
+  - 2500.
+default_params:
+rel_bounds:
+- - local_signal_decay
+  - '>'
+  - 1.0
+  - global_signal_decay
+- - k_pot
+  - '>'
+  - 1.0
+  - k_dep
+feature_names:
+- induction1_delta_val_at_target_peak
+- induction1_delta_val_at_model_peak
+- induction1_delta_width
+- induction1_delta_peak_shift
+- induction1_delta_asymmetry
+- induction1_delta_min_loc
+- induction1_delta_val_at_target_min
+- induction1_delta_val_at_model_min
+- induction1_depo_delta_val_at_target_peak
+- induction1_depo_delta_val_at_model_peak
+- induction1_depo_delta_width
+- induction1_depo_delta_peak_shift
+- induction1_depo_delta_asymmetry
+- induction1_depo_delta_min_loc
+- induction1_depo_delta_val_at_target_min
+- induction1_depo_delta_val_at_model_min
+- induction1_hyper_delta_val_at_target_peak
+- induction1_hyper_delta_val_at_model_peak
+- induction1_hyper_delta_width
+- induction1_hyper_delta_peak_shift
+- induction1_hyper_delta_asymmetry
+- induction1_hyper_delta_min_loc
+- induction1_hyper_delta_val_at_target_min
+- induction1_hyper_delta_val_at_model_min
+- induction2_delta_val_at_target_peak
+- induction2_delta_val_at_model_peak
+- induction2_delta_width
+- induction2_delta_peak_shift
+- induction2_delta_asymmetry
+- induction2_delta_min_loc
+- induction2_delta_val_at_target_min
+- induction2_delta_val_at_model_min
+- induction2_hyper_delta_val_at_target_peak
+- induction2_hyper_delta_val_at_model_peak
+- induction2_hyper_delta_width
+- induction2_hyper_delta_peak_shift
+- induction2_hyper_delta_asymmetry
+- induction2_hyper_delta_min_loc
+- induction2_hyper_delta_val_at_target_min
+- induction2_hyper_delta_val_at_model_min
+- ramp_amp_after_first_plateau
+update_context:
+- - optimize_biBTSP_synthetic_hybrid_alt2
+  - update_model_params
+get_features_stages:
+- source: optimize_biBTSP_synthetic_hybrid_alt2
+  get_args_static: get_args_static_model_ramp
+  compute_features: compute_features_model_ramp
+  filter_features: filter_features_model_ramp
+get_objectives:
+  optimize_biBTSP_synthetic_hybrid_alt2: get_objectives
+kwargs:
+  data_file_name: 20190711_biBTSP_data_calibrated_input.hdf5
+  input_field_width: 90.  # cm
+  verbose: 1
+  min_delta_weight: -0.2
+  min_delta_ramp: -60.
+  plateau_delta_vm: 25.
+  peak_delta_ramp: 40.
+  peak_delta_weight: 3.
+  vd_min: 0.
+  default_run_vel: 25.
+  induction_loc:
+    '1': 120.
+    '2': 45.
+  target_ramp_width: 160.
+  target_peak_delta_weight: 3.
+  target_peak_shift_1: -10.
+  target_peak_shift_2: 0.
+  target_peak_val_1: 8.
+  target_peak_val_1_depo: 12.
+  target_peak_val_2: 8.
+  target_min_val_2: 4.
+  target_ramp_offset_1_depo: 10.
+  target_ramp_offset_1_hyper: -40.
+  target_ramp_offset_2_hyper: -25.
+objective_names:
+- induction1_residual_score
+- induction1_depo_residual_score
+- induction1_hyper_residual_score
+- induction2_residual_score
+- induction2_hyper_residual_score
+- self_consistent_delta_residual_score
+optimization_title: biBTSP_synthetic_hybrid_alt2
+param_gen: PopulationAnnealing
+param_names:
+- vd_half_width
+- vd_th_pot
+- vd_th_dep
+- f_pot_half_width
+- f_pot_th
+- f_dep_th
+- f_dep_half_width
+- k_pot
+- k_dep
+- local_signal_decay
+- global_signal_decay
+target_range:
+  ramp_offset: 0.01
+  delta_min_val: 0.01
+  delta_peak_val: 0.01
+  residuals: 0.1
+  weights_smoothness: 0.005
+  ramp_amp_after_first_plateau: 0.01
+target_val:
+  ramp_amp_after_first_plateau: 5.
+x0:
+  f_dep_half_width: 4.063616E-02
+  f_dep_th: 4.085338E-02
+  f_pot_half_width: 5.837401E-01
+  f_pot_th: 1.563482E-01
+  global_signal_decay: 4.428467E+02
+  k_dep: 5.279940E-01
+  k_pot: 1.544540E+00
+  local_signal_decay: 1.883415E+03
+  vd_half_width: 4.648724E+00
+  vd_th_dep: -1.963440E+01
+  vd_th_pot: -1.492053E+00
