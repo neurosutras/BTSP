@@ -116,7 +116,10 @@ def init_context():
         ramp_scaling_factor = f['calibrated_input'][input_field_width_key].attrs['ramp_scaling_factor']
 
     down_dt = 10.  # ms, to speed up optimization
-    num_induction_laps = 1
+    if 'num_induction_laps' not in context():
+        num_induction_laps = 1
+    else:
+        num_induction_laps = context.num_induction_laps
     induction_dur = 300.  # ms
     context.update(locals())
 
