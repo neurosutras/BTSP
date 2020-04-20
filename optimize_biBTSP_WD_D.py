@@ -598,9 +598,9 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
 
     signal_xrange = np.linspace(0., 1., 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_pot_th, context.f_pot_th + context.f_pot_peak, signal_xrange))
+        context.f_pot_th, context.f_pot_th + context.f_pot_half_width, signal_xrange))
     dep_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_dep_th, context.f_dep_th + context.f_dep_peak, signal_xrange))
+        context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
 
     if plot:
         fig, axes = plt.subplots(1)
@@ -1051,9 +1051,9 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
 
     signal_xrange = np.linspace(0., 1., 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_pot_th, context.f_pot_th + context.f_pot_peak, signal_xrange))
+        context.f_pot_th, context.f_pot_th + context.f_pot_half_width, signal_xrange))
     dep_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_dep_th, context.f_dep_th + context.f_dep_peak, signal_xrange))
+        context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
 
     peak_weight = context.peak_delta_weight + 1.
     peak_ramp_amp = np.max(ramp_snapshots) + 5.
@@ -1455,9 +1455,9 @@ def plot_model_summary_figure(cell_id, model_file_path, induction_lap=0, target_
 
     signal_xrange = np.linspace(0., 1., 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_pot_th, context.f_pot_th + context.f_pot_peak, signal_xrange))
+        context.f_pot_th, context.f_pot_th + context.f_pot_half_width, signal_xrange))
     dep_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_dep_th, context.f_dep_th + context.f_dep_peak, signal_xrange))
+        context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
 
     peak_weight = context.peak_delta_weight + 1.
     peak_ramp_amp = np.max(ramp_snapshots) + 5.

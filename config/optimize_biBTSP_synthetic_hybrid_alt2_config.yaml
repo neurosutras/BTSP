@@ -2,7 +2,10 @@ bounds:
   vd_half_width: !!python/tuple
   - 0.001
   - 100.
-  vd_min: !!python/tuple
+  vd_pot_min: !!python/tuple
+  - 0.
+  - 1.
+  vd_dep_min: !!python/tuple
   - 0.
   - 1.
   vd_th: !!python/tuple
@@ -135,7 +138,8 @@ param_gen: PopulationAnnealing
 param_names:
 - vd_half_width
 - vd_th
-- vd_min
+- vd_pot_min
+- vd_dep_min
 - f_pot_half_width
 - f_pot_th
 - f_dep_th
@@ -166,6 +170,7 @@ x0:
   local_signal_decay: 1.5E+03
   vd_half_width: 4.648724E+00
   vd_th: -1.963440E+01
-  vd_min: 0.
+  vd_pot_min: 0.
+  vd_dep_min: 0.
   peak_delta_ramp: 40.
   peak_delta_weight: 3.
