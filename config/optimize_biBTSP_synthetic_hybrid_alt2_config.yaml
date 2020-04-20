@@ -155,7 +155,7 @@ target_range:
   weights_smoothness: 0.005
   ramp_amp_after_first_plateau: 0.01
 target_val:
-  ramp_amp_after_first_plateau: 5.
+  ramp_amp_after_first_plateau: 0.5
 x0:
   f_dep_half_width: 4.063616E-02
   f_dep_th: 4.085338E-02

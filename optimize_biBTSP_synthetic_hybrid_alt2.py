@@ -497,8 +497,9 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     if context.induction == 2:
         if not np.all((context.min_delta_weight <= initial_delta_weights) &
                       (initial_delta_weights <= context.peak_delta_weight)):
+            target_initial_ramp = initial_ramp
             initial_ramp, initial_delta_weights, _, _ = \
-                get_delta_weights_LSA(initial_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
+                get_delta_weights_LSA(target_initial_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
                                       interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
                                       peak_locs=context.peak_locs, ramp_scaling_factor=context.ramp_scaling_factor,
                                       induction_start_loc=context.mean_induction_start_loc,
@@ -509,6 +510,13 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             if context.verbose > 1:
                 print('Process: %i; re-computed initial weights before induction: %i' %
                       (os.getpid(), context.induction))
+            if not 0.95 * np.max(target_initial_ramp) < np.max(initial_ramp) < 1.05 * np.max(target_initial_ramp):
+                if context.verbose > 0:
+                    print('optimize_biBTSP_%s: calculate_model_ramp: pid: %i; aborting - initial ramp is inconsistent'
+                          ' with value of peak_delta_weight: %.1f' %
+                          (BTSP_model_name, os.getpid(), context.peak_delta_weight))
+                    sys.stdout.flush()
+                return dict()
 
     delta_weights_snapshots = [initial_delta_weights]
     current_ramp = initial_ramp
@@ -598,6 +606,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
 
         if context.induction == 1 and context.condition == 'control' and induction_lap == 0:
             result['ramp_amp_after_first_plateau'] = np.max(current_ramp)
+            result['target_ramp_amp_after_first_plateau'] = np.max(target_ramp)
         ramp_snapshots.append(current_ramp)
 
     if plot:
@@ -1313,7 +1322,8 @@ def filter_features_model_ramp(primitives, current_features, model_id=None, expo
     grouped_feature_names = ['delta_val_at_target_peak', 'delta_val_at_model_peak', 'delta_width', 'delta_peak_shift',
                              'delta_asymmetry', 'delta_min_loc', 'delta_val_at_target_min', 'delta_val_at_model_min',
                              'residual_score']
-    feature_names = ['self_consistent_delta_residual_score', 'ramp_amp_after_first_plateau']
+    feature_names = ['self_consistent_delta_residual_score', 'ramp_amp_after_first_plateau',
+                     'target_ramp_amp_after_first_plateau']
     for this_result_dict in primitives:
         if not this_result_dict:
             if context.verbose > 0:
@@ -1377,11 +1387,14 @@ def get_objectives(features, model_id=None, export=False):
         if feature_name in context.objective_names and feature_name in features:
             objectives[feature_name] = features[feature_name]
 
-    feature_names = ['ramp_amp_after_first_plateau']
-    for feature_name in feature_names:
-        if feature_name in context.objective_names and feature_name in features:
-            objectives[feature_name] = ((features[feature_name] - context.target_val[feature_name]) /
-                                        context.target_range[feature_name]) ** 2.
+    feature_name = 'ramp_amp_after_first_plateau'
+    this_feature_val = features['ramp_amp_after_first_plateau']
+    target_val = features['target_ramp_amp_after_first_plateau'] * context.target_val[feature_name]
+    if feature_name in context.objective_names:
+        if this_feature_val < target_val:
+            objectives[feature_name] = ((this_feature_val - target_val) / context.target_range[feature_name]) ** 2.
+        else:
+            objectives[feature_name] = 0.
 
     for objective_name in context.objective_names:
         if objective_name not in objectives:

@@ -115,14 +115,17 @@ def init_context():
                                  for cell_id in [cell_id for cell_id in context.data_keys if str(cell_id) in f['data']]
                                  for induction in f['data'][str(cell_id)]]
         spont_cell_id_list = [int(cell_id) for cell_id in f['data'] if f['data'][cell_id].attrs['spont']]
-        allow_offset_cell_ids = [int(cell_id) for cell_id in f['data'] if '2' in f['data'][cell_id] and
-                                 ('1' not in f['data'][cell_id] or
-                                  'before' not in f['data'][cell_id]['1']['raw']['exp_ramp'])]
+        allow_offset_cell_ids = \
+            [int(cell_id) for cell_id in f['data'] if '2' in f['data'][cell_id] and '3' not in f['data'][cell_id] and
+             ('1' not in f['data'][cell_id] or 'before' not in f['data'][cell_id]['1']['raw']['exp_ramp'])]
     if context.verbose > 1:
         print('optimize_biBTSP_%s: pid: %i; processing the following data_keys: %s' %
               (BTSP_model_name, os.getpid(), str(context.data_keys)))
-    self_consistent_cell_ids = [cell_id for (cell_id, induction) in context.data_keys if induction == 1 and
-                                (cell_id, 2) in context.data_keys]
+    self_consistent_cell_ids = \
+        [cell_id for (cell_id, induction) in context.data_keys if
+         (induction == 1 and (cell_id, 2) in context.data_keys) or
+         (induction == 2 and (cell_id, 3) in context.data_keys)]
+    largest_signal_amplitude_data_keys = [(6, 1), (18, 1), (23, 1), (24, 1), (25, 1)]
     down_dt = 10.  # ms, to speed up optimization
     context.update(locals())
     context.cell_id = None
@@ -476,7 +479,8 @@ def get_args_static_signal_amplitudes():
     (static) for each set of parameters.
     :return: list of list
     """
-    return list(zip(*context.all_data_keys))
+    # return list(zip(*context.all_data_keys))
+    return list(zip(*context.largest_signal_amplitude_data_keys))
 
 
 def compute_features_signal_amplitudes(x, cell_id=None, induction=None, model_id=None, export=False, plot=False):
@@ -531,15 +535,16 @@ def filter_features_signal_amplitudes(primitives, current_features, model_id=Non
                 global_signal_peaks.append(this_dict[cell_id][induction_id]['global_signal_peak'])
                 local_signal_peaks.append(this_dict[cell_id][induction_id]['local_signal_peak'])
                 data_key_list.append((cell_id, induction_id))
-    if context.verbose > 1:
+    if context.verbose > 0:
         index = np.argmax(global_signal_peaks)
         this_data_key = data_key_list[index]
         if this_data_key[0] not in [24] or this_data_key[1] != 1:
             print('cell: %i, induction: %i has largest global_signal_peak' % (this_data_key[0], this_data_key[1]))
         index = np.argmax(local_signal_peaks)
         this_data_key = data_key_list[index]
-    if this_data_key[0] not in [6, 18, 23, 24, 25] or this_data_key[1] != 1:
-        print('cell: %i, induction: %i has largest local_signal_peak' % (this_data_key[0], this_data_key[1]))
+        if this_data_key[0] not in [6, 18, 23, 24, 25] or this_data_key[1] != 1:
+            print('cell: %i, induction: %i has largest local_signal_peak' % (this_data_key[0], this_data_key[1]))
+        sys.stdout.flush()
     if plot:
         fig, axes = plt.subplots(1)
         hist, edges = np.histogram(local_signal_peaks, bins=min(10, len(primitives)), density=True)
