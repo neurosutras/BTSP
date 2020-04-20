@@ -164,7 +164,7 @@ x0:
   global_signal_decay: 4.428467E+02
   k_dep: 5.279940E-01
   k_pot: 1.544540E+00
-  local_signal_decay: 1.883415E+03
+  local_signal_decay: 1.5E+03
   vd_half_width: 4.648724E+00
   vd_th_dep: -1.963440E+01
   vd_th_pot: -1.492053E+00
