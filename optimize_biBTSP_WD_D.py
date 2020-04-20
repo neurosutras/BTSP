@@ -987,6 +987,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
             print('optimize_biBTSP_%s: calculate_model_ramp: pid: %i; model_id: %s; aborting - excessive fluctuations '
                   'in weights across laps; cell_id: %i, induction: %i' %
                   (BTSP_model_name, os.getpid(), model_id, context.cell_id, context.induction))
+            sys.stdout.flush()
         return dict()
 
     return {context.cell_id: {context.induction: result}}

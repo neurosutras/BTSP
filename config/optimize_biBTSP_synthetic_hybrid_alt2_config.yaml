@@ -1,5 +1,8 @@
 bounds:
-  vd_half_width: !!python/tuple
+  vd_pot_half_width: !!python/tuple
+  - 0.001
+  - 100.
+  vd_dep_half_width: !!python/tuple
   - 0.001
   - 100.
   vd_th_pot: !!python/tuple
@@ -117,7 +120,7 @@ kwargs:
   target_peak_shift_1: -10.
   target_peak_shift_2: 0.
   target_peak_val_1: 8.
-  target_peak_val_1_depo: 12.
+  target_peak_val_1_depo: 10.  # 12.
   target_peak_val_2: 8.
   target_min_val_2: 4.
   target_ramp_offset_1_depo: 10.
@@ -128,13 +131,14 @@ objective_names:
 - induction1_depo_residual_score
 - induction1_hyper_residual_score
 - induction2_residual_score
-- induction2_hyper_residual_score
+# - induction2_hyper_residual_score
 - self_consistent_delta_residual_score
 - ramp_amp_after_first_plateau
 optimization_title: biBTSP_synthetic_hybrid_alt2
 param_gen: PopulationAnnealing
 param_names:
-- vd_half_width
+- vd_pot_half_width
+- vd_dep_half_width
 - vd_th_pot
 - vd_th_dep
 - f_pot_half_width
@@ -165,7 +169,8 @@ x0:
   k_dep: 5.279940E-01
   k_pot: 1.544540E+00
   local_signal_decay: 1.5E+03
-  vd_half_width: 4.648724E+00
+  vd_pot_half_width: 4.648724E+00
+  vd_dep_half_width: 4.648724E+00
   vd_th_dep: -1.963440E+01
   vd_th_pot: -1.492053E+00
   peak_delta_ramp: 40.

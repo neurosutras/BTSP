@@ -466,10 +466,10 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
     phi_pot = np.vectorize(scaled_single_sigmoid(
-        context.vd_th_pot, context.vd_th_pot + context.vd_half_width, vrange, [context.vd_min, 1.]))
+        context.vd_th_pot, context.vd_th_pot + context.vd_pot_half_width, vrange, [context.vd_min, 1.]))
     # phi_dep = np.vectorize(lambda x: 1.)
     phi_dep = np.vectorize(scaled_single_sigmoid(
-        context.vd_th_dep, context.vd_th_dep + context.vd_half_width, vrange, [context.vd_min, 1.]))
+        context.vd_th_dep, context.vd_th_dep + context.vd_dep_half_width, vrange, [context.vd_min, 1.]))
 
     if plot and context.induction == 1 and context.condition == 'control':
         fig, axes = plt.subplots(1, 2)
@@ -826,6 +826,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             print('optimize_biBTSP_%s: calculate_model_ramp: pid: %i; aborting - excessive fluctuations in weights '
                   'across laps; induction: %i' %
                   (BTSP_model_name, os.getpid(), context.induction))
+            sys.stdout.flush()
         return dict()
 
     return {context.induction: {context.condition: result}}
@@ -890,10 +891,10 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
     phi_pot = np.vectorize(scaled_single_sigmoid(
-        context.vd_th_pot, context.vd_th_pot + context.vd_half_width, vrange, [context.vd_min, 1.]))
+        context.vd_th_pot, context.vd_th_pot + context.vd_pot_half_width, vrange, [context.vd_min, 1.]))
     # phi_dep = np.vectorize(lambda x: 1.)
     phi_dep = np.vectorize(scaled_single_sigmoid(
-        context.vd_th_dep, context.vd_th_dep + context.vd_half_width, vrange, [context.vd_min, 1.]))
+        context.vd_th_dep, context.vd_th_dep + context.vd_dep_half_width, vrange, [context.vd_min, 1.]))
 
     fig, axes = plt.subplots(1, 3, figsize=(10, 3.5))
     dep_scale = context.k_dep / context.k_pot
