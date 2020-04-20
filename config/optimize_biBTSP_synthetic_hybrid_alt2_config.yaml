@@ -1,14 +1,11 @@
 bounds:
-  vd_pot_half_width: !!python/tuple
+  vd_half_width: !!python/tuple
   - 0.001
   - 100.
-  vd_dep_half_width: !!python/tuple
-  - 0.001
-  - 100.
-  vd_th_pot: !!python/tuple
-  - -40.
-  - 15.
-  vd_th_dep: !!python/tuple
+  vd_min: !!python/tuple
+  - 0.
+  - 1.
+  vd_th: !!python/tuple
   - -40.
   - 15.
   f_pot_half_width: !!python/tuple
@@ -110,7 +107,6 @@ kwargs:
   num_induction_laps: 2
   min_delta_weight: -0.2
   min_delta_ramp: -60.
-  vd_min: 0.
   default_run_vel: 25.
   induction_loc:
     '1': 120.
@@ -137,10 +133,9 @@ objective_names:
 optimization_title: biBTSP_synthetic_hybrid_alt2
 param_gen: PopulationAnnealing
 param_names:
-- vd_pot_half_width
-- vd_dep_half_width
-- vd_th_pot
-- vd_th_dep
+- vd_half_width
+- vd_th
+- vd_min
 - f_pot_half_width
 - f_pot_th
 - f_dep_th
@@ -169,9 +164,8 @@ x0:
   k_dep: 5.279940E-01
   k_pot: 1.544540E+00
   local_signal_decay: 1.5E+03
-  vd_pot_half_width: 4.648724E+00
-  vd_dep_half_width: 4.648724E+00
-  vd_th_dep: -1.963440E+01
-  vd_th_pot: -1.492053E+00
+  vd_half_width: 4.648724E+00
+  vd_dep: -1.963440E+01
+  vd_min: 0.
   peak_delta_ramp: 40.
   peak_delta_weight: 3.

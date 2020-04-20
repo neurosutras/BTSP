@@ -665,6 +665,14 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
                 print('Process: %i; re-computed initial weights: model_id: %s, cell_id: %i, before induction: %i, '
                       'ramp_offset: %.3f' % (os.getpid(), model_id, context.cell_id, context.induction,
                                              initial_ramp_offset))
+            if not 0.95 * np.max(context.exp_ramp['before']) < np.max(initial_ramp) < \
+                   1.05 * np.max(context.exp_ramp['before']):
+                if context.verbose > 0:
+                    print('optimize_biBTSP_%s: calculate_model_ramp: pid: %i; aborting - initial ramp is inconsistent'
+                          ' with value of peak_delta_weight: %.1f' %
+                          (BTSP_model_name, os.getpid(), context.peak_delta_weight))
+                    sys.stdout.flush()
+                return dict()
         else:
             initial_ramp = context.LSA_ramp['before']
             initial_ramp_offset = context.LSA_ramp_offset['before']
