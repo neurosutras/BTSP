@@ -165,7 +165,7 @@ x0:
   k_pot: 1.544540E+00
   local_signal_decay: 1.5E+03
   vd_half_width: 4.648724E+00
-  vd_dep: -1.963440E+01
+  vd_th: -1.963440E+01
   vd_min: 0.
   peak_delta_ramp: 40.
   peak_delta_weight: 3.
