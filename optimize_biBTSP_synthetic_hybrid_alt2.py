@@ -1280,7 +1280,8 @@ def get_args_static_model_ramp():
     :param x: array
     :return: list of list
     """
-    return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
+    # return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
+    return [[1, 1, 1, 2], ['control', 'depo', 'hyper', 'control']]
 
 
 def compute_features_model_ramp(x, induction=None, condition=None, model_id=None, export=False, plot=False):
