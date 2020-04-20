@@ -1748,6 +1748,9 @@ def run_tests():
     sys.stdout.flush()
     time.sleep(.1)
 
+    if context.plot:
+        context.interface.apply(plt.show)
+
     return features
 
 

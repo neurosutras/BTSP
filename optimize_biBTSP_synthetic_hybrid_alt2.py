@@ -544,7 +544,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             np.maximum(context.min_delta_ramp, np.minimum(context.peak_delta_ramp,
                        get_complete_ramp(np.add(current_ramp, this_ramp_offset), context.binned_x,
                                          context.position, context.complete_run_vel_gate, context.induction_gate,
-                                         context.plateau_delta_vm)))
+                                         context.peak_delta_ramp)))
         current_complete_down_ramp = np.interp(context.down_t, context.complete_t, current_complete_ramp)
         vd_mod_pot = np.minimum(1., np.maximum(0., phi_pot(current_complete_down_ramp)))
         vd_mod_dep = np.minimum(1., np.maximum(0., phi_dep(current_complete_down_ramp)))
