@@ -8,7 +8,10 @@ bounds:
   vd_dep_min: !!python/tuple
   - 0.
   - 1.
-  vd_th: !!python/tuple
+  vd_pot_th: !!python/tuple
+  - -40.
+  - 15.
+  vd_dep_th: !!python/tuple
   - -40.
   - 15.
   f_pot_half_width: !!python/tuple
@@ -137,7 +140,8 @@ optimization_title: biBTSP_synthetic_hybrid_alt2
 param_gen: PopulationAnnealing
 param_names:
 - vd_half_width
-- vd_th
+- vd_pot_th
+- vd_dep_th
 - vd_pot_min
 - vd_dep_min
 - f_pot_half_width
@@ -169,7 +173,8 @@ x0:
   k_pot: 1.544540E+00
   local_signal_decay: 1.5E+03
   vd_half_width: 4.648724E+00
-  vd_th: -1.963440E+01
+  vd_dep_th: -1.963440E+01
+  vd_pot_th: -1.963440E+01
   vd_pot_min: 0.
   vd_dep_min: 0.
   peak_delta_ramp: 40.
