@@ -424,8 +424,8 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
                       (os.getpid(), model_id, context.cell_id, context.induction))
 
             # discard model if current peak_delta_weight constraint reduces accuracy of initial_ramp
-            if not 0.9 * np.max(context.exp_ramp['before']) < np.max(initial_ramp) < \
-                   1.1 * np.max(context.exp_ramp['before']):
+            if not 0.9 * np.max(context.LSA_ramp['before']) < np.max(initial_ramp) < \
+                   1.1 * np.max(context.LSA_ramp['before']):
                 if context.verbose > 0:
                     print('optimize_biBTSP_%s: calculate_model_ramp: pid: %i; model_id: %s: aborting - initial ramp is '
                           'inconsistent with value of peak_delta_weight: %.1f' %
@@ -511,22 +511,12 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
     initial_weights = np.multiply(initial_normalized_weights, peak_weight)
     final_weights = np.add(current_delta_weights, 1.)
 
-    try:
-        model_ramp, discard_delta_weights, model_ramp_offset, model_residual_score = \
-            get_residual_score(current_delta_weights, target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
-                               interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
-                               ramp_scaling_factor=context.ramp_scaling_factor,
-                               induction_loc=context.mean_induction_start_loc, track_length=context.track_length,
-                               target_range=context.target_range, full_output=True)
-    except Exception as e:
-        print('optimize_biBTSP_%s: compute_features_model_ramp: pid: %i; model_id: %s; Exception was generated while '
-              'evaluating cell_id: %i, induction: %i with x:' %
-              (BTSP_model_name, os.getpid(), model_id, context.cell_id, context.induction))
-        pprint.pprint(context.x_array)
-        pprint.pprint('current_ramp has np.nan: %s' % np.any(np.isnan(current_ramp)))
-        traceback.print_exc(file=sys.stdout)
-        sys.stdout.flush()
-        raise e
+    model_ramp, discard_delta_weights, model_ramp_offset, model_residual_score = \
+        get_residual_score(current_delta_weights, target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
+                           interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
+                           ramp_scaling_factor=context.ramp_scaling_factor,
+                           induction_loc=context.mean_induction_start_loc, track_length=context.track_length,
+                           target_range=context.target_range, full_output=True)
 
     result = {'residual_score': model_residual_score}
 
@@ -776,7 +766,7 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
         sample_time_delays.append(this_delay)
     sample_time_delays = np.abs(sample_time_delays)
 
-    target_time_delay = 5000.
+    target_time_delay = 2500.
 
     relative_indexes = np.where((sample_time_delays > target_time_delay) &
                                 (final_weights[input_sample_indexes] > initial_weights[input_sample_indexes]))[0]
@@ -851,7 +841,7 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
     this_axis.set_ylabel('Normalized rate')
     this_axis.set_ylim(0., this_axis.get_ylim()[1])
     # this_axis.set_xlim(0., 1.)
-    this_axis.set_title('Nonlinear sensitivity to\nsynaptic eligibility signals', fontsize=mpl.rcParams['font.size'])
+    this_axis.set_title('Nonlinear sensitivity to\nplasticity signal overlap', fontsize=mpl.rcParams['font.size'])
     this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
 
     example_local_signals = dict()
@@ -892,10 +882,9 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
     axes[0][1].get_shared_x_axes().join(axes[0][1], axes[0][2], axes[1][1], axes[1][2], axes[2][1], axes[2][2])
     axes[0][1].get_shared_y_axes().join(axes[0][1], axes[0][2])
     axes[1][1].get_shared_y_axes().join(axes[1][1], axes[1][2])
-    axes[2][1].get_shared_y_axes().join(axes[2][1], axes[2][2])
+    # axes[2][1].get_shared_y_axes().join(axes[2][1], axes[2][2])
 
     ymax1 = np.max(this_global_signal)
-    ymax2 = 0.
     axes0_1_right = [axes[0][1].twinx(), axes[0][2].twinx()]
     axes0_1_right[0].get_shared_y_axes().join(axes0_1_right[0], axes0_1_right[1])
     for i, (name, index) in enumerate(viewitems(example_input_dict)):
@@ -922,7 +911,6 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
 
         axes[2][i + 1].plot(this_t, this_net_dwdt, c=colors[i])
         axes[2][i + 1].set_xlabel('Time (s)')
-        ymax2 = max(ymax2, np.max(np.abs(this_net_dwdt)))
 
     xmin = max(-5., np.min(this_t))
     xmax = np.max(this_t)
@@ -937,19 +925,21 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
     ymax0_left = context.input_field_peak_rate / 0.9
     ymax0_right = peak_ramp_amp / 0.9
     ymax1 /= 0.9
-    ymax2 /= 0.85
     axes[0][1].set_ylim([0., ymax0_left])
     # axes[0][2].set_ylim([0., ymax1_left])
     axes0_1_right[0].set_ylim([0., ymax0_right])
     # axes0_1_right[1].set_ylim([0., ymax0_right])
     axes[1][1].set_ylim([0., ymax1])
     # axes[1][2].set_ylim([0., ymax1])
-    axes[2][1].set_ylim([-ymax2, ymax2])
-    # axes[2][2].set_ylim([-ymax2, ymax2])
+    ymax2_1 = np.max(np.abs(axes[2][1].get_ylim())) / 0.85
+    axes[2][1].set_ylim([-ymax2_1, ymax2_1])
+    ymax2_2 = np.max(np.abs(axes[2][2].get_ylim())) / 0.85
+    axes[2][2].set_ylim([-ymax2_2, ymax2_2])
 
     bar_loc0 = ymax0_left * 0.95
     bar_loc1 = ymax1 * 0.95
-    bar_loc2 = ymax2 * 0.95
+    bar_loc2_1 = ymax2_1 * 0.95
+    bar_loc2_2 = ymax2_2 * 0.95
     axes[0][1].hlines(bar_loc0,
                       xmin=context.induction_start_times[induction_lap] / 1000.,
                       xmax=context.induction_stop_times[induction_lap] / 1000., linewidth=2)
@@ -962,10 +952,10 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
     axes[1][2].hlines(bar_loc1,
                       xmin=context.induction_start_times[induction_lap] / 1000.,
                       xmax=context.induction_stop_times[induction_lap] / 1000., linewidth=2)
-    axes[2][1].hlines(bar_loc2,
+    axes[2][1].hlines(bar_loc2_1,
                       xmin=context.induction_start_times[induction_lap] / 1000.,
                       xmax=context.induction_stop_times[induction_lap] / 1000., linewidth=2)
-    axes[2][2].hlines(bar_loc2,
+    axes[2][2].hlines(bar_loc2_2,
                       xmin=context.induction_start_times[induction_lap] / 1000.,
                       xmax=context.induction_stop_times[induction_lap] / 1000., linewidth=2)
 
@@ -978,9 +968,9 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
     axes[1][1].set_ylabel('Plasticity signal\namplitude')
     axes[1][1].set_yticks(np.arange(0., ymax1, 0.2))
     axes[1][2].set_yticks(np.arange(0., ymax1, 0.2))
-    yrange2 = np.round((np.arange(-ymax2, ymax2, 0.2) / 0.2)) * 0.2
-    axes[2][1].set_yticks(yrange2)
-    axes[2][2].set_yticks(yrange2)
+    # yrange2 = np.round((np.arange(-ymax2, ymax2, 0.2) / 0.2)) * 0.2
+    # axes[2][1].set_yticks(yrange2)
+    # axes[2][2].set_yticks(yrange2)
     axes[2][1].set_ylabel('Rate of change\nin synaptic weight')
 
     for row in range(3):
@@ -1141,11 +1131,10 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
         final_weights = source['model_weights'][:]
 
     import_data(cell_id, 2)
-    print(x)
     update_source_contexts(x, context)
 
-    initial_exp_ramp = context.exp_ramp['before']  # context.exp_ramp_raw['before']
-    target_ramp = context.exp_ramp['after']  # context.exp_ramp_raw['after']
+    initial_exp_ramp = context.exp_ramp['before']
+    target_ramp = context.exp_ramp['after']
 
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
     local_signals = \
@@ -1196,7 +1185,7 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     mpl.rcParams['axes.unicode_minus'] = True
     from matplotlib.lines import Line2D
 
-    fig, axes = plt.subplots(3, figsize=(4, 8.5))
+    fig, axes = plt.subplots(3, figsize=(5, 7.5))
 
     current_weights = np.add(delta_weights_snapshots[induction_lap], 1.)
     current_ramp = ramp_snapshots[induction_lap]
@@ -1222,8 +1211,10 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     example_local_signal = local_signals[depressing_example_index][indexes]
     example_pot_elig_signal = example_local_signal * (1. - example_current_normalized_weight)
     example_dep_elig_signal = example_local_signal * example_current_normalized_weight
-    example_pot_rate = peak_weight * context.k_pot * pot_rate(np.multiply(example_pot_elig_signal, this_global_signal))
-    example_dep_rate = peak_weight * context.k_dep * dep_rate(np.multiply(example_dep_elig_signal, this_global_signal))
+    example_pot_rate = peak_weight * context.k_pot * (1. - example_current_normalized_weight) * \
+                       pot_rate(np.multiply(example_local_signal, this_global_signal))
+    example_dep_rate = peak_weight * context.k_dep * example_current_normalized_weight * \
+                       dep_rate(np.multiply(example_local_signal, this_global_signal))
     example_net_dwdt = np.subtract(example_pot_rate, example_dep_rate)
 
     axes[0].get_shared_x_axes().join(axes[0], axes[1], axes[2])
@@ -1260,7 +1251,10 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     axes[2].plot(this_t, example_dep_rate, c='r', linewidth=1., label='Depression rate')
     axes[2].plot(this_t, example_net_dwdt, c='k', linewidth=1., label='Net dW/dt')
     axes[2].set_xlabel('Time (s)')
-    axes[2].legend(loc=(0., 1.0), frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
+    leg = axes[2].legend(loc=(0., 1.0), frameon=False, framealpha=0.5, handlelength=1,
+                         fontsize=mpl.rcParams['font.size'])
+    for line in leg.get_lines():
+        line.set_linewidth(2.)
 
     xmin = max(-5., np.min(this_t))
     xmax = np.max(this_t)
