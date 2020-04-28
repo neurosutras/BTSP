@@ -18,5 +18,5 @@ set -x
 cd $SCRATCH/src/BTSP
 
 ibrun -n 448 python3 -m nested.optimize --config-file-path=config/optimize_biBTSP_synthetic_VD_config.yaml \
-    --output-dir=data --pop_size=200 --max_iter=50 --path_length=3 --disp --export
+    --output-dir=data --pop_size=200 --max_iter=50 --path_length=3 --disp
 EOT

@@ -119,7 +119,8 @@ def init_context():
     if context.verbose > 1:
         print('optimize_biBTSP_%s: pid: %i; processing the following data_keys: %s' %
               (BTSP_model_name, os.getpid(), str(context.data_keys)))
-    largest_signal_amplitude_data_keys = [(6, 1), (18, 1), (23, 1), (24, 1), (25, 1), (31, 2), (46, 2), (5, 2)]
+    largest_signal_amplitude_data_keys = \
+        [(6, 1), (18, 1), (23, 1), (24, 1), (25, 1), (31, 2), (46, 2), (5, 2), (16, 1)]
     down_dt = 10.  # ms, to speed up optimization
     context.update(locals())
     context.cell_id = None
@@ -265,8 +266,8 @@ def get_args_static_signal_amplitudes():
     (static) for each set of parameters.
     :return: list of list
     """
-    return list(zip(*context.all_data_keys))
-    # return list(zip(*context.largest_signal_amplitude_data_keys))
+    # return list(zip(*context.all_data_keys))
+    return list(zip(*context.largest_signal_amplitude_data_keys))
 
 
 def compute_features_signal_amplitudes(x, cell_id=None, induction=None, model_id=None, export=False, plot=False):
