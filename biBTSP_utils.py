@@ -1496,16 +1496,17 @@ def get_circular_distance(start_loc, end_loc, track_length):
 
 
 def get_min_induction_t(complete_t, complete_position, binned_x, track_length, induction_loc, num_induction_laps,
-                        plot=False):
+                        plot=False, title=None):
     """
 
-    :param complete_t:
-    :param complete_position:
-    :param binned_x:
-    :param track_length:
-    :param induction_loc:
-    :param num_induction_laps:
-    :param plot:
+    :param complete_t: array
+    :param complete_position: array
+    :param binned_x: array
+    :param track_length: float
+    :param induction_loc: float
+    :param num_induction_laps: int
+    :param plot: bool
+    :param title: str
     :return:
     """
     induction_loc_start_times = []
@@ -1589,6 +1590,9 @@ def get_min_induction_t(complete_t, complete_position, binned_x, track_length, i
         axes.set_ylabel('Time (s)')
         clean_axes(axes)
         fig.tight_layout()
+        if title is not None:
+            fig.suptitle(title, y=0.98)
+            fig.subplots_adjust(top=0.9)
         fig.show()
 
     return nearest

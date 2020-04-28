@@ -1148,8 +1148,8 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
                                                      context.down_dt)[indexes], local_signal_peak)
         example_pot_signals[name] = this_pot_signal
         example_dep_signals[name] = this_dep_signal
-        this_pot_rate = pot_rate(np.multiply(this_pot_signal, this_global_signal))
-        this_dep_rate = dep_rate(np.multiply(this_dep_signal, this_global_signal))
+        this_pot_rate = np.multiply(pot_rate(this_pot_signal), this_global_signal)
+        this_dep_rate = np.multiply(dep_rate(this_dep_signal), this_global_signal)
         this_net_weight_rate = context.k_pot * this_pot_rate - context.k_dep * this_dep_rate
         example_net_dwdt[name] = this_net_weight_rate
 

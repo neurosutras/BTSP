@@ -1488,8 +1488,8 @@ def plot_model_summary_figure(cell_id, model_file_path, induction_lap=0, target_
         np.divide(get_local_signal(np.multiply(example_pre_rate, dep_phi(this_normalized_current_ramp)),
                                    local_signal_filter, context.down_dt),
                   local_signal_peak)
-    example_pot_rate = context.k_pot * np.multiply(pot_rate(example_pot_elig_signal), this_global_signal)
-    example_dep_rate = context.k_dep * np.multiply(dep_rate(example_dep_elig_signal), this_global_signal)
+    example_pot_rate = context.k_pot * pot_rate(np.multiply(example_pot_elig_signal, this_global_signal))
+    example_dep_rate = context.k_dep * dep_rate(np.multiply(example_dep_elig_signal, this_global_signal))
     example_net_dwdt = np.subtract(example_pot_rate, example_dep_rate)
 
     axes[0].get_shared_x_axes().join(axes[0], axes[1], axes[2])
