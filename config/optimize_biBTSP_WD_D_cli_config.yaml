@@ -61,6 +61,14 @@ feature_names:
 - exp2_delta_min_loc
 - exp2_delta_val_at_target_min
 - exp2_delta_val_at_model_min
+- exp3_delta_val_at_target_peak
+- exp3_delta_val_at_model_peak
+- exp3_delta_width
+- exp3_delta_peak_shift
+- exp3_delta_asymmetry
+- exp3_delta_min_loc
+- exp3_delta_val_at_target_min
+- exp3_delta_val_at_model_min
 update_context:
 - - optimize_biBTSP_WD_D
   - update_model_params
@@ -84,6 +92,7 @@ objective_names:
 - spont_residual_score
 - exp1_residual_score
 - exp2_residual_score
+- exp3_residual_score
 optimization_title: biBTSP_WD_D
 param_gen: PopulationAnnealing
 param_names:

@@ -119,7 +119,7 @@ def init_context():
     if context.verbose > 1:
         print('optimize_biBTSP_%s: pid: %i; processing the following data_keys: %s' %
               (BTSP_model_name, os.getpid(), str(context.data_keys)))
-    largest_signal_amplitude_data_keys = [(6, 1), (18, 1), (23, 1), (24, 1), (25, 1), (31, 2)]
+    largest_signal_amplitude_data_keys = [(6, 1), (18, 1), (23, 1), (24, 1), (25, 1), (31, 2), (46, 2), (5, 2)]
     down_dt = 10.  # ms, to speed up optimization
     context.update(locals())
     context.cell_id = None
@@ -1350,7 +1350,7 @@ def filter_features_model_ramp(primitives, current_features, model_id=None, expo
     :return: dict
     """
     features = {}
-    groups = ['spont', 'exp1', 'exp2']
+    groups = ['spont', 'exp1', 'exp2', 'exp3']
     grouped_feature_names = ['delta_val_at_target_peak', 'delta_val_at_model_peak', 'delta_width', 'delta_peak_shift',
                              'delta_asymmetry', 'delta_min_loc', 'delta_val_at_target_min', 'delta_val_at_model_min',
                              'residual_score']
@@ -1397,7 +1397,7 @@ def get_objectives(features, model_id=None, export=False):
     objectives = {}
 
     grouped_feature_names = ['residual_score']
-    groups = ['spont', 'exp1', 'exp2']
+    groups = ['spont', 'exp1', 'exp2', 'exp3']
     for feature_name in grouped_feature_names:
         for group in groups:
             objective_name = group + '_' + feature_name
