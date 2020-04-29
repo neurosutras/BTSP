@@ -55,8 +55,8 @@ data:
                     after
                 mean_position
                 mean_t
-                initial_induction_delta_vm:
-                mean_induction_t:
+                initial_induction_delta_vm
+                min_induction_t
             complete:
                 run_vel
                 run_vel_gate
@@ -70,22 +70,23 @@ context = Context()
 
 @click.command()
 @click.option("--cell-id", type=int, default=1)
-@click.option("--induction", type=int, default=1)
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
               default='config/20200313_process_biBTSP_data_DC_soma_depo_config.yaml')
 @click.option("--data-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True),
               default='data/20190825_biBTSP_DC_soma_depo')
+@click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True),
+              default='data')
 @click.option("--label", type=str, default='depo')
 @click.option("--plot", is_flag=True)
 @click.option("--export", is_flag=True)
 @click.option("--export-file-path", type=click.Path(exists=False, file_okay=True, dir_okay=False))
-def main(cell_id, induction, config_file_path, data_dir, label, plot, export, export_file_path):
+def main(cell_id, config_file_path, data_dir, output_dir, label, plot, export, export_file_path):
     """
 
     :param cell_id: int
-    :param induction: int
     :param config_file_path: str (path)
     :param data_dir: str
+    :param output_dir: str
     :param label: str
     :param plot: bool
     :param export: bool

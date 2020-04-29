@@ -4,36 +4,31 @@ import click
 
 
 @click.command()
-@click.option("--model-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='data/20190812_biBTSP_SRL_B_90cm_all_cells_merged_exported_model_output.hdf5')
+@click.option("--legend-file-name", type=click.Path(exists=True, file_okay=True, dir_okay=False),
+              required=True)
 @click.option("--export-file-name", type=str)
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
-def main(model_file_path, export_file_name, output_dir):
+@click.option("--verbose", is_flag=True)
+def main(legend_file_name, export_file_name, output_dir, verbose):
     """
 
-    :param model_file_path: str (path)
+    :param legend_file_name: str (path)
     :param export_file_name: str
     :param output_dir: str (dir path)
+    :param verbose: bool
     """
-    if not os.path.isfile(model_file_path):
-        raise IOError('Invalid model_file_path: %s' % model_file_path)
     if not os.path.isdir(output_dir):
         raise IOError('Invalid output_dir: %s' % output_dir)
     export_file_path = '%s/%s' % (output_dir, export_file_name)
     model_params = dict()
-    with h5py.File(model_file_path, 'r') as f:
-        shared_context_key = 'shared_context'
-        group = f[shared_context_key]
-        param_names = np.array(group['param_names'][:], dtype='str')
-        exported_data_key = 'exported_data'
-        for cell_key in f[exported_data_key]:
-            description = 'model_ramp_features'
-            group = next(iter(viewvalues(f[exported_data_key][cell_key])))[description]
-            param_array = group['param_array'][:]
-            param_dict = param_array_to_dict(param_array, param_names)
-            model_params[int(cell_key)] = dict()
-            model_params[int(cell_key)].update(param_dict)
-    pprint.pprint(model_params)
+    legend = read_from_yaml(legend_file_name)
+    for key, file_name in legend.items():
+        file_path = '%s/%s' % (output_dir, file_name)
+        report = OptimizationReport(file_path=file_path)
+        model_params[key] = param_array_to_dict(report.survivors[0].x, report.param_names)
+    if verbose:
+        pprint.pprint(model_params)
+        sys.stdout.flush()
     write_to_yaml(export_file_path, model_params, convert_scalars=True)
 
 

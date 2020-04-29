@@ -1834,6 +1834,99 @@ def get_biBTSP_analysis_results(data_file_path, binned_x, binned_extra_x, extend
            interp_delta_exp_ramp, interp_final_exp_ramp
 
 
+def get_biBTSP_analysis_results_alt(data_file_path, reference_delta_t, debug=False, truncate=2.5):
+    """
+
+    :param data_file_path: str (path)
+    :param reference_delta_t: array
+    :param debug: bool
+    :param truncate: float
+    :return: tuple
+    """
+    peak_ramp_amp = []
+    total_induction_dur = []
+
+    group_indexes = defaultdict(list)
+
+    exp_ramp = defaultdict(lambda: defaultdict(dict))
+    delta_exp_ramp = defaultdict(dict)
+    mean_induction_loc = defaultdict(dict)
+    min_induction_t = defaultdict(dict)
+    clean_induction_t_indexes = defaultdict(dict)
+    interp_delta_exp_ramp = defaultdict(dict)
+    interp_exp_ramp = defaultdict(lambda: defaultdict(dict))
+
+    with h5py.File(data_file_path, 'r') as f:
+        for cell_key in f['data']:
+            for induction_key in f['data'][cell_key]:
+                induction_locs = f['data'][cell_key][induction_key].attrs['induction_locs']
+                induction_durs = f['data'][cell_key][induction_key].attrs['induction_durs']
+                if induction_key == '1' and f['data'][cell_key].attrs['spont']:
+                    group = 'spont'
+                else:
+                    group = 'exp%s' % induction_key
+                group_indexes[group].append(len(total_induction_dur))
+                total_induction_dur.append(np.sum(induction_durs))
+
+                exp_ramp[cell_key][induction_key]['after'] = \
+                    f['data'][cell_key][induction_key]['processed']['exp_ramp']['after'][:]
+
+                if 'before' in f['data'][cell_key][induction_key]['processed']['exp_ramp']:
+                    exp_ramp[cell_key][induction_key]['before'] = \
+                        f['data'][cell_key][induction_key]['processed']['exp_ramp']['before'][:]
+                    delta_exp_ramp[cell_key][induction_key] = np.subtract(exp_ramp[cell_key][induction_key]['after'],
+                                                                          exp_ramp[cell_key][induction_key]['before'])
+                else:
+                    exp_ramp[cell_key][induction_key]['before'] = \
+                        np.zeros_like(exp_ramp[cell_key][induction_key]['after'])
+                    delta_exp_ramp[cell_key][induction_key], discard = \
+                        subtract_baseline(exp_ramp[cell_key][induction_key]['after'])
+
+                peak_ramp_amp.append(np.max(exp_ramp[cell_key][induction_key]['after']))
+                mean_induction_loc[cell_key][induction_key] = np.mean(induction_locs)
+                if 'min_induction_t' in f['data'][cell_key][induction_key]['processed']:
+                    this_induction_t = f['data'][cell_key][induction_key]['processed']['min_induction_t'][:]
+                else:
+                    raise RuntimeError(
+                        'get_biBTSP_analysis_results: problem finding min_induction_t trace for cell: %s, induction: %s'
+                        ' in data file: %s' % (cell_key, induction_key, data_file_path))
+                this_clean_indexes = get_clean_induction_t_indexes(this_induction_t, truncate * 1000.)
+                this_induction_t = this_induction_t[this_clean_indexes]
+                min_induction_t[cell_key][induction_key] = this_induction_t
+                clean_induction_t_indexes[cell_key][induction_key] = this_clean_indexes
+                bad_indexes = np.where((reference_delta_t < np.min(this_induction_t)) |
+                                       (reference_delta_t > np.max(this_induction_t)))[0]
+                interp_exp_ramp[cell_key][induction_key]['before'] = np.interp(
+                    reference_delta_t, this_induction_t,
+                    exp_ramp[cell_key][induction_key]['before'][this_clean_indexes])
+                interp_exp_ramp[cell_key][induction_key]['before'][bad_indexes] = np.nan
+                interp_exp_ramp[cell_key][induction_key]['after'] = np.interp(
+                    reference_delta_t, this_induction_t, exp_ramp[cell_key][induction_key]['after'][this_clean_indexes])
+                interp_exp_ramp[cell_key][induction_key]['after'][bad_indexes] = np.nan
+                interp_delta_exp_ramp[cell_key][induction_key] = np.interp(
+                    reference_delta_t, this_induction_t, delta_exp_ramp[cell_key][induction_key][this_clean_indexes])
+                interp_delta_exp_ramp[cell_key][induction_key][bad_indexes] = np.nan
+
+                if debug:
+                    fig2, axes2 = plt.subplots()
+                    axes2.plot(reference_delta_t, interp_delta_exp_ramp[cell_key][induction_key], c='r')
+                    axes2.plot(this_induction_t,
+                               delta_exp_ramp[cell_key][induction_key][this_clean_indexes], c='k')
+                    axes2.set_xlim(reference_delta_t[0], reference_delta_t[-1])
+                    fig2.suptitle('Cell: %s; Induction: %s' % (cell_key, induction_key),
+                                  fontsize=mpl.rcParams['font.size'])
+                    axes2.set_xlabel('Time relative to plateau onset (ms)')
+                    axes2.set_ylabel('Change in ramp\namplitude (mV)')
+                    clean_axes(axes2)
+                    fig2.show()
+
+    total_induction_dur = np.array(total_induction_dur)
+    peak_ramp_amp = np.array(peak_ramp_amp)
+
+    return peak_ramp_amp, total_induction_dur, group_indexes, exp_ramp, delta_exp_ramp, mean_induction_loc, \
+           interp_exp_ramp, interp_delta_exp_ramp, min_induction_t, clean_induction_t_indexes
+
+
 def get_biBTSP_DC_soma_analysis_results(data_file_path, binned_x, binned_extra_x, extended_binned_x, reference_delta_t,
                                         track_length, dt, group='exp1', induction=1, debug=False, truncate=False):
     """
