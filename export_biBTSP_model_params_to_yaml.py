@@ -7,7 +7,7 @@ import click
 @click.option("--legend-file-name", type=click.Path(exists=True, file_okay=True, dir_okay=False),
               required=True)
 @click.option("--export-file-name", type=str)
-@click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
+@click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='config')
 @click.option("--verbose", is_flag=True)
 def main(legend_file_name, export_file_name, output_dir, verbose):
     """
