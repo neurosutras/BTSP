@@ -56,7 +56,7 @@ def main(data_file_path, model_file_path, tmax, truncate, debug, cell):
     peak_ramp_amp, total_induction_dur, initial_induction_delta_vm, group_indexes, exp_ramp, extended_exp_ramp, \
     delta_exp_ramp, mean_induction_loc, extended_min_delta_t, extended_delta_exp_ramp, interp_initial_exp_ramp, \
     interp_delta_exp_ramp, interp_final_exp_ramp = \
-        get_biBTSP_analysis_results(data_file_path, binned_x, binned_extra_x, extended_binned_x, reference_delta_t,
+        get_biBTSP_analysis_results_old(data_file_path, binned_x, binned_extra_x, extended_binned_x, reference_delta_t,
                                     track_length, dt, debug, truncate=truncate)
 
     context.update(locals())

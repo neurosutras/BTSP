@@ -1,9 +1,9 @@
 """
 To reproduce panels from Figure 1:
-python -i plot_biBTSP_data_summary_figure.py --target-induction=2
+python -i plot_biBTSP_data_summary_figure_old.py --target-induction=2
 
 To reproduce panels from Figure 3:
-python -i plot_biBTSP_data_summary_figure.py --target-induction=1 --target-induction=2
+python -i plot_biBTSP_data_summary_figure_old.py --target-induction=1 --target-induction=2
 
 plot_ramp_prediction_from_interpolation(context.gp,
     ['data/20200316_biBTSP_data_DC_soma_depo.h5', 'data/20200316_biBTSP_data_DC_soma_hyper.h5'],
@@ -404,7 +404,7 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
     peak_ramp_amp, total_induction_dur, initial_induction_delta_vm, group_indexes, exp_ramp, extended_exp_ramp, \
         delta_exp_ramp, mean_induction_loc, extended_min_delta_t, extended_delta_exp_ramp, interp_initial_exp_ramp, \
         interp_delta_exp_ramp, interp_final_exp_ramp = \
-        get_biBTSP_analysis_results(data_file_path, binned_x, binned_extra_x, extended_binned_x, reference_delta_t,
+        get_biBTSP_analysis_results_old(data_file_path, binned_x, binned_extra_x, extended_binned_x, reference_delta_t,
                                     track_length, dt, debug, truncate=truncate)
 
     context.update(locals())

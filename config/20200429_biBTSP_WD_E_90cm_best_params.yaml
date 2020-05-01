@@ -178,3 +178,13 @@
   k_pot: 1.7146810945146194
   local_signal_decay: 1499.7749082747782
   peak_delta_weight: 2.305279980235686
+1:
+  f_dep_half_width: 1.495952E-03
+  f_dep_th: 1.693843E-03
+  f_pot_half_width: 2.797251E-02
+  f_pot_th: 1.227206E-01
+  global_signal_decay: 5.388769E+02
+  k_dep: 1.310781E-01
+  k_pot: 4.733677E-01
+  local_signal_decay: 1.107214E+03
+  peak_delta_weight: 2.835859E+00
