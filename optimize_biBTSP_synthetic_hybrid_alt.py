@@ -660,9 +660,9 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
               (ramp_amp['target'], ramp_width['target'], peak_shift['target'], ratio['target'], start_loc['target'],
                peak_loc['target'], end_loc['target'], min_val['target'], min_loc['target']))
         print('model: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f' 
-              ', end_loc: %.1f, min_val: %.1f, min_loc: %.1f, ramp_offset: %.3f' %
+              ', end_loc: %.1f, min_val: %.1f, min_loc: %.1f' %
               (ramp_amp['model'], ramp_width['model'], peak_shift['model'], ratio['model'], start_loc['model'],
-               peak_loc['model'], end_loc['model'], min_val['model'], min_loc['model'], model_ramp_offset))
+               peak_loc['model'], end_loc['model'], min_val['model'], min_loc['model']))
         sys.stdout.flush()
 
     peak_index, min_index = {}, {}

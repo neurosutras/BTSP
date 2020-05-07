@@ -167,7 +167,7 @@ target_range:
   delta_min_val: 0.01
   delta_peak_val: 0.01
   residuals: 0.1
-  weights_smoothness: 0.005
+  weights_smoothness: 0.015
   ramp_amp_after_first_plateau: 0.01
 target_val:
   ramp_amp_after_first_plateau: 5.
