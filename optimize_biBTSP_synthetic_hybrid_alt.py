@@ -511,8 +511,8 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                       (os.getpid(), model_id, context.induction))
 
             # discard model if current peak_delta_weight constraint reduces accuracy of initial_ramp
-            if not 0.9 * np.max(context.LSA_ramp['before']['control']) < np.max(initial_ramp) < \
-                   1.1 * np.max(context.LSA_ramp['before']['control']):
+            if not 0.9 * np.max(context.target_ramp['before']['control']) < np.max(initial_ramp) < \
+                   1.1 * np.max(context.target_ramp['before']['control']):
                 if context.verbose > 0:
                     print(
                         'optimize_biBTSP_%s: calculate_model_ramp: pid: %i; model_id: %s: aborting - initial ramp is '
