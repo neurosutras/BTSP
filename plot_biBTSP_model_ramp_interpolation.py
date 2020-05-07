@@ -41,7 +41,7 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
     :param debug: bool
     :param label: str
     :param target_induction: tuple of int
-    :param exported_data_key
+    :param exported_data_key: str
     :param font_size: float
     """
     mpl.rcParams['font.size'] = font_size
@@ -53,12 +53,13 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
 
     reference_delta_t = np.linspace(-1000. * tmax, 1000. * tmax, 100)
 
-    peak_ramp_amp, total_induction_dur, group_indexes, exp_ramp, delta_exp_ramp, mean_induction_loc, interp_exp_ramp, \
-    interp_delta_exp_ramp, min_induction_t, clean_induction_t_indexes, initial_induction_delta_vm = \
+    peak_ramp_amp, total_induction_dur, group_indexes, exp_ramp, delta_exp_ramp, exp_ramp_raw, delta_exp_ramp_raw, \
+    mean_induction_loc, interp_exp_ramp, interp_delta_exp_ramp, interp_delta_exp_ramp_raw, min_induction_t, \
+    clean_min_induction_t, clean_induction_t_indexes, initial_induction_delta_vm = \
         get_biBTSP_data_analysis_results(data_file_path, reference_delta_t, debug=debug, truncate=truncate)
 
     delta_model_ramp, interp_delta_model_ramp = \
-        get_biBTSP_model_analysis_results(model_file_path, reference_delta_t, exp_ramp, min_induction_t,
+        get_biBTSP_model_analysis_results(model_file_path, reference_delta_t, exp_ramp, clean_min_induction_t,
                                           clean_induction_t_indexes, exported_data_key=exported_data_key, debug=debug)
 
     context.update(locals())
@@ -78,8 +79,8 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
                 if debug:
                     print('Including cell: %s, induction: %s' % (cell_key, induction_key))
                 this_clean_indexes = clean_induction_t_indexes[cell_key][induction_key]
-                flat_min_t.extend(np.divide(min_induction_t[cell_key][induction_key], 1000.))
-                target_flat_min_t.extend(np.divide(min_induction_t[cell_key][induction_key], 1000.))
+                flat_min_t.extend(np.divide(clean_min_induction_t[cell_key][induction_key], 1000.))
+                target_flat_min_t.extend(np.divide(clean_min_induction_t[cell_key][induction_key], 1000.))
                 flat_delta_model_ramp.extend(delta_model_ramp[cell_key][induction_key][this_clean_indexes])
                 target_flat_delta_model_ramp.extend(delta_model_ramp[cell_key][induction_key][this_clean_indexes])
                 flat_initial_ramp.extend(exp_ramp[cell_key][induction_key]['before'][this_clean_indexes])
@@ -91,7 +92,7 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
             if debug:
                 print('Including cell: %s, induction: %s' % (cell_key, induction_key))
             this_clean_indexes = clean_induction_t_indexes[cell_key][induction_key]
-            flat_min_t.extend(np.divide(min_induction_t[cell_key][induction_key], 1000.))
+            flat_min_t.extend(np.divide(clean_min_induction_t[cell_key][induction_key], 1000.))
             flat_delta_model_ramp.extend(delta_model_ramp[cell_key][induction_key][this_clean_indexes])
             flat_initial_ramp.extend(exp_ramp[cell_key][induction_key]['before'][this_clean_indexes])
             flat_delta_exp_ramp.extend(delta_exp_ramp[cell_key][induction_key][this_clean_indexes])
@@ -102,7 +103,8 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
     lines_cmap = 'jet'
     interp_cmap = 'bwr'
 
-    fig, axes = plt.subplots(1, 3, figsize=(12, 3.5), constrained_layout=True)
+    fig, axes = plt.subplots(1, 3, figsize=(11.5, 3.5))  #, constrained_layout=True)
+    # axes = [axesgrid[2][0], axesgrid[2][1], axesgrid[2][2]]
 
     axes[0].set_xlim(-tmax, tmax)
     for cell_key in interp_delta_model_ramp:
@@ -170,8 +172,8 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
     this_xlim = this_axis.get_xlim()
     this_axis.plot([this_xlim[0], this_xlim[1]], [this_xlim[0], this_xlim[1]], '--', c='darkgrey', alpha=0.75)
     this_axis.set_title('Change in\nramp amplitude', fontsize=mpl.rcParams['font.size'], y=1.1)
-    # cbar = plt.colorbar(cax, ax=this_axis)
-    # cbar.ax.set_visible(False)
+    cbar = plt.colorbar(cax, ax=this_axis)
+    cbar.ax.set_visible(False)
 
     r_val, p_val = pearsonr(flat_delta_model_ramp, flat_delta_exp_ramp)
     this_axis.annotate('R$^{2}$ = %.3f; p %s %.3f' %
@@ -179,8 +181,10 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
                        xy=(0.1, 0.9), xycoords='axes fraction', color='k')
 
     clean_axes(axes)
-    fig.suptitle(label, x=0.05, y=0.95, ha='left', fontsize=mpl.rcParams['font.size'])
-    fig.set_constrained_layout_pads(wspace=0.08, hspace=0.12)
+    fig.suptitle(label, y=0.95, x=0.05, ha='left', fontsize=mpl.rcParams['font.size'])  # y=0.95,
+    # fig.set_constrained_layout_pads(wspace=0.08, hspace=0.12)
+    fig.tight_layout()
+    fig.subplots_adjust(top=0.75, hspace=0.2, wspace=0.6)
     fig.show()
 
 

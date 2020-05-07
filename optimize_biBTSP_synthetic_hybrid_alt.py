@@ -372,7 +372,7 @@ def load_data(induction, condition='control'):
             induction_context.ramp_offset['hyper'][offset_indexes] = context.target_ramp_offset_1_hyper
             induction_context.LSA_weights['after']['hyper'] = \
                 np.array(induction_context.LSA_weights['after']['control'])
-            induction_context.LSA_weights['after']['hyper'][delta_weights_offset_indexes] /= 2.
+            induction_context.LSA_weights['after']['hyper'][delta_weights_offset_indexes] *= 0.6
             induction_context.target_ramp['after']['hyper'], _ = \
                 get_model_ramp(induction_context.LSA_weights['after']['hyper'], context.binned_x, context.peak_locs,
                                context.input_rate_maps, context.ramp_scaling_factor)
@@ -466,10 +466,10 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
     phi_pot = np.vectorize(scaled_single_sigmoid(
-        context.vd_th_pot, context.vd_th_pot + context.vd_half_width, vrange, [context.vd_min, 1.]))
+        context.vd_pot_th, context.vd_pot_th + context.vd_pot_half_width, vrange, [context.vd_pot_min, 1.]))
     # phi_dep = np.vectorize(lambda x: 1.)
     phi_dep = np.vectorize(scaled_single_sigmoid(
-        context.vd_th_dep, context.vd_th_dep + context.vd_half_width, vrange, [context.vd_min, 1.]))
+        context.vd_dep_th, context.vd_dep_th + context.vd_dep_half_width, vrange, [context.vd_dep_min, 1.]))
 
     if plot and context.induction == 1 and context.condition == 'control':
         fig, axes = plt.subplots(1, 2)
@@ -507,8 +507,19 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                                       bounds=(context.min_delta_weight, context.peak_delta_weight),
                                       initial_delta_weights=initial_delta_weights, verbose=context.verbose)
             if context.verbose > 1:
-                print('Process: %i; re-computed initial weights before induction: %i' %
-                      (os.getpid(), context.induction))
+                print('Process: %i; model_id: %i; re-computed initial weights before induction: %i' %
+                      (os.getpid(), model_id, context.induction))
+
+            # discard model if current peak_delta_weight constraint reduces accuracy of initial_ramp
+            if not 0.9 * np.max(context.LSA_ramp['before']['control']) < np.max(initial_ramp) < \
+                   1.1 * np.max(context.LSA_ramp['before']['control']):
+                if context.verbose > 0:
+                    print(
+                        'optimize_biBTSP_%s: calculate_model_ramp: pid: %i; model_id: %s: aborting - initial ramp is '
+                        'inconsistent with value of peak_delta_weight: %.1f' %
+                        (BTSP_model_name, os.getpid(), model_id, context.peak_delta_weight))
+                    sys.stdout.flush()
+                return dict()
 
     delta_weights_snapshots = [initial_delta_weights]
     current_ramp = initial_ramp
@@ -627,34 +638,6 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
 
     result['residual_score'] = model_residual_score
 
-    if context.induction == 1:
-        LSA_delta_weights = context.LSA_weights['after'][context.condition]
-        if not np.all((context.min_delta_weight <= LSA_delta_weights) &
-                      (LSA_delta_weights <= context.peak_delta_weight)):
-            LSA_ramp, LSA_delta_weights, LSA_ramp_offset, LSA_residual_score = \
-                get_delta_weights_LSA(target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
-                                      interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
-                                      peak_locs=context.peak_locs, ramp_scaling_factor=context.ramp_scaling_factor,
-                                      induction_start_loc=context.mean_induction_start_loc,
-                                      induction_stop_loc=context.mean_induction_stop_loc,
-                                      track_length=context.track_length, target_range=context.target_range,
-                                      bounds=(context.min_delta_weight, context.peak_delta_weight),
-                                      initial_delta_weights=LSA_delta_weights, verbose=context.verbose)
-            if context.verbose > 1:
-                print('Process: %i; re-computed LSA weights: after induction: %i' % (os.getpid(), context.induction))
-        else:
-            LSA_ramp, LSA_delta_weights, LSA_ramp_offset, LSA_residual_score = \
-                get_residual_score(LSA_delta_weights, target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
-                                   interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
-                                   ramp_scaling_factor=context.ramp_scaling_factor,
-                                   induction_loc=context.mean_induction_start_loc, track_length=context.track_length,
-                                   target_range=context.target_range, full_output=True)
-
-        if context.condition == 'control':
-            result['self_consistent_delta_residual_score'] = max(0., model_residual_score - LSA_residual_score)
-    else:
-        LSA_ramp = None
-
     ramp_amp, ramp_width, peak_shift, ratio, start_loc, peak_loc, end_loc, min_val, min_loc = {}, {}, {}, {}, {}, {}, \
                                                                                               {}, {}, {}
 
@@ -670,24 +653,12 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                                 binned_x=context.binned_x, interp_x=context.default_interp_x,
                                 track_length=context.track_length)
 
-    if LSA_ramp is not None:
-        ramp_amp['LSA'], ramp_width['LSA'], peak_shift['LSA'], ratio['LSA'], start_loc['LSA'], \
-        peak_loc['LSA'], end_loc['LSA'], min_val['LSA'], min_loc['LSA'] = \
-            calculate_ramp_features(ramp=LSA_ramp, induction_loc=context.mean_induction_start_loc,
-                                    binned_x=context.binned_x, interp_x=context.default_interp_x,
-                                    track_length=context.track_length)
-
     if context.verbose > 0:
         print('Process: %i; induction: %i; condition: %s:' % (os.getpid(), context.induction, context.condition))
         print('exp: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f, '
               'end_loc: %.1f, min_val: %.1f, min_loc: %.1f' %
               (ramp_amp['target'], ramp_width['target'], peak_shift['target'], ratio['target'], start_loc['target'],
                peak_loc['target'], end_loc['target'], min_val['target'], min_loc['target']))
-        if LSA_ramp is not None:
-            print('LSA: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, ' 
-                  'peak_loc: %.1f, end_loc: %.1f, min_val: %.1f, min_loc: %.1f, ramp_offset: %.3f' %
-                  (ramp_amp['LSA'], ramp_width['LSA'], peak_shift['LSA'], ratio['LSA'], start_loc['LSA'],
-                   peak_loc['LSA'], end_loc['LSA'], min_val['LSA'], min_loc['LSA'], LSA_ramp_offset))
         print('model: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f' 
               ', end_loc: %.1f, min_val: %.1f, min_loc: %.1f, ramp_offset: %.3f' %
               (ramp_amp['model'], ramp_width['model'], peak_shift['model'], ratio['model'], start_loc['model'],
@@ -760,9 +731,6 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                                        description], create=True)
             group.create_dataset('target_ramp', compression='gzip', data=target_ramp)
             group.create_dataset('initial_model_ramp', compression='gzip', data=initial_ramp)
-            if LSA_ramp is not None:
-                group.create_dataset('LSA_ramp', compression='gzip', data=LSA_ramp)
-                group.create_dataset('LSA_weights', compression='gzip', data=np.add(LSA_delta_weights, 1.))
             group.create_dataset('model_ramp', compression='gzip', data=model_ramp)
             group.create_dataset('model_weights', compression='gzip', data=final_weights)
             group.create_dataset('initial_weights', compression='gzip', data=initial_weights)
@@ -881,10 +849,10 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
     phi_pot = np.vectorize(scaled_single_sigmoid(
-        context.vd_th_pot, context.vd_th_pot + context.vd_half_width, vrange, [context.vd_min, 1.]))
+        context.vd_pot_th, context.vd_pot_th + context.vd_pot_half_width, vrange, [context.vd_pot_min, 1.]))
     # phi_dep = np.vectorize(lambda x: 1.)
     phi_dep = np.vectorize(scaled_single_sigmoid(
-        context.vd_th_dep, context.vd_th_dep + context.vd_half_width, vrange, [context.vd_min, 1.]))
+        context.vd_dep_th, context.vd_dep_th + context.vd_dep_half_width, vrange, [context.vd_dep_min, 1.]))
 
     fig, axes = plt.subplots(1, 3, figsize=(10, 3.5))
     dep_scale = context.k_dep / context.k_pot
@@ -1313,7 +1281,7 @@ def filter_features_model_ramp(primitives, current_features, model_id=None, expo
     grouped_feature_names = ['delta_val_at_target_peak', 'delta_val_at_model_peak', 'delta_width', 'delta_peak_shift',
                              'delta_asymmetry', 'delta_min_loc', 'delta_val_at_target_min', 'delta_val_at_model_min',
                              'residual_score']
-    feature_names = ['self_consistent_delta_residual_score', 'ramp_amp_after_first_plateau']
+    feature_names = ['ramp_amp_after_first_plateau']
     for this_result_dict in primitives:
         if not this_result_dict:
             if context.verbose > 0:
@@ -1371,11 +1339,6 @@ def get_objectives(features, model_id=None, export=False):
             objective_name = group + '_' + feature_name
             if objective_name in features:
                 objectives[objective_name] = features[objective_name]
-
-    feature_names = ['self_consistent_delta_residual_score']
-    for feature_name in feature_names:
-        if feature_name in context.objective_names and feature_name in features:
-            objectives[feature_name] = features[feature_name]
 
     feature_names = ['ramp_amp_after_first_plateau']
     for feature_name in feature_names:

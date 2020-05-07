@@ -1852,12 +1852,16 @@ def get_biBTSP_data_analysis_results(data_file_path, reference_delta_t, debug=Fa
     group_indexes = defaultdict(list)
 
     exp_ramp = defaultdict(lambda: defaultdict(dict))
+    exp_ramp_raw = defaultdict(lambda: defaultdict(dict))
     delta_exp_ramp = defaultdict(dict)
+    delta_exp_ramp_raw = defaultdict(dict)
     initial_induction_delta_vm = defaultdict(dict)
     mean_induction_loc = defaultdict(dict)
     min_induction_t = defaultdict(dict)
+    clean_min_induction_t = defaultdict(dict)
     clean_induction_t_indexes = defaultdict(dict)
     interp_delta_exp_ramp = defaultdict(dict)
+    interp_delta_exp_ramp_raw = defaultdict(dict)
     interp_exp_ramp = defaultdict(lambda: defaultdict(dict))
 
     with h5py.File(data_file_path, 'r') as f:
@@ -1874,17 +1878,26 @@ def get_biBTSP_data_analysis_results(data_file_path, reference_delta_t, debug=Fa
 
                 exp_ramp[cell_key][induction_key]['after'] = \
                     f['data'][cell_key][induction_key]['processed']['exp_ramp']['after'][:]
+                exp_ramp_raw[cell_key][induction_key]['after'] = \
+                    f['data'][cell_key][induction_key]['raw']['exp_ramp']['after'][:]
 
                 if 'before' in f['data'][cell_key][induction_key]['processed']['exp_ramp']:
                     exp_ramp[cell_key][induction_key]['before'] = \
                         f['data'][cell_key][induction_key]['processed']['exp_ramp']['before'][:]
                     delta_exp_ramp[cell_key][induction_key] = np.subtract(exp_ramp[cell_key][induction_key]['after'],
                                                                           exp_ramp[cell_key][induction_key]['before'])
+                    exp_ramp_raw[cell_key][induction_key]['before'] = \
+                        f['data'][cell_key][induction_key]['raw']['exp_ramp']['before'][:]
+                    delta_exp_ramp_raw[cell_key][induction_key] = \
+                        np.subtract(exp_ramp_raw[cell_key][induction_key]['after'],
+                                    exp_ramp_raw[cell_key][induction_key]['before'])
                 else:
                     exp_ramp[cell_key][induction_key]['before'] = \
                         np.zeros_like(exp_ramp[cell_key][induction_key]['after'])
-                    delta_exp_ramp[cell_key][induction_key], discard = \
-                        subtract_baseline(exp_ramp[cell_key][induction_key]['after'])
+                    exp_ramp_raw[cell_key][induction_key]['before'] = \
+                        np.zeros_like(exp_ramp[cell_key][induction_key]['after'])
+                    delta_exp_ramp[cell_key][induction_key] = exp_ramp[cell_key][induction_key]['after']
+                    delta_exp_ramp_raw[cell_key][induction_key] = exp_ramp_raw[cell_key][induction_key]['after']
 
                 peak_ramp_amp.append(np.max(exp_ramp[cell_key][induction_key]['after']))
                 mean_induction_loc[cell_key][induction_key] = np.mean(induction_locs)
@@ -1901,9 +1914,10 @@ def get_biBTSP_data_analysis_results(data_file_path, reference_delta_t, debug=Fa
                     initial_induction_delta_vm[cell_key][induction_key] = \
                         np.copy(exp_ramp[cell_key][induction_key]['before'])
 
+                min_induction_t[cell_key][induction_key] = this_induction_t
                 this_clean_indexes = get_clean_induction_t_indexes(this_induction_t, truncate * 1000.)
                 this_induction_t = this_induction_t[this_clean_indexes]
-                min_induction_t[cell_key][induction_key] = this_induction_t
+                clean_min_induction_t[cell_key][induction_key] = this_induction_t
                 clean_induction_t_indexes[cell_key][induction_key] = this_clean_indexes
                 bad_indexes = np.where((reference_delta_t < np.min(this_induction_t)) |
                                        (reference_delta_t > np.max(this_induction_t)))[0]
@@ -1917,6 +1931,11 @@ def get_biBTSP_data_analysis_results(data_file_path, reference_delta_t, debug=Fa
                 interp_delta_exp_ramp[cell_key][induction_key] = np.interp(
                     reference_delta_t, this_induction_t, delta_exp_ramp[cell_key][induction_key][this_clean_indexes])
                 interp_delta_exp_ramp[cell_key][induction_key][bad_indexes] = np.nan
+
+                interp_delta_exp_ramp_raw[cell_key][induction_key] = np.interp(
+                    reference_delta_t, this_induction_t,
+                    delta_exp_ramp_raw[cell_key][induction_key][this_clean_indexes])
+                interp_delta_exp_ramp_raw[cell_key][induction_key][bad_indexes] = np.nan
 
                 if debug:
                     fig2, axes2 = plt.subplots(1, 2)
@@ -1943,19 +1962,19 @@ def get_biBTSP_data_analysis_results(data_file_path, reference_delta_t, debug=Fa
     total_induction_dur = np.array(total_induction_dur)
     peak_ramp_amp = np.array(peak_ramp_amp)
 
-    return peak_ramp_amp, total_induction_dur, group_indexes, exp_ramp, delta_exp_ramp, mean_induction_loc, \
-           interp_exp_ramp, interp_delta_exp_ramp, min_induction_t, clean_induction_t_indexes, \
-           initial_induction_delta_vm
+    return peak_ramp_amp, total_induction_dur, group_indexes, exp_ramp, delta_exp_ramp, exp_ramp_raw,\
+           delta_exp_ramp_raw, mean_induction_loc, interp_exp_ramp, interp_delta_exp_ramp, interp_delta_exp_ramp_raw, \
+           min_induction_t, clean_min_induction_t, clean_induction_t_indexes, initial_induction_delta_vm
 
 
-def get_biBTSP_model_analysis_results(model_file_path, reference_delta_t, exp_ramp, min_induction_t,
+def get_biBTSP_model_analysis_results(model_file_path, reference_delta_t, exp_ramp, clean_min_induction_t,
                                       clean_induction_t_indexes, exported_data_key=None, debug=False):
     """
 
     :param model_file_path: str (path)
     :param reference_delta_t: array
     :param exp_ramp: nested dict of array
-    :param min_induction_t: nested dict of array
+    :param clean_min_induction_t: nested dict of array
     :param clean_induction_t_indexes: nested dict of int
     :param exported_data_key: int or str
     :param debug: bool
@@ -1979,7 +1998,7 @@ def get_biBTSP_model_analysis_results(model_file_path, reference_delta_t, exp_ra
                 this_model_ramp = source[cell_key][induction_key]['model_ramp_features']['model_ramp'][:]
                 delta_model_ramp[cell_key][induction_key] = \
                     np.subtract(this_model_ramp, exp_ramp[cell_key][induction_key]['before'])
-                this_induction_t = min_induction_t[cell_key][induction_key]
+                this_induction_t = clean_min_induction_t[cell_key][induction_key]
                 this_clean_indexes = clean_induction_t_indexes[cell_key][induction_key]
                 bad_indexes = np.where((reference_delta_t < np.min(this_induction_t)) |
                                        (reference_delta_t > np.max(this_induction_t)))[0]
