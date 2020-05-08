@@ -459,7 +459,7 @@ def get_voltage_dependent_eligibility_signal_population(local_filter, normalized
     return local_signals
 
 
-def weights_path_distance_exceeds_threshold(weights_snapshots, threshold=2.):
+def weights_path_distance_exceeds_threshold(weights_snapshots, threshold=2., cumulative=True):
     """
     If changes in weights across laps are monotonic, the path distance is equal to the euclidean distance. However, if
     weight changes change sign across laps, the path distance can increase. This method checks if the weight changes
@@ -474,7 +474,10 @@ def weights_path_distance_exceeds_threshold(weights_snapshots, threshold=2.):
     euc_distance = np.abs(np.sum(weights_diff, axis=0))
     euc_distance_pop_sum = np.sum(euc_distance)
 
-    return path_distance_pop_sum > threshold * euc_distance_pop_sum
+    if cumulative:
+        return path_distance_pop_sum > threshold * euc_distance_pop_sum
+    else:
+        return np.any(path_distance > threshold * euc_distance)
 
 
 def sigmoid_segment(slope, th, xlim=None, ylim=None):

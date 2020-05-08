@@ -798,7 +798,8 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                 group['delta_weights_snapshots'].create_dataset(str(i), data=this_delta_weights)
 
     # catch models with excessive fluctuations in weights across laps:
-    if weights_path_distance_exceeds_threshold(delta_weights_snapshots, context.weights_path_distance_threshold):
+    if weights_path_distance_exceeds_threshold(delta_weights_snapshots, context.weights_path_distance_threshold,
+                                               cumulative=False):
         if context.verbose > 0:
             print('optimize_biBTSP_%s: calculate_model_ramp: pid: %i; aborting - excessive fluctuations in weights '
                   'across laps; induction: %i' %
