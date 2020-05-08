@@ -68,7 +68,7 @@ def init_context():
                       (BTSP_model_name, context.data_file_path))
 
     if 'weights_path_distance_threshold' not in context():
-        context.weights_path_distance_threshold = 2.
+        context.weights_path_distance_threshold = 1.5 # 2.
     else:
         context.weights_path_distance_threshold = float(context.weights_path_distance_threshold)
 
@@ -1257,8 +1257,8 @@ def get_args_static_model_ramp():
     :param x: array
     :return: list of list
     """
-    # return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
-    return [[1, 2], ['control', 'control']]
+    return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
+    # return [[1, 2], ['control', 'control']]
 
 
 def compute_features_model_ramp(x, induction=None, condition=None, model_id=None, export=False, plot=False):
