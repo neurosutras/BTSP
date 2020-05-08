@@ -665,13 +665,24 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     initial_weights = np.multiply(initial_normalized_weights, peak_weight)
     final_weights = np.add(current_delta_weights, 1.)
 
-    model_ramp, discard_delta_weights, model_ramp_offset, model_residual_score = \
-        get_synthetic_residual_score(current_delta_weights, target_ramp, initial_ramp, ramp_x=context.binned_x,
-                                     input_x=context.binned_x, interp_x=context.default_interp_x,
-                                     input_rate_maps=context.input_rate_maps,
-                                     ramp_scaling_factor=context.ramp_scaling_factor,
-                                     induction_loc=context.mean_induction_start_loc, track_length=context.track_length,
-                                     target_range=context.target_range, full_output=True)
+    if context.induction == 2:
+        model_ramp, discard_delta_weights, model_ramp_offset, model_residual_score = \
+            get_synthetic_residual_score(current_delta_weights, target_ramp, initial_ramp, ramp_x=context.binned_x,
+                                         input_x=context.binned_x, interp_x=context.default_interp_x,
+                                         input_rate_maps=context.input_rate_maps,
+                                         ramp_scaling_factor=context.ramp_scaling_factor,
+                                         induction_loc=context.mean_induction_start_loc,
+                                         track_length=context.track_length, target_range=context.target_range,
+                                         full_output=True)
+    else:
+        model_ramp, discard_delta_weights, model_ramp_offset, model_residual_score = \
+            get_residual_score(current_delta_weights, target_ramp, ramp_x=context.binned_x,
+                                         input_x=context.binned_x, interp_x=context.default_interp_x,
+                                         input_rate_maps=context.input_rate_maps,
+                                         ramp_scaling_factor=context.ramp_scaling_factor,
+                                         induction_loc=context.mean_induction_start_loc,
+                                         track_length=context.track_length, target_range=context.target_range,
+                                         full_output=True)
 
     result['residual_score'] = model_residual_score
 

@@ -235,8 +235,8 @@ def load_data(induction, condition='control'):
 
                 target_ramp = get_target_synthetic_ramp(induction_loc, ramp_x=context.binned_x,
                                                         track_length=context.track_length,
-                                                        target_peak_val=context.target_peak_val_1, target_min_val=0.,
-                                                        target_asymmetry=1.8,
+                                                        target_peak_val=context.target_peak_val_1,
+                                                        target_min_val=0., target_asymmetry=1.1,
                                                         target_peak_shift=context.target_peak_shift_1,
                                                         target_ramp_width=context.target_ramp_width)
                 induction_context.target_ramp['before']['control'], \
@@ -249,12 +249,18 @@ def load_data(induction, condition='control'):
                                           bounds=(context.min_delta_weight, context.target_peak_delta_weight),
                                           verbose=context.verbose)
 
-            target_ramp_2 = get_target_synthetic_ramp(this_induction_loc, ramp_x=context.binned_x,
-                                                      track_length=context.track_length,
-                                                      target_peak_val=context.target_peak_val_2,
-                                                      target_min_val=context.target_min_val_2, target_asymmetry=1.8,
-                                                      target_peak_shift=context.target_peak_shift_2,
-                                                      target_ramp_width=context.target_ramp_width)
+            # the shape of this target_ramp was estimated from gaussian regression from experimental data
+            target_delta_ramp_2_dep = get_target_synthetic_ramp(110., ramp_x=context.binned_x,
+                                                                track_length=context.track_length, target_peak_val=4.5,
+                                                                target_min_val=0., target_asymmetry=0.6,
+                                                                target_peak_shift=0., target_ramp_width=90.)
+            target_delta_ramp_2_pot = get_target_synthetic_ramp(induction_context.mean_induction_start_loc,
+                                                                ramp_x=context.binned_x,
+                                                                track_length=context.track_length, target_peak_val=8.,
+                                                                target_min_val=0., target_asymmetry=1.7,
+                                                                target_peak_shift=-5., target_ramp_width=144.)
+            target_delta_ramp_2 = np.subtract(target_delta_ramp_2_pot, target_delta_ramp_2_dep)
+            target_ramp_2 = np.add(induction_context.target_ramp['before']['control'], target_delta_ramp_2)
             induction_context.target_ramp['after']['control'], \
             induction_context.LSA_weights['after']['control'], _, _ = \
                 get_delta_weights_LSA(target_ramp_2, ramp_x=context.binned_x, input_x=context.binned_x,
@@ -318,7 +324,7 @@ def load_data(induction, condition='control'):
             target_ramp = get_target_synthetic_ramp(induction_loc, ramp_x=context.binned_x,
                                                     track_length=context.track_length,
                                                     target_peak_val=context.target_peak_val_1, target_min_val=0.,
-                                                    target_asymmetry=1.8,
+                                                    target_asymmetry=1.1,
                                                     target_peak_shift=context.target_peak_shift_1,
                                                     target_ramp_width=context.target_ramp_width)
             induction_context.target_ramp['after']['control'], \
@@ -334,7 +340,7 @@ def load_data(induction, condition='control'):
             target_ramp = get_target_synthetic_ramp(induction_loc, ramp_x=context.binned_x,
                                                     track_length=context.track_length,
                                                     target_peak_val=context.target_peak_val_1_depo, target_min_val=0.,
-                                                    target_asymmetry=1.8,
+                                                    target_asymmetry=1.1,
                                                     target_peak_shift=context.target_peak_shift_1,
                                                     target_ramp_width=context.target_ramp_width)
             induction_context.target_ramp['after']['depo'], \
@@ -372,7 +378,7 @@ def load_data(induction, condition='control'):
             induction_context.ramp_offset['hyper'][offset_indexes] = context.target_ramp_offset_1_hyper
             induction_context.LSA_weights['after']['hyper'] = \
                 np.array(induction_context.LSA_weights['after']['control'])
-            induction_context.LSA_weights['after']['hyper'][delta_weights_offset_indexes] *= 0.6
+            induction_context.LSA_weights['after']['hyper'][delta_weights_offset_indexes] *= 0.5
             induction_context.target_ramp['after']['hyper'], _ = \
                 get_model_ramp(induction_context.LSA_weights['after']['hyper'], context.binned_x, context.peak_locs,
                                context.input_rate_maps, context.ramp_scaling_factor)
@@ -629,12 +635,24 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     initial_weights = np.multiply(initial_normalized_weights, peak_weight)
     final_weights = np.add(current_delta_weights, 1.)
 
-    model_ramp, discard_delta_weights, model_ramp_offset, model_residual_score = \
-        get_residual_score(current_delta_weights, target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
-                           interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
-                           ramp_scaling_factor=context.ramp_scaling_factor,
-                           induction_loc=context.mean_induction_start_loc, track_length=context.track_length,
-                           target_range=context.target_range, full_output=True)
+    if context.induction == 2:
+        model_ramp, discard_delta_weights, model_ramp_offset, model_residual_score = \
+            get_synthetic_residual_score(current_delta_weights, target_ramp, initial_ramp, ramp_x=context.binned_x,
+                                         input_x=context.binned_x, interp_x=context.default_interp_x,
+                                         input_rate_maps=context.input_rate_maps,
+                                         ramp_scaling_factor=context.ramp_scaling_factor,
+                                         induction_loc=context.mean_induction_start_loc,
+                                         track_length=context.track_length, target_range=context.target_range,
+                                         full_output=True)
+    else:
+        model_ramp, discard_delta_weights, model_ramp_offset, model_residual_score = \
+            get_residual_score(current_delta_weights, target_ramp, ramp_x=context.binned_x,
+                                         input_x=context.binned_x, interp_x=context.default_interp_x,
+                                         input_rate_maps=context.input_rate_maps,
+                                         ramp_scaling_factor=context.ramp_scaling_factor,
+                                         induction_loc=context.mean_induction_start_loc,
+                                         track_length=context.track_length, target_range=context.target_range,
+                                         full_output=True)
 
     result['residual_score'] = model_residual_score
 
@@ -1238,7 +1256,8 @@ def get_args_static_model_ramp():
     :param x: array
     :return: list of list
     """
-    return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
+    # return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
+    return [[1, 2], ['control', 'control']]
 
 
 def compute_features_model_ramp(x, induction=None, condition=None, model_id=None, export=False, plot=False):
@@ -1343,8 +1362,11 @@ def get_objectives(features, model_id=None, export=False):
     feature_names = ['ramp_amp_after_first_plateau']
     for feature_name in feature_names:
         if feature_name in context.objective_names and feature_name in features:
-            objectives[feature_name] = ((features[feature_name] - context.target_val[feature_name]) /
-                                        context.target_range[feature_name]) ** 2.
+            if features[feature_name] < context.target_val[feature_name]:
+                objectives[feature_name] = ((features[feature_name] - context.target_val[feature_name]) /
+                                            context.target_range[feature_name]) ** 2.
+            else:
+                objectives[feature_name] = 0.
 
     for objective_name in context.objective_names:
         if objective_name not in objectives:
