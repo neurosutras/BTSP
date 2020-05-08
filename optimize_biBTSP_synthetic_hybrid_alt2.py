@@ -666,11 +666,12 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     final_weights = np.add(current_delta_weights, 1.)
 
     model_ramp, discard_delta_weights, model_ramp_offset, model_residual_score = \
-        get_residual_score(current_delta_weights, target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
-                           interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
-                           ramp_scaling_factor=context.ramp_scaling_factor,
-                           induction_loc=context.mean_induction_start_loc, track_length=context.track_length,
-                           target_range=context.target_range, full_output=True)
+        get_synthetic_residual_score(current_delta_weights, target_ramp, initial_ramp, ramp_x=context.binned_x,
+                                     input_x=context.binned_x, interp_x=context.default_interp_x,
+                                     input_rate_maps=context.input_rate_maps,
+                                     ramp_scaling_factor=context.ramp_scaling_factor,
+                                     induction_loc=context.mean_induction_start_loc, track_length=context.track_length,
+                                     target_range=context.target_range, full_output=True)
 
     result['residual_score'] = model_residual_score
 
@@ -1274,8 +1275,8 @@ def get_args_static_model_ramp():
     :param x: array
     :return: list of list
     """
-    return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
-    # return [[1, 1, 1, 2], ['control', 'depo', 'hyper', 'control']]
+    # return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
+    return [[1, 2], ['control', 'control']]
 
 
 def compute_features_model_ramp(x, induction=None, condition=None, model_id=None, export=False, plot=False):

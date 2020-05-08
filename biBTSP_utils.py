@@ -953,6 +953,105 @@ def get_residual_score(delta_weights, target_ramp, ramp_x, input_x, interp_x, in
         return Err
 
 
+def get_synthetic_residual_score(delta_weights, target_ramp, initial_ramp, ramp_x, input_x, interp_x, input_rate_maps,
+                                 ramp_scaling_factor, induction_loc, track_length, target_range, bounds=None,
+                                 allow_offset=False, impose_offset=None, disp=False, full_output=False):
+    """
+
+    :param delta_weights: array
+    :param target_ramp: array
+    :param initial_ramp: array
+    :param ramp_x: array (spatial resolution of ramp)
+    :param input_x: array (spatial resolution of input_rate_maps)
+    :param interp_x: array (spatial resolution for computing fine features)
+    :param input_rate_maps: list of array
+    :param ramp_scaling_factor: float
+    :param induction_loc: float
+    :param track_length: float
+    :param target_range: dict
+    :param bounds: array
+    :param allow_offset: bool (allow special case where baseline Vm before 1st induction is unknown)
+    :param impose_offset: float (impose Vm offset from 1st induction on 2nd induction)
+    :param disp: bool
+    :param full_output: bool
+    :return: float
+    """
+    if bounds is not None:
+        min_weight, max_weight = bounds
+        if np.min(delta_weights) < min_weight or np.max(delta_weights) > max_weight:
+            if full_output:
+                raise Exception('get_residual_score: input out of bounds; cannot return full_output')
+            return 1e9
+    if len(target_ramp) != len(input_x):
+        exp_ramp = np.interp(input_x, ramp_x, target_ramp)
+    else:
+        exp_ramp = np.array(target_ramp)
+
+    model_ramp, ramp_offset = get_model_ramp(delta_weights, ramp_x=ramp_x, input_x=input_x,
+                                             input_rate_maps=input_rate_maps, ramp_scaling_factor=ramp_scaling_factor,
+                                             allow_offset=allow_offset, impose_offset=impose_offset)
+
+    Err = 0.
+    if allow_offset:
+        Err += (ramp_offset / target_range['ramp_offset']) ** 2.
+
+    ramp_amp, ramp_width, peak_shift, ratio, start_loc, peak_loc, end_loc, min_val, min_loc = {}, {}, {}, {}, {}, {}, \
+                                                                                              {}, {}, {}
+    ramp_amp['target'], ramp_width['target'], peak_shift['target'], ratio['target'], start_loc['target'], \
+    peak_loc['target'], end_loc['target'], min_val['target'], min_loc['target'] = \
+        calculate_ramp_features(ramp=exp_ramp, induction_loc=induction_loc, binned_x=ramp_x, interp_x=interp_x,
+                                track_length=track_length)
+
+    ramp_amp['initial'], ramp_width['initial'], peak_shift['initial'], ratio['initial'], start_loc['initial'], \
+    peak_loc['initial'], end_loc['initial'], min_val['initial'], min_loc['initial'] = \
+        calculate_ramp_features(ramp=initial_ramp, induction_loc=induction_loc, binned_x=ramp_x, interp_x=interp_x,
+                                track_length=track_length)
+
+    ramp_amp['model'], ramp_width['model'], peak_shift['model'], ratio['model'], start_loc['model'], \
+    peak_loc['model'], end_loc['model'], min_val['model'], min_loc['model'] = \
+        calculate_ramp_features(ramp=model_ramp, induction_loc=induction_loc, binned_x=ramp_x, interp_x=interp_x,
+                                track_length=track_length)
+
+    if disp:
+        print('exp: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f, ' \
+              'end_loc: %.1f, min_val: %.1f, min_loc: %.1f' % \
+              (ramp_amp['target'], ramp_width['target'], peak_shift['target'], ratio['target'], start_loc['target'],
+               peak_loc['target'], end_loc['target'], min_val['target'], min_loc['target']))
+        print('model: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f' \
+              ', end_loc: %.1f, min_val: %.1f, min_loc: %.1f' % \
+              (ramp_amp['model'], ramp_width['model'], peak_shift['model'], ratio['model'], start_loc['model'],
+               peak_loc['model'], end_loc['model'], min_val['model'], min_loc['model']))
+        sys.stdout.flush()
+
+    _, initial_peak_index, _, _ = \
+        get_indexes_from_ramp_bounds_with_wrap(ramp_x, start_loc['initial'], peak_loc['initial'], end_loc['initial'],
+                                               min_loc['initial'])
+
+    start_index, peak_index, end_index, min_index = \
+        get_indexes_from_ramp_bounds_with_wrap(ramp_x, start_loc['target'], peak_loc['target'], end_loc['target'],
+                                               min_loc['target'])
+
+    model_val_at_initial_peak_loc = model_ramp[initial_peak_index]
+    target_val_at_initial_peak_loc = target_ramp[initial_peak_index]
+    Err += ((model_val_at_initial_peak_loc - target_val_at_initial_peak_loc) / target_range['delta_peak_val']) ** 2.
+    model_val_at_target_min_loc = model_ramp[min_index]
+    Err += ((model_val_at_target_min_loc - min_val['target']) / target_range['delta_min_val']) ** 2.
+    Err += ((min_val['model'] - min_val['target']) / target_range['delta_min_val']) ** 2.
+    model_val_at_target_peak_loc = model_ramp[peak_index]
+    Err += ((model_val_at_target_peak_loc - ramp_amp['target']) / target_range['delta_peak_val']) ** 2.
+
+    for i in range(len(exp_ramp)):
+        Err += ((exp_ramp[i] - model_ramp[i]) / target_range['residuals']) ** 2.
+    # regularization
+    for delta in np.diff(np.insert(delta_weights, 0, delta_weights[-1])):
+        Err += (delta / target_range['weights_smoothness']) ** 2.
+
+    if full_output:
+        return model_ramp, delta_weights, ramp_offset, Err
+    else:
+        return Err
+
+
 def get_adjusted_delta_weights_and_ramp_scaling_factor(delta_weights, input_rate_maps, target_peak_weight,
                                                        target_ramp_amp):
     """
