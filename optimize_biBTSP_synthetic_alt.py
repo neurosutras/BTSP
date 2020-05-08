@@ -66,7 +66,7 @@ def init_context():
                       (BTSP_model_name, context.data_file_path))
 
     if 'weights_path_distance_threshold' not in context():
-        context.weights_path_distance_threshold = 1.5 # 2.
+        context.weights_path_distance_threshold = 2.
     else:
         context.weights_path_distance_threshold = float(context.weights_path_distance_threshold)
 

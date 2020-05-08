@@ -109,6 +109,7 @@ kwargs:
   target_ramp_offset_1_depo: 10.
   target_ramp_offset_1_hyper: -40.
   target_ramp_offset_2_hyper: -25.
+  weights_path_distance_threshold: 1.25
 objective_names:
 - induction1_residual_score
 - induction2_residual_score
