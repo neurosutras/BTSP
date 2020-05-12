@@ -481,7 +481,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     pot_rate = lambda x: x
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
-    phi_spine_vm = np.vectorize(scaled_single_sigmoid(context.phi_th, context.phi_th + context.phi_half_width, vrange))
+    phi_spine_vm = np.vectorize(lambda x: context.phi_min + (1. - context.phi_min) * x)
 
     if plot and context.induction == 1 and context.condition == 'control':
         fig, axes = plt.subplots(1, 2)
@@ -583,11 +583,13 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         for i, (this_rate_map, this_current_normalized_weight) in \
                 enumerate(zip(context.down_rate_maps, current_normalized_weights)):
             this_expected_spine_depo_amp = min(1., max(0., phi_spine_vm(this_current_normalized_weight)))
-            this_local_signal = np.divide(get_local_signal(
+            this_local_signal_pot = np.divide(get_local_signal(
                 this_rate_map * this_expected_spine_depo_amp, local_signal_filter, context.down_dt), local_signal_peak)
-            this_pot_rate = np.trapz(pot_rate(np.multiply(this_local_signal[indexes], global_signal[indexes])),
+            this_local_signal_dep = np.divide(get_local_signal(
+                this_rate_map, local_signal_filter, context.down_dt), local_signal_peak)
+            this_pot_rate = np.trapz(pot_rate(np.multiply(this_local_signal_pot[indexes], global_signal[indexes])),
                                      dx=context.down_dt / 1000.)
-            this_dep_rate = np.trapz(dep_rate(np.multiply(this_local_signal[indexes], global_signal[indexes])),
+            this_dep_rate = np.trapz(dep_rate(np.multiply(this_local_signal_dep[indexes], global_signal[indexes])),
                                      dx=context.down_dt / 1000.)
             this_normalized_delta_weight = context.k_pot * this_pot_rate * (1. - this_current_normalized_weight) - \
                                            context.k_dep * this_dep_rate * this_current_normalized_weight
@@ -795,13 +797,9 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                 group['delta_weights_snapshots'].create_dataset(str(i), data=this_delta_weights)
 
     # catch models with excessive fluctuations in weights across laps:
-    if weights_path_distance_exceeds_threshold(delta_weights_snapshots, context.weights_path_distance_threshold,
-                                               cumulative=False):
-        if context.verbose > 0:
-            print('optimize_biBTSP_%s: calculate_model_ramp: pid: %i; aborting - excessive fluctuations in weights '
-                  'across laps; induction: %i' %
-                  (BTSP_model_name, os.getpid(), context.induction))
-        return dict()
+    result['weights_path_distance'] = \
+        weights_path_distance_exceeds_threshold(delta_weights_snapshots, context.weights_path_distance_threshold,
+                                                cumulative=False, return_value=True)
 
     return {context.induction: {context.condition: result}}
 
@@ -1295,7 +1293,7 @@ def filter_features_model_ramp(primitives, current_features, model_id=None, expo
     grouped_feature_names = ['delta_val_at_target_peak', 'delta_val_at_model_peak', 'delta_width', 'delta_peak_shift',
                              'delta_asymmetry', 'delta_min_loc', 'delta_val_at_target_min', 'delta_val_at_model_min',
                              'residual_score']
-    feature_names = ['ramp_amp_after_first_plateau']
+    feature_names = ['ramp_amp_after_first_plateau', 'weights_path_distance']
     for this_result_dict in primitives:
         if not this_result_dict:
             if context.verbose > 0:
@@ -1354,14 +1352,17 @@ def get_objectives(features, model_id=None, export=False):
             if objective_name in features:
                 objectives[objective_name] = features[objective_name]
 
-    feature_names = ['ramp_amp_after_first_plateau']
-    for feature_name in feature_names:
-        if feature_name in context.objective_names and feature_name in features:
-            if features[feature_name] < context.target_val[feature_name]:
-                objectives[feature_name] = ((features[feature_name] - context.target_val[feature_name]) /
-                                            context.target_range[feature_name]) ** 2.
-            else:
-                objectives[feature_name] = 0.
+    feature_name = 'ramp_amp_after_first_plateau'
+    if feature_name in context.objective_names and feature_name in features:
+        if features[feature_name] < context.target_val[feature_name]:
+            objectives[feature_name] = ((features[feature_name] - context.target_val[feature_name]) /
+                                        context.target_range[feature_name]) ** 2.
+        else:
+            objectives[feature_name] = 0.
+
+    feature_name = 'weights_path_distance'
+    if feature_name in context.objective_names and feature_name in features:
+        objectives[feature_name] = (features[feature_name] / context.target_range[feature_name]) ** 2.
 
     for objective_name in context.objective_names:
         if objective_name not in objectives:

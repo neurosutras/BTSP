@@ -459,12 +459,15 @@ def get_voltage_dependent_eligibility_signal_population(local_filter, normalized
     return local_signals
 
 
-def weights_path_distance_exceeds_threshold(weights_snapshots, threshold=2., cumulative=True):
+def weights_path_distance_exceeds_threshold(weights_snapshots, threshold=2., cumulative=True, return_value=False):
     """
     If changes in weights across laps are monotonic, the path distance is equal to the euclidean distance. However, if
     weight changes change sign across laps, the path distance can increase. This method checks if the weight changes
     across the population of inputs exceed a threshold fold increase of path distance relative to euclidean distance.
     :param weights_snapshots: list of array
+    :param threshold: float
+    :param cumulative: bool
+    :param return_value: bool
     :return: bool
     """
     weights_snapshots = np.array(weights_snapshots)
@@ -475,9 +478,19 @@ def weights_path_distance_exceeds_threshold(weights_snapshots, threshold=2., cum
     euc_distance_pop_sum = np.sum(euc_distance)
 
     if cumulative:
-        return path_distance_pop_sum > threshold * euc_distance_pop_sum
+        if return_value:
+            return max(0., path_distance_pop_sum - threshold * euc_distance_pop_sum)
+        else:
+            return path_distance_pop_sum > threshold * euc_distance_pop_sum
     else:
-        return np.any(path_distance > threshold * euc_distance)
+        if return_value:
+            indexes = np.where(path_distance > threshold * euc_distance)[0]
+            if len(indexes) > 0:
+                return np.sum(np.abs(np.subtract(path_distance, threshold * euc_distance)[indexes]))
+            else:
+                return 0.
+        else:
+            return np.any(path_distance > threshold * euc_distance)
 
 
 def sigmoid_segment(slope, th, xlim=None, ylim=None):

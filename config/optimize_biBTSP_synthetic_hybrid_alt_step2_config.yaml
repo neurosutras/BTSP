@@ -1,8 +1,5 @@
 bounds:
-  phi_half_width: !!python/tuple
-  - 0.001
-  - 1.
-  phi_th: !!python/tuple
+  phi_min: !!python/tuple
   - 0.001
   - 1.
   f_dep_th: !!python/tuple
@@ -28,14 +25,14 @@ bounds:
   - 4.
 default_params:
 rel_bounds:
-- - local_signal_decay
-  - '>'
-  - 1.0
-  - global_signal_decay
-- - k_pot
-  - '>'
-  - 1.0
-  - k_dep
+#- - local_signal_decay
+#  - '>'
+#  - 1.0
+#  - global_signal_decay
+#- - k_pot
+#  - '>'
+#  - 1.0
+#  - k_dep
 feature_names:
 - induction1_delta_val_at_target_peak
 - induction1_delta_val_at_model_peak
@@ -114,11 +111,11 @@ objective_names:
 - induction1_residual_score
 - induction2_residual_score
 - ramp_amp_after_first_plateau
+- weights_path_distance
 optimization_title: biBTSP_synthetic_hybrid_alt_step2
 param_gen: PopulationAnnealing
 param_names:
-- phi_half_width
-- phi_th
+- phi_min
 - f_dep_th
 - f_dep_half_width
 - k_pot
@@ -133,11 +130,11 @@ target_range:
   residuals: 0.1
   weights_smoothness: 0.015
   ramp_amp_after_first_plateau: 0.01
+  weights_path_distance: 0.01
 target_val:
   ramp_amp_after_first_plateau: 4.
 x0:
-  phi_half_width: 0.25
-  phi_th: 0.5
+  phi_min: 0.5
   f_dep_half_width: 1.513922E-01
   f_dep_th: 4.998954E-02
   global_signal_decay: 1.974956E+02
