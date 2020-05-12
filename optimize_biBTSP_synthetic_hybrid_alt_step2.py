@@ -478,8 +478,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
 
     signal_xrange = np.linspace(0., 1., 10000)
     vrange = np.linspace(0., 1., 10000)
-    pot_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_pot_th, context.f_pot_th + context.f_pot_half_width, signal_xrange))
+    pot_rate = lambda x: x
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
     phi_spine_vm = np.vectorize(scaled_single_sigmoid(context.phi_th, context.phi_th + context.phi_half_width, vrange))
@@ -581,29 +580,20 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         indexes = np.where((context.down_t > start_time) & (context.down_t <= stop_time))
 
         next_normalized_weights = []
-        local_signals = []
         for i, (this_rate_map, this_current_normalized_weight) in \
                 enumerate(zip(context.down_rate_maps, current_normalized_weights)):
             this_expected_spine_depo_amp = min(1., max(0., phi_spine_vm(this_current_normalized_weight)))
             this_local_signal = np.divide(get_local_signal(
                 this_rate_map * this_expected_spine_depo_amp, local_signal_filter, context.down_dt), local_signal_peak)
-            local_signals.append(this_local_signal)
-            this_pot_rate = np.trapz(np.multiply(pot_rate(this_local_signal[indexes]), global_signal[indexes]),
+            this_pot_rate = np.trapz(pot_rate(np.multiply(this_local_signal[indexes], global_signal[indexes])),
                                      dx=context.down_dt / 1000.)
-            this_dep_rate = np.trapz(np.multiply(dep_rate(this_local_signal[indexes]), global_signal[indexes]),
+            this_dep_rate = np.trapz(dep_rate(np.multiply(this_local_signal[indexes], global_signal[indexes])),
                                      dx=context.down_dt / 1000.)
             this_normalized_delta_weight = context.k_pot * this_pot_rate * (1. - this_current_normalized_weight) - \
                                            context.k_dep * this_dep_rate * this_current_normalized_weight
             this_next_normalized_weight = \
                 max(0., min(1., this_current_normalized_weight + this_normalized_delta_weight))
             next_normalized_weights.append(this_next_normalized_weight)
-            if induction_lap == 0:
-                if i % 20 == 0:
-                    this_pot_rate = pot_rate(this_local_signal[indexes])
-                    this_dep_rate = dep_rate(this_local_signal[indexes])
-                    this_net_rate = context.k_pot * this_pot_rate * (1. - this_current_normalized_weight) - \
-                                    context.k_dep * this_dep_rate * this_current_normalized_weight
-                    axes[0].plot(context.down_t[indexes] / 1000., this_net_rate)
         if plot:
             axes[1].plot(context.down_t[indexes] / 1000., current_complete_down_ramp[indexes],
                          label='Induction lap: %i' % (induction_lap + 1))
@@ -618,7 +608,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                            input_rate_maps=context.input_rate_maps, ramp_scaling_factor=context.ramp_scaling_factor)
 
         if plot:
-            axes2[0].plot(context.binned_x, current_ramp, label='After induction lap: %i' % (induction_lap + 1))
+            axes2[0].plot(context.binned_x, current_ramp)
 
         if context.induction == 1 and context.condition == 'control' and induction_lap == 0:
             result['ramp_amp_after_first_plateau'] = np.max(current_ramp)

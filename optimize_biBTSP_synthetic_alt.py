@@ -537,17 +537,17 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     target_ramp = context.target_ramp['after'][context.condition]
 
     if plot:
-        fig, axes = plt.subplots(2, sharex=True)
+        fig, axes = plt.subplots(2, 2, sharex=True)
         fig.suptitle('Induction: %i (%s)' % (context.induction, context.condition), y=1.)
-        axes[0].plot(context.down_t / 1000., global_signal, label='Instructive signal')
-        # axes[0].set_ylabel('Plasticity gating signal')
-        axes[1].set_xlabel('Time (s)')
-        axes[1].set_ylabel('Relative ramp amplitude (mV)')
+        axes[0][0].plot(context.down_t / 1000., global_signal, label='Instructive signal')
+        axes[1][0].set_xlabel('Time (s)')
+        axes[1][1].set_xlabel('Time (s)')
+        axes[1][0].set_ylabel('Relative ramp\namplitude (mV)')
 
         fig2, axes2 = plt.subplots(1, 2, sharex=True)
         fig2.suptitle('Induction: %i (%s)' % (context.induction, context.condition))
         axes2[0].plot(context.binned_x, initial_ramp, c='k', label='Before')
-        axes2[0].plot(context.binned_x, target_ramp, c='r', label='After (Target)')
+        axes2[0].plot(context.binned_x, target_ramp, c='r', label='Target')
         axes2[0].set_ylabel('Ramp amplitude (mV)')
         axes2[0].set_xlabel('Location (cm)')
         axes2[1].set_ylabel('Change in synaptic weight')
@@ -582,7 +582,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             stop_time = context.down_t[-1]
         else:
             stop_time = context.induction_start_times[induction_lap + 1]
-        indexes = np.where((context.down_t >= start_time) & (context.down_t <= stop_time))
+        indexes = np.where((context.down_t > start_time) & (context.down_t <= stop_time))
 
         next_normalized_weights = []
         overlap = []
@@ -606,12 +606,10 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             axes3.set_title('Induction: %i (%s)' % (context.induction, context.condition))
             fig3.show()
         if plot:
-            axes[0].plot(context.down_t[indexes] / 1000., vd_mod_pot[indexes], c='c',
-                         label='Voltage-dependence (potentiation)')
-            axes[0].plot(context.down_t[indexes] / 1000., vd_mod_dep[indexes], c='r',
-                         label='Voltage-dependence (depression)')
-            axes[1].plot(context.down_t[indexes] / 1000., current_complete_down_ramp[indexes],
-                         label='Induction lap: %i' % (induction_lap + 1))
+            axes[0][1].plot(context.down_t[indexes] / 1000., vd_mod_pot[indexes])
+            axes[1][1].plot(context.down_t[indexes] / 1000., vd_mod_dep[indexes])
+            axes[1][0].plot(context.down_t[indexes] / 1000., current_complete_down_ramp[indexes],
+                            label='Induction lap: %i' % (induction_lap + 1))
             axes2[1].plot(context.peak_locs,
                           np.multiply(np.subtract(next_normalized_weights, current_normalized_weights), peak_weight),
                           label='Induction lap: %i' % (induction_lap + 1))
@@ -623,15 +621,17 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                            input_rate_maps=context.input_rate_maps, ramp_scaling_factor=context.ramp_scaling_factor)
 
         if plot:
-            axes2[0].plot(context.binned_x, current_ramp, c='c', label='After (Model)')
+            axes2[0].plot(context.binned_x, current_ramp)
 
         if context.induction == 1 and context.condition == 'control' and induction_lap == 0:
             result['ramp_amp_after_first_plateau'] = np.max(current_ramp)
         ramp_snapshots.append(current_ramp)
 
     if plot:
-        axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-        axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        axes[0][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        axes[0][1].set_title('Voltage-dependence (potentiation)')
+        axes[1][1].set_title('Voltage-dependence (depression)')
+        axes[1][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
         axes2[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
         axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
         clean_axes(axes)

@@ -5,12 +5,6 @@ bounds:
   phi_th: !!python/tuple
   - 0.001
   - 1.
-  f_pot_half_width: !!python/tuple
-  - 0.001
-  - 1.
-  f_pot_th: !!python/tuple
-  - 0.001
-  - 1.
   f_dep_th: !!python/tuple
   - 0.001
   - 1.
@@ -125,8 +119,6 @@ param_gen: PopulationAnnealing
 param_names:
 - phi_half_width
 - phi_th
-- f_pot_half_width
-- f_pot_th
 - f_dep_th
 - f_dep_half_width
 - k_pot
@@ -148,8 +140,6 @@ x0:
   phi_th: 0.5
   f_dep_half_width: 1.513922E-01
   f_dep_th: 4.998954E-02
-  f_pot_half_width: 8.556127E-01
-  f_pot_th: 2.593549E-01
   global_signal_decay: 1.974956E+02
   k_dep: 1.139180E+00
   k_pot: 1.547370E+00
