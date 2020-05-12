@@ -472,8 +472,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
 
     signal_xrange = np.linspace(0., 1., 10000)
     vrange = np.linspace(context.min_delta_ramp, context.peak_delta_ramp, 10000)
-    pot_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_pot_th, context.f_pot_th + context.f_pot_half_width, signal_xrange))
+    pot_rate = lambda x: x
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
     phi_pot = np.vectorize(lambda x: 1.)
@@ -812,7 +811,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
 
     # catch models with excessive fluctuations in weights across laps:
     if weights_path_distance_exceeds_threshold(delta_weights_snapshots, context.weights_path_distance_threshold,
-                                               cumulative=True):
+                                               cumulative=False):
         if context.verbose > 0:
             print('optimize_biBTSP_%s: calculate_model_ramp: pid: %i; aborting - excessive fluctuations in weights '
                   'across laps; induction: %i' %

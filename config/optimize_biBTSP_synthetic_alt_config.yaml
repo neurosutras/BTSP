@@ -1,10 +1,4 @@
 bounds:
-  f_pot_half_width: !!python/tuple
-  - 0.001
-  - 1.
-  f_pot_th: !!python/tuple
-  - 0.001
-  - 1.
   f_dep_th: !!python/tuple
   - 0.001
   - 1.
@@ -28,14 +22,14 @@ bounds:
   - 4.
 default_params:
 rel_bounds:
-- - local_signal_decay
-  - '>'
-  - 1.0
-  - global_signal_decay
-- - k_pot
-  - '>'
-  - 1.0
-  - k_dep
+# - - local_signal_decay
+#   - '>'
+#   - 1.0
+#   - global_signal_decay
+# - - k_pot
+#   - '>'
+#   - 1.0
+#  - k_dep
 feature_names:
 - induction1_delta_val_at_target_peak
 - induction1_delta_val_at_model_peak
@@ -117,8 +111,6 @@ objective_names:
 optimization_title: biBTSP_synthetic_alt
 param_gen: PopulationAnnealing
 param_names:
-- f_pot_half_width
-- f_pot_th
 - f_dep_th
 - f_dep_half_width
 - k_pot
@@ -138,8 +130,6 @@ target_val:
 x0:
   f_dep_half_width: 4.063616E-02
   f_dep_th: 4.085338E-02
-  f_pot_half_width: 5.837401E-01
-  f_pot_th: 1.563482E-01
   global_signal_decay: 4.428467E+02
   k_dep: 5.279940E-01
   k_pot: 1.544540E+00
