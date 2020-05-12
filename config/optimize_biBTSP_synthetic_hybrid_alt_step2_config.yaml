@@ -1,6 +1,6 @@
 bounds:
   phi_min: !!python/tuple
-  - 0.001
+  - 0.7
   - 1.
   f_dep_th: !!python/tuple
   - 0.001
@@ -24,6 +24,7 @@ bounds:
   - 1.5
   - 4.
 default_params:
+  phi_min: 0.8
 rel_bounds:
 #- - local_signal_decay
 #  - '>'
@@ -130,11 +131,11 @@ target_range:
   residuals: 0.1
   weights_smoothness: 0.015
   ramp_amp_after_first_plateau: 0.01
-  weights_path_distance: 0.01
+  weights_path_distance: 0.1
 target_val:
   ramp_amp_after_first_plateau: 4.
 x0:
-  phi_min: 0.5
+  phi_min: 0.8
   f_dep_half_width: 1.513922E-01
   f_dep_th: 4.998954E-02
   global_signal_decay: 1.974956E+02

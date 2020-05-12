@@ -544,9 +544,8 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         fig, axes = plt.subplots(2, sharex=True)
         fig.suptitle('Induction: %i (%s)' % (context.induction, context.condition), y=1.)
         axes[0].plot(context.down_t / 1000., global_signal, label='Instructive signal')
-        # axes[0].set_ylabel('Plasticity gating signal')
         axes[1].set_xlabel('Time (s)')
-        axes[1].set_ylabel('Relative ramp amplitude (mV)')
+        axes[1].set_ylabel('Relative ramp\n\amplitude (mV)')
 
         fig2, axes2 = plt.subplots(1, 2, sharex=True)
         fig2.suptitle('Induction: %i (%s)' % (context.induction, context.condition))
@@ -586,7 +585,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             this_local_signal_pot = np.divide(get_local_signal(
                 this_rate_map * this_expected_spine_depo_amp, local_signal_filter, context.down_dt), local_signal_peak)
             this_local_signal_dep = np.divide(get_local_signal(
-                this_rate_map, local_signal_filter, context.down_dt), local_signal_peak)
+                this_rate_map * this_expected_spine_depo_amp, local_signal_filter, context.down_dt), local_signal_peak)
             this_pot_rate = np.trapz(pot_rate(np.multiply(this_local_signal_pot[indexes], global_signal[indexes])),
                                      dx=context.down_dt / 1000.)
             this_dep_rate = np.trapz(dep_rate(np.multiply(this_local_signal_dep[indexes], global_signal[indexes])),
@@ -799,7 +798,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     # catch models with excessive fluctuations in weights across laps:
     result['weights_path_distance'] = \
         weights_path_distance_exceeds_threshold(delta_weights_snapshots, context.weights_path_distance_threshold,
-                                                cumulative=False, return_value=True)
+                                                cumulative=True, return_value=True)
 
     return {context.induction: {context.condition: result}}
 
