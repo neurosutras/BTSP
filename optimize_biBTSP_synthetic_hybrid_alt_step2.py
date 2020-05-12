@@ -578,14 +578,16 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             stop_time = context.down_t[-1]
         else:
             stop_time = context.induction_start_times[induction_lap + 1]
-        indexes = np.where((context.down_t >= start_time) & (context.down_t <= stop_time))
+        indexes = np.where((context.down_t > start_time) & (context.down_t <= stop_time))
 
         next_normalized_weights = []
+        local_signals = []
         for i, (this_rate_map, this_current_normalized_weight) in \
                 enumerate(zip(context.down_rate_maps, current_normalized_weights)):
             this_expected_spine_depo_amp = min(1., max(0., phi_spine_vm(this_current_normalized_weight)))
             this_local_signal = np.divide(get_local_signal(
                 this_rate_map * this_expected_spine_depo_amp, local_signal_filter, context.down_dt), local_signal_peak)
+            local_signals.append(this_local_signal)
             this_pot_rate = np.trapz(np.multiply(pot_rate(this_local_signal[indexes]), global_signal[indexes]),
                                      dx=context.down_dt / 1000.)
             this_dep_rate = np.trapz(np.multiply(dep_rate(this_local_signal[indexes]), global_signal[indexes]),
@@ -595,6 +597,13 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             this_next_normalized_weight = \
                 max(0., min(1., this_current_normalized_weight + this_normalized_delta_weight))
             next_normalized_weights.append(this_next_normalized_weight)
+            if induction_lap == 0:
+                if i % 20 == 0:
+                    this_pot_rate = pot_rate(this_local_signal[indexes])
+                    this_dep_rate = dep_rate(this_local_signal[indexes])
+                    this_net_rate = context.k_pot * this_pot_rate * (1. - this_current_normalized_weight) - \
+                                    context.k_dep * this_dep_rate * this_current_normalized_weight
+                    axes[0].plot(context.down_t[indexes] / 1000., this_net_rate)
         if plot:
             axes[1].plot(context.down_t[indexes] / 1000., current_complete_down_ramp[indexes],
                          label='Induction lap: %i' % (induction_lap + 1))

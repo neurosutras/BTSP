@@ -188,6 +188,13 @@ def load_data(induction, condition='control'):
             induction_context.complete_t -= len(induction_context.t['pre'][i]) * context.dt
             induction_context.complete_position -= context.track_length
 
+        induction_context.min_induction_t = \
+            get_min_induction_t(induction_context.complete_t, induction_context.complete_position,
+                                context.binned_x, context.track_length, induction_context.mean_induction_start_loc,
+                                context.num_induction_laps)
+        induction_context.clean_induction_t_indexes = \
+            get_clean_induction_t_indexes(induction_context.min_induction_t)
+
         induction_context.complete_run_vel = np.full_like(induction_context.complete_t, context.default_run_vel)
         induction_context.complete_run_vel_gate = np.ones_like(induction_context.complete_run_vel)
         induction_context.complete_run_vel_gate[np.where(induction_context.complete_run_vel <= 5.)[0]] = 0.
@@ -579,15 +586,26 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         indexes = np.where((context.down_t >= start_time) & (context.down_t <= stop_time))
 
         next_normalized_weights = []
+        overlap = []
         for i, (this_local_signal_pot, this_local_signal_dep) in enumerate(zip(local_signals_pot, local_signals_dep)):
-            this_pot_rate = np.trapz(np.multiply(pot_rate(this_local_signal_pot[indexes]), global_signal[indexes]),
+            this_pot_rate = np.trapz(pot_rate(np.multiply(this_local_signal_pot[indexes], global_signal[indexes])),
                                      dx=context.down_dt / 1000.)
-            this_dep_rate = np.trapz(np.multiply(dep_rate(this_local_signal_dep[indexes]), global_signal[indexes]),
+            this_dep_rate = np.trapz(dep_rate(np.multiply(this_local_signal_dep[indexes], global_signal[indexes])),
                                      dx=context.down_dt / 1000.)
             this_normalized_delta_weight = context.k_pot * this_pot_rate * (1. - current_normalized_weights[i]) - \
                                            context.k_dep * this_dep_rate * current_normalized_weights[i]
             this_next_normalized_weight = max(0., min(1., current_normalized_weights[i] + this_normalized_delta_weight))
             next_normalized_weights.append(this_next_normalized_weight)
+            overlap.append(np.trapz(np.multiply(this_local_signal_pot[indexes], global_signal[indexes]),
+                                    dx=context.down_dt / 1000.))
+        if induction_lap == 0:
+            fig3, axes3 = plt.subplots()
+            interp_overlap = np.interp(context.binned_x, context.peak_locs, overlap)
+            axes3.plot(context.min_induction_t[context.clean_induction_t_indexes] / 1000.,
+                       interp_overlap[context.clean_induction_t_indexes])
+            # axes3.plot(context.peak_locs, overlap)
+            axes3.set_title('Induction: %i (%s)' % (context.induction, context.condition))
+            fig3.show()
         if plot:
             axes[0].plot(context.down_t[indexes] / 1000., vd_mod_pot[indexes], c='c',
                          label='Voltage-dependence (potentiation)')
