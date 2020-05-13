@@ -1,6 +1,6 @@
 bounds:
   phi_min: !!python/tuple
-  - 0.7
+  - 0.25
   - 1.
   f_dep_th: !!python/tuple
   - 0.001
@@ -24,7 +24,7 @@ bounds:
   - 1.5
   - 4.
 default_params:
-  phi_min: 0.8
+  # phi_min: 0.8
 rel_bounds:
 #- - local_signal_decay
 #  - '>'
@@ -93,7 +93,8 @@ kwargs:
   num_induction_laps: 3
   min_delta_weight: -0.2
   peak_delta_ramp: 25.
-  min_delta_ramp: -60.
+  min_delta_ramp: -40.
+  dend_depo_range: 3.
   # vd_min: 0.
   default_run_vel: 25.
   induction_loc:

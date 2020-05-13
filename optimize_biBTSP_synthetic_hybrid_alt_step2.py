@@ -389,7 +389,7 @@ def load_data(induction, condition='control'):
             induction_context.ramp_offset['hyper'][offset_indexes] = context.target_ramp_offset_1_hyper
             induction_context.LSA_weights['after']['hyper'] = \
                 np.array(induction_context.LSA_weights['after']['control'])
-            induction_context.LSA_weights['after']['hyper'][delta_weights_offset_indexes] *= 0.5
+            induction_context.LSA_weights['after']['hyper'][delta_weights_offset_indexes] *= 0.4
             induction_context.target_ramp['after']['hyper'], _ = \
                 get_model_ramp(induction_context.LSA_weights['after']['hyper'], context.binned_x, context.peak_locs,
                                context.input_rate_maps, context.ramp_scaling_factor)
@@ -561,12 +561,13 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     this_ramp_offset = context.ramp_offset[context.condition]
 
     for induction_lap in range(len(context.induction_start_times)):
-        current_complete_ramp = \
-            np.maximum(context.min_delta_ramp, np.minimum(context.peak_delta_ramp,
-                       get_complete_ramp(np.add(current_ramp, this_ramp_offset), context.binned_x,
-                                         context.position, context.complete_run_vel_gate, context.induction_gate,
-                                         context.peak_delta_ramp)))
-        current_complete_down_ramp = np.interp(context.down_t, context.complete_t, current_complete_ramp)
+        current_complete_dend_depo = \
+            np.maximum(context.min_delta_ramp, np.minimum(
+                context.peak_delta_ramp, get_complete_dend_depo(
+                    this_ramp_offset, context.binned_x, context.position, context.complete_run_vel_gate,
+                    context.induction_gate, context.peak_delta_ramp)))
+        current_complete_dend_depo *= context.dend_depo_range / (context.peak_delta_ramp - context.min_delta_ramp)
+        current_complete_down_dend_depo = np.interp(context.down_t, context.complete_t, current_complete_dend_depo)
 
         if induction_lap == 0:
             start_time = context.down_t[0]
@@ -581,7 +582,9 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         next_normalized_weights = []
         for i, (this_rate_map, this_current_normalized_weight) in \
                 enumerate(zip(context.down_rate_maps, current_normalized_weights)):
-            this_expected_spine_depo_amp = min(1., max(0., phi_spine_vm(this_current_normalized_weight)))
+            this_expected_spine_depo_amp = \
+                np.minimum(1., np.maximum(context.phi_min, phi_spine_vm(
+                    np.add(this_current_normalized_weight, current_complete_down_dend_depo))))
             this_local_signal_pot = np.divide(get_local_signal(
                 this_rate_map * this_expected_spine_depo_amp, local_signal_filter, context.down_dt), local_signal_peak)
             this_local_signal_dep = np.divide(get_local_signal(
@@ -596,7 +599,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                 max(0., min(1., this_current_normalized_weight + this_normalized_delta_weight))
             next_normalized_weights.append(this_next_normalized_weight)
         if plot:
-            axes[1].plot(context.down_t[indexes] / 1000., current_complete_down_ramp[indexes],
+            axes[1].plot(context.down_t[indexes] / 1000., current_complete_down_dend_depo[indexes],
                          label='Induction lap: %i' % (induction_lap + 1))
             axes2[1].plot(context.peak_locs,
                           np.multiply(np.subtract(next_normalized_weights, current_normalized_weights), peak_weight),
@@ -1249,7 +1252,8 @@ def get_args_static_model_ramp():
     :return: list of list
     """
     # return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
-    return [[1, 2], ['control', 'control']]
+    return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control']]
+    # return [[1, 2], ['control', 'control']]
 
 
 def compute_features_model_ramp(x, induction=None, condition=None, model_id=None, export=False, plot=False):
