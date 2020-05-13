@@ -111,7 +111,10 @@ kwargs:
   weights_path_distance_threshold: 1.25
 objective_names:
 - induction1_residual_score
+- induction1_depo_residual_score
+- induction1_hyper_residual_score
 - induction2_residual_score
+- induction2_hyper_residual_score
 - ramp_amp_after_first_plateau
 - weights_path_distance
 optimization_title: biBTSP_synthetic_hybrid_alt_step2
