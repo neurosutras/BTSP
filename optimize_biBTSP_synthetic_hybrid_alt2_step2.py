@@ -502,14 +502,14 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                                         context.dend_depo_mod_width * context.max_dend_depo)
 
     if plot and context.induction == 1 and context.condition == 'control':
-        fig, axes = plt.subplots(1, 3)
+        fig, axes = plt.subplots(1, 3, figsize=(10, 3.5))
         dep_scale = context.k_dep / context.k_pot
         axes[0].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='Potentiation rate')
         axes[0].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='Depression rate')
-        axes[0].set_xlabel('Normalized eligibility signal amplitude (a.u.)')
+        axes[0].set_xlabel('Plasticity signal\noverlap (a.u.)')
         axes[0].set_ylabel('Normalized rate')
         axes[1].plot(spine_depo_range, get_norm_spine_depo(spine_depo_range), c='k')
-        axes[1].set_xlabel('Expected spine depolarization (normalized)')
+        axes[1].set_xlabel('Expected spine\ndepolarization (normalized)')
         axes[1].set_ylabel('Actual spine depolarization (normalized)')
         axes[2].plot(dend_depo_range, dend_depo_mod_f(dend_depo_range), c='k')
         axes[2].set_xlabel('Dendritic depolarization')
