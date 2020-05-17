@@ -459,6 +459,20 @@ def update_model_params(x, local_context):
     local_context.update(param_array_to_dict(x, local_context.param_names))
 
 
+def get_dend_depo_mod(mod_min, mod_max, width):
+    """
+
+    :param mod_min: float
+    :param mod_max: float
+    :param width: float
+    :return: lambda
+    """
+    if mod_min >= 1. or mod_max <= 1.:
+        raise RuntimeError('get_dend_depo_mod: invalid scale parameters')
+    th = width * np.log((mod_max - mod_min) / (1. - mod_min) - 1.)
+    return np.vectorize(lambda x: (mod_max - mod_min) / (1. + np.exp(-(x - th) / width)) + mod_min)
+
+
 def calculate_model_ramp(model_id=None, export=False, plot=False):
     """
 
@@ -477,29 +491,30 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                                                            context.down_dt))
 
     signal_xrange = np.linspace(0., 1., 10000)
-    vrange = np.linspace(0., 1., 10000)
+    spine_depo_range = np.linspace(0., 1., 10000)
+    dend_depo_range = np.linspace(context.min_dend_depo, context.max_dend_depo, 10000)
     pot_rate = lambda x: x
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
-    get_phi = np.vectorize(lambda norm_spine_depo, norm_dend_depo:
-                           max(context.phi_min, min(1., norm_spine_depo + norm_dend_depo)))
-    get_norm_dend_depo = \
-        np.vectorize(
-            lambda dend_vm: max(context.min_delta_ramp, min(context.peak_delta_ramp, dend_vm)) /
-                            context.peak_delta_ramp * context.dend_depo_range)
+    get_norm_spine_depo = np.vectorize(scaled_single_sigmoid(
+        context.phi_th, context.phi_th + context.phi_half_width, spine_depo_range))
+    dend_depo_mod_f = get_dend_depo_mod(context.dend_depo_mod_min, context.dend_depo_mod_max,
+                                        context.dend_depo_mod_width * context.max_dend_depo)
 
     if plot and context.induction == 1 and context.condition == 'control':
-        fig, axes = plt.subplots(1, 2)
+        fig, axes = plt.subplots(1, 3)
         dep_scale = context.k_dep / context.k_pot
         axes[0].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='Potentiation rate')
         axes[0].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='Depression rate')
         axes[0].set_xlabel('Normalized eligibility signal amplitude (a.u.)')
         axes[0].set_ylabel('Normalized rate')
-        axes[1].plot(vrange, get_phi(vrange, 0.), c='k')
+        axes[1].plot(spine_depo_range, get_norm_spine_depo(spine_depo_range), c='k')
         axes[1].set_xlabel('Expected spine depolarization (normalized)')
-        axes[1].set_ylabel('Voltage-dependent modulation factor')
+        axes[1].set_ylabel('Actual spine depolarization (normalized)')
+        axes[2].plot(dend_depo_range, dend_depo_mod_f(dend_depo_range), c='k')
+        axes[2].set_xlabel('Dendritic depolarization')
+        axes[2].set_ylabel('Modulation of spine depolarization')
         axes[0].legend(loc='best', frameon=False, framealpha=0.5)
-        axes[1].legend(loc='best', frameon=False, framealpha=0.5)
         clean_axes(axes)
         fig.tight_layout()
         fig.show()
@@ -566,12 +581,11 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     this_ramp_offset = context.ramp_offset[context.condition]
 
     for induction_lap in range(len(context.induction_start_times)):
-        current_complete_norm_dend_depo = \
-            get_norm_dend_depo(
-                get_complete_dend_depo(this_ramp_offset, context.binned_x, context.position, context.induction_gate,
-                                       context.peak_delta_ramp))
-        current_complete_down_norm_dend_depo = \
-            np.interp(context.down_t, context.complete_t, current_complete_norm_dend_depo)
+        current_complete_dend_depo_mod = \
+            dend_depo_mod_f(get_complete_dend_depo(
+                this_ramp_offset, context.binned_x, context.position, context.induction_gate, context.max_dend_depo))
+        current_complete_down_dend_depo_mod = \
+            np.interp(context.down_t, context.complete_t, current_complete_dend_depo_mod)
 
         if induction_lap == 0:
             start_time = context.down_t[0]
@@ -586,15 +600,15 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         next_normalized_weights = []
         for i, (this_rate_map, this_current_normalized_weight) in \
                 enumerate(zip(context.down_rate_maps, current_normalized_weights)):
-            this_phi_pot = get_phi(this_current_normalized_weight, current_complete_down_norm_dend_depo)
-            this_phi_dep = get_phi(this_current_normalized_weight, np.zeros_like(current_complete_down_norm_dend_depo))
+            this_expected_norm_spine_depo = current_complete_down_dend_depo_mod * this_current_normalized_weight
+            this_actual_norm_spine_depo = get_norm_spine_depo(this_expected_norm_spine_depo)
             this_local_signal_pot = \
-                np.divide(get_local_signal(this_rate_map * this_phi_pot * this_current_normalized_weight,
-                                           local_signal_filter, context.down_dt),
+                np.divide(get_local_signal(this_rate_map * this_actual_norm_spine_depo, local_signal_filter,
+                                           context.down_dt),
                           local_signal_peak)
             this_local_signal_dep = \
-                np.divide(get_local_signal(this_rate_map * this_phi_dep * this_current_normalized_weight,
-                                           local_signal_filter, context.down_dt),
+                np.divide(get_local_signal(this_rate_map * this_actual_norm_spine_depo, local_signal_filter,
+                                           context.down_dt),
                           local_signal_peak)
             this_pot_rate = np.trapz(pot_rate(np.multiply(this_local_signal_pot[indexes], global_signal[indexes])),
                                      dx=context.down_dt / 1000.)
@@ -606,7 +620,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                 max(0., min(1., this_current_normalized_weight + this_normalized_delta_weight))
             next_normalized_weights.append(this_next_normalized_weight)
         if plot:
-            axes[1].plot(context.down_t[indexes] / 1000., current_complete_down_norm_dend_depo[indexes],
+            axes[1].plot(context.down_t[indexes] / 1000., current_complete_down_dend_depo_mod[indexes],
                          label='Induction lap: %i' % (induction_lap + 1))
             axes2[1].plot(context.peak_locs,
                           np.multiply(np.subtract(next_normalized_weights, current_normalized_weights), peak_weight),
@@ -744,7 +758,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                 group.create_dataset('peak_locs', compression='gzip', data=context.peak_locs)
                 group.create_dataset('binned_x', compression='gzip', data=context.binned_x)
                 group.create_dataset('signal_xrange', compression='gzip', data=signal_xrange)
-                group.create_dataset('vrange', compression='gzip', data=vrange)
+                group.create_dataset('dend_depo_range', compression='gzip', data=dend_depo_range)
                 group.create_dataset('param_names', compression='gzip', data=np.asarray(context.param_names, dtype='S'))
                 group.attrs['input_field_width'] = context.input_field_width
                 group.attrs['ramp_scaling_factor'] = context.ramp_scaling_factor

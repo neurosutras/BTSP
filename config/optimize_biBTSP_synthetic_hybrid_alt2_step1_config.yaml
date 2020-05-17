@@ -36,6 +36,9 @@ bounds:
   - 0.01
   - 0.5
 default_params:
+  dend_depo_mod_min: 0.99
+  dend_depo_mod_max: 1.01
+  dend_depo_mod_width: 0.5
 rel_bounds:
 #- - local_signal_decay
 #  - '>'
