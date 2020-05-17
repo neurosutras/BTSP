@@ -482,7 +482,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
     get_phi = np.vectorize(lambda norm_spine_depo, norm_dend_depo:
-                       context.phi_min + (1. - context.phi_min) * max(0., min(1., norm_spine_depo + norm_dend_depo)))
+                           max(context.phi_min, min(1., norm_spine_depo + norm_dend_depo)))
     get_norm_dend_depo = \
         np.vectorize(
             lambda dend_vm: max(context.min_delta_ramp, min(context.peak_delta_ramp, dend_vm)) /
@@ -550,7 +550,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         fig.suptitle('Induction: %i (%s)' % (context.induction, context.condition), y=1.)
         axes[0].plot(context.down_t / 1000., global_signal, label='Instructive signal')
         axes[1].set_xlabel('Time (s)')
-        axes[1].set_ylabel('Relative ramp\n\amplitude (mV)')
+        axes[1].set_ylabel('Relative ramp\namplitude (mV)')
 
         fig2, axes2 = plt.subplots(1, 2, sharex=True)
         fig2.suptitle('Induction: %i (%s)' % (context.induction, context.condition))
@@ -568,8 +568,8 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     for induction_lap in range(len(context.induction_start_times)):
         current_complete_norm_dend_depo = \
             get_norm_dend_depo(
-                get_complete_dend_depo(this_ramp_offset, context.binned_x, context.position,
-                                       context.complete_run_vel_gate, context.induction_gate, context.peak_delta_ramp))
+                get_complete_dend_depo(this_ramp_offset, context.binned_x, context.position, context.induction_gate,
+                                       context.peak_delta_ramp))
         current_complete_down_norm_dend_depo = \
             np.interp(context.down_t, context.complete_t, current_complete_norm_dend_depo)
 
@@ -586,11 +586,16 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         next_normalized_weights = []
         for i, (this_rate_map, this_current_normalized_weight) in \
                 enumerate(zip(context.down_rate_maps, current_normalized_weights)):
-            this_phi = get_phi(this_current_normalized_weight, current_complete_down_norm_dend_depo)
-            this_local_signal_pot = np.divide(get_local_signal(
-                this_rate_map * this_phi, local_signal_filter, context.down_dt), local_signal_peak)
-            this_local_signal_dep = np.divide(get_local_signal(this_rate_map, local_signal_filter, context.down_dt),
-                                              local_signal_peak)
+            this_phi_pot = get_phi(this_current_normalized_weight, current_complete_down_norm_dend_depo)
+            this_phi_dep = get_phi(this_current_normalized_weight, np.zeros_like(current_complete_down_norm_dend_depo))
+            this_local_signal_pot = \
+                np.divide(get_local_signal(this_rate_map * this_phi_pot * this_current_normalized_weight,
+                                           local_signal_filter, context.down_dt),
+                          local_signal_peak)
+            this_local_signal_dep = \
+                np.divide(get_local_signal(this_rate_map * this_phi_dep * this_current_normalized_weight,
+                                           local_signal_filter, context.down_dt),
+                          local_signal_peak)
             this_pot_rate = np.trapz(pot_rate(np.multiply(this_local_signal_pot[indexes], global_signal[indexes])),
                                      dx=context.down_dt / 1000.)
             this_dep_rate = np.trapz(dep_rate(np.multiply(this_local_signal_dep[indexes], global_signal[indexes])),
@@ -1254,8 +1259,8 @@ def get_args_static_model_ramp():
     :return: list of list
     """
     # return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
-    return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control']]
-    # return [[1, 2], ['control', 'control']]
+    # return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control']]
+    return [[1, 2], ['control', 'control']]
 
 
 def compute_features_model_ramp(x, induction=None, condition=None, model_id=None, export=False, plot=False):

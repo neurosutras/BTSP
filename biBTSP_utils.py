@@ -265,13 +265,12 @@ def get_complete_ramp(current_ramp, input_x, position, complete_run_vel_gate, in
     return complete_ramp
 
 
-def get_complete_dend_depo(current_depo, input_x, position, complete_run_vel_gate, induction_gate, peak_ramp_amp):
+def get_complete_dend_depo(current_depo, input_x, position, induction_gate, peak_ramp_amp):
     """
 
     :param current_depo: array
     :param input_x: array (x resolution of input)
     :param position: nested dict of array
-    :param complete_run_vel_gate: array
     :param induction_gate: array
     :param peak_ramp_amp: float
     :return: array
@@ -281,10 +280,9 @@ def get_complete_dend_depo(current_depo, input_x, position, complete_run_vel_gat
         for i, this_position in enumerate(position[group]):
             this_lap_vm = np.interp(this_position, input_x, current_depo)
             complete_dend_depo = np.append(complete_dend_depo, this_lap_vm)
-    complete_dend_depo = np.multiply(complete_dend_depo, complete_run_vel_gate)
-    complete_dend_depo[np.where(induction_gate == 1.)[0]] = peak_ramp_amp
-    if len(complete_dend_depo) != len(complete_run_vel_gate):
+    if len(complete_dend_depo) != len(induction_gate):
         print('get_complete_dend_depo: mismatched array length')
+    complete_dend_depo[np.where(induction_gate == 1.)[0]] = peak_ramp_amp
 
     return complete_dend_depo
 
