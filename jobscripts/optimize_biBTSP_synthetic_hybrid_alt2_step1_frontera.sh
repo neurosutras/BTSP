@@ -1,6 +1,6 @@
 #!/bin/bash -l
 export DATE=$(date +%Y%m%d_%H%M%S)
-export JOB_NAME=optimize_biBTSP_synthetic_hybrid_alt2_step2"$DATE"
+export JOB_NAME=optimize_biBTSP_synthetic_hybrid_alt2_step1"$DATE"
 sbatch <<EOT
 #!/bin/bash -l
 #SBATCH -J $JOB_NAME
