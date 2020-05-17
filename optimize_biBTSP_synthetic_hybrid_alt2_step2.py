@@ -565,7 +565,8 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         fig.suptitle('Induction: %i (%s)' % (context.induction, context.condition), y=1.)
         axes[0].plot(context.down_t / 1000., global_signal, label='Instructive signal')
         axes[1].set_xlabel('Time (s)')
-        axes[1].set_ylabel('Relative ramp\namplitude (mV)')
+        axes[1].set_ylabel('Signal amplitude (a.u.)')
+        axes[1].set_ylabel('Modulation by dendritic\ndepolarization')
 
         fig2, axes2 = plt.subplots(1, 2, sharex=True)
         fig2.suptitle('Induction: %i (%s)' % (context.induction, context.condition))
@@ -600,7 +601,8 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         next_normalized_weights = []
         for i, (this_rate_map, this_current_normalized_weight) in \
                 enumerate(zip(context.down_rate_maps, current_normalized_weights)):
-            this_expected_norm_spine_depo = current_complete_down_dend_depo_mod * this_current_normalized_weight
+            this_expected_norm_spine_depo = \
+                np.maximum(0., np.minimum(1., current_complete_down_dend_depo_mod * this_current_normalized_weight))
             this_actual_norm_spine_depo = get_norm_spine_depo(this_expected_norm_spine_depo)
             this_local_signal_pot = \
                 np.divide(get_local_signal(this_rate_map * this_actual_norm_spine_depo, local_signal_filter,
@@ -1265,7 +1267,17 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     context.update(locals())
 
 
-def get_args_static_model_ramp():
+def get_args_static_model_ramp_step1():
+    """
+    A nested map operation is required to compute model_ramp features. The arguments to be mapped are the same
+    (static) for each set of parameters.
+    :param x: array
+    :return: list of list
+    """
+    return [[1, 2], ['control', 'control']]
+
+
+def get_args_static_model_ramp_step2():
     """
     A nested map operation is required to compute model_ramp features. The arguments to be mapped are the same
     (static) for each set of parameters.
@@ -1273,8 +1285,7 @@ def get_args_static_model_ramp():
     :return: list of list
     """
     # return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
-    # return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control']]
-    return [[1, 2], ['control', 'control']]
+    return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control']]
 
 
 def compute_features_model_ramp(x, induction=None, condition=None, model_id=None, export=False, plot=False):
@@ -1407,7 +1418,7 @@ def get_features_interactive(interface, x, model_id=None, plot=False):
     :return: dict
     """
     features = {}
-    args = interface.execute(get_args_static_model_ramp)
+    args = interface.execute(globals()[context.stages[0]['get_args_static']])
     group_size = len(args[0])
     sequences = [[x] * group_size] + args + [[model_id] * group_size] + [[context.export] * group_size] + \
                 [[plot] * group_size]

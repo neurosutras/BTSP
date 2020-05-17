@@ -92,7 +92,7 @@ update_context:
   - update_model_params
 get_features_stages:
 - source: optimize_biBTSP_synthetic_hybrid_alt2_step2
-  get_args_static: get_args_static_model_ramp
+  get_args_static: get_args_static_model_ramp_step2
   compute_features: compute_features_model_ramp
   filter_features: filter_features_model_ramp
 get_objectives:
@@ -152,15 +152,15 @@ target_range:
 target_val:
   ramp_amp_after_first_plateau: 4.
 x0:
-  phi_th: 0.5
-  phi_half_width: 0.25
-  dend_depo_mod_min: 0.99
-  dend_depo_mod_max: 1.01
-  dend_depo_mod_width: 0.5
-  f_dep_th: 8.449156E-03
-  f_dep_half_width: 3.310570E-02
-  k_pot: 1.889704E+00
-  k_dep: 1.733164E-01
-  local_signal_decay: 7.602399E+02
-  global_signal_decay: 6.314786E+02
-  peak_delta_weight: 2.452824E+00
+  dend_depo_mod_max: 1.5
+  dend_depo_mod_min: 0.5
+  dend_depo_mod_width: 5.000000E-01
+  f_dep_half_width: 9.653914E-02
+  f_dep_th: 2.976247E-03
+  global_signal_decay: 6.234602E+02
+  k_dep: 3.109035E-01
+  k_pot: 6.347702E-01
+  local_signal_decay: 8.146532E+02
+  peak_delta_weight: 4.899299E+00
+  phi_half_width: 2.414883E-02
+  phi_th: 3.196775E-02

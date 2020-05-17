@@ -95,7 +95,7 @@ update_context:
   - update_model_params
 get_features_stages:
 - source: optimize_biBTSP_synthetic_hybrid_alt2_step2
-  get_args_static: get_args_static_model_ramp
+  get_args_static: get_args_static_model_ramp_step1
   compute_features: compute_features_model_ramp
   filter_features: filter_features_model_ramp
 get_objectives:
