@@ -11,6 +11,12 @@ bounds:
   f_dep_half_width: !!python/tuple
   - 0.001
   - 1.
+  f_pot_th: !!python/tuple
+  - 0.001
+  - 1.
+  f_pot_half_width: !!python/tuple
+  - 0.001
+  - 1.
   k_pot: !!python/tuple
   - 0.01
   - 10.
@@ -134,6 +140,8 @@ param_names:
 - dend_depo_mod_width
 - phi_th
 - phi_half_width
+- f_pot_th
+- f_pot_half_width
 - f_dep_th
 - f_dep_half_width
 - k_pot
@@ -152,15 +160,17 @@ target_range:
 target_val:
   ramp_amp_after_first_plateau: 4.
 x0:
-  dend_depo_mod_max: 1.5
-  dend_depo_mod_min: 0.5
-  dend_depo_mod_width: 5.000000E-01
-  f_dep_half_width: 9.653914E-02
-  f_dep_th: 2.976247E-03
-  global_signal_decay: 6.234602E+02
-  k_dep: 3.109035E-01
-  k_pot: 6.347702E-01
-  local_signal_decay: 8.146532E+02
-  peak_delta_weight: 4.899299E+00
-  phi_half_width: 2.414883E-02
-  phi_th: 3.196775E-02
+  dend_depo_mod_min: 4.332954E-01
+  dend_depo_mod_max: 1.554219E+00
+  dend_depo_mod_width: 4.527586E-01
+  phi_th: 5.926090E-02
+  phi_half_width: 3.120900E-02
+  f_pot_th: 9.658960E-03
+  f_pot_half_width: 1.342305E-01
+  f_dep_th: 9.658960E-03
+  f_dep_half_width: 1.342305E-01
+  k_pot: 6.750687E-01
+  k_dep: 3.910557E-01
+  local_signal_decay: 9.081207E+02
+  global_signal_decay: 6.800621E+02
+  peak_delta_weight: 4.835168E+00

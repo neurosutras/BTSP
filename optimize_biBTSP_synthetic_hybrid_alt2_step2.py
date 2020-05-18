@@ -493,7 +493,9 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     signal_xrange = np.linspace(0., 1., 10000)
     spine_depo_range = np.linspace(0., 1., 10000)
     dend_depo_range = np.linspace(context.min_dend_depo, context.max_dend_depo, 10000)
-    pot_rate = lambda x: x
+    # pot_rate = lambda x: x
+    pot_rate = np.vectorize(scaled_single_sigmoid(
+        context.f_pot_th, context.f_pot_th + context.f_pot_half_width, signal_xrange))
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
     get_norm_spine_depo = np.vectorize(scaled_single_sigmoid(
@@ -601,15 +603,18 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         next_normalized_weights = []
         for i, (this_rate_map, this_current_normalized_weight) in \
                 enumerate(zip(context.down_rate_maps, current_normalized_weights)):
-            this_expected_norm_spine_depo = \
+            this_expected_modulated_spine_depo = \
                 np.maximum(0., np.minimum(1., current_complete_down_dend_depo_mod * this_current_normalized_weight))
-            this_actual_norm_spine_depo = get_norm_spine_depo(this_expected_norm_spine_depo)
+            this_actual_modulated_spine_depo = get_norm_spine_depo(this_expected_modulated_spine_depo)
+            this_expected_nonmodulated_spine_depo = \
+                np.ones_like(current_complete_down_dend_depo_mod) * this_current_normalized_weight
+            this_actual_nonmodulated_spine_depo = get_norm_spine_depo(this_expected_nonmodulated_spine_depo)
             this_local_signal_pot = \
-                np.divide(get_local_signal(this_rate_map * this_actual_norm_spine_depo, local_signal_filter,
+                np.divide(get_local_signal(this_rate_map * this_actual_modulated_spine_depo, local_signal_filter,
                                            context.down_dt),
                           local_signal_peak)
             this_local_signal_dep = \
-                np.divide(get_local_signal(this_rate_map * this_actual_norm_spine_depo, local_signal_filter,
+                np.divide(get_local_signal(this_rate_map * this_actual_nonmodulated_spine_depo, local_signal_filter,
                                            context.down_dt),
                           local_signal_peak)
             this_pot_rate = np.trapz(pot_rate(np.multiply(this_local_signal_pot[indexes], global_signal[indexes])),
