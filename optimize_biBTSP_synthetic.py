@@ -1004,7 +1004,6 @@ def get_args_static_model_ramp():
     A nested map operation is required to compute model_ramp features. The arguments to be mapped are the same
     (static) for each set of parameters.
     :param x: array
-    :param features: dict
     :return: list of list
     """
 

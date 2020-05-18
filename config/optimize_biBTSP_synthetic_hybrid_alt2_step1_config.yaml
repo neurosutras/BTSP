@@ -1,9 +1,9 @@
 bounds:
   phi_th: !!python/tuple
-  - 0.25
+  - 0.001
   - 1.
   phi_half_width: !!python/tuple
-  - 0.25
+  - 0.05
   - 1.
   f_dep_th: !!python/tuple
   - 0.001
@@ -120,7 +120,7 @@ objective_names:
 - induction2_hyper_residual_score
 - ramp_amp_after_first_plateau
 - weights_path_distance
-optimization_title: biBTSP_synthetic_hybrid_alt2_step2
+optimization_title: biBTSP_synthetic_hybrid_alt2_step1
 param_gen: PopulationAnnealing
 param_names:
 - dend_depo_mod_scale

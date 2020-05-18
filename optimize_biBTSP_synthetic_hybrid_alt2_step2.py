@@ -40,7 +40,7 @@ Spine Vm is a nonlinear NMDA(R)-like transformation of the sum of unitary synapt
 dendritic depolarization.
 A Ca2+ signal is estimated as a the product of rate_pre and Vm_spine.
 Eligibility filter acts on the Ca2+ signal.
-Gain functions f_pot and f_dep are sigmoidal.
+Gain function f_pot is linear and f_dep is sigmoidal.
 
 """
 __author__ = 'milsteina'
@@ -607,6 +607,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         indexes = np.where((context.down_t > start_time) & (context.down_t <= stop_time))
 
         next_normalized_weights = []
+        overlap = []
         for i, (this_rate_map, this_current_normalized_weight) in \
                 enumerate(zip(context.down_rate_maps, current_normalized_weights)):
             this_actual_norm_spine_depo = \
@@ -631,6 +632,8 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             this_next_normalized_weight = \
                 max(0., min(1., this_current_normalized_weight + this_normalized_delta_weight))
             next_normalized_weights.append(this_next_normalized_weight)
+            overlap.append(np.trapz(np.multiply(this_local_signal_pot[indexes], global_signal[indexes]),
+                                    dx=context.down_dt / 1000.))
         if plot:
             axes[1].plot(context.down_t[indexes] / 1000., current_complete_down_dend_depo_mod[indexes],
                          label='Induction lap: %i' % (induction_lap + 1))

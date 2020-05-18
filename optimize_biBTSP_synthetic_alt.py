@@ -35,7 +35,8 @@ f_pot has the flexibility to be any segment of a sigmoid (so can be linear, expo
 7) f_dep represents the "sensitivity" of the reverse process to the presence of the local_signal. The transformation
 f_dep has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
 
-biBTSP_synthetic_alt: Single eligibility signal filter. Sigmoidal f_pot and f_dep.
+biBTSP_synthetic_alt: Single eligibility signal filter.
+Gain function f_pot is linear and f_dep is sigmoidal.
 """
 __author__ = 'milsteina'
 from biBTSP_utils import *
@@ -125,14 +126,12 @@ def init_context():
     context.data_cache = defaultdict(dict)
 
 
-def load_data(induction, condition='control'):
+def load_data(induction):
     """
 
     :param induction: int
     """
     induction = int(induction)
-    context.condition = str(condition)
-
     if induction == context.induction:
         return
 
@@ -223,15 +222,12 @@ def load_data(induction, condition='control'):
         induction_context.induction_start_times = np.array(induction_context.induction_start_times)
         induction_context.induction_stop_times = np.array(induction_context.induction_stop_times)
 
-        induction_context.target_ramp = defaultdict(dict)
-        induction_context.LSA_weights = defaultdict(dict)
-        induction_context.ramp_offset = dict()
+        induction_context.target_ramp = {}
+        induction_context.LSA_weights = {}
         if induction == 2:
             if 1 in context.data_cache:
-                induction_context.target_ramp['before']['control'] = \
-                    context.data_cache[1].target_ramp['after']['control']
-                induction_context.LSA_weights['before']['control'] = \
-                    context.data_cache[1].LSA_weights['after']['control']
+                induction_context.target_ramp['before'] = context.data_cache[1].target_ramp['after']
+                induction_context.LSA_weights['before'] = context.data_cache[1].LSA_weights['after']
             else:
                 induction_loc = context.induction_loc['1']
                 induction_stop_index = np.where(context.default_interp_x >= induction_loc)[0][0] + \
@@ -244,8 +240,8 @@ def load_data(induction, condition='control'):
                                                         target_min_val=0., target_asymmetry=1.1,
                                                         target_peak_shift=context.target_peak_shift_1,
                                                         target_ramp_width=context.target_ramp_width)
-                induction_context.target_ramp['before']['control'], \
-                induction_context.LSA_weights['before']['control'], _, _ = \
+                induction_context.target_ramp['before'], \
+                induction_context.LSA_weights['before'], _, _ = \
                     get_delta_weights_LSA(target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
                                           interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
                                           peak_locs=context.peak_locs, ramp_scaling_factor=context.ramp_scaling_factor,
@@ -265,9 +261,9 @@ def load_data(induction, condition='control'):
                                                                 target_min_val=0., target_asymmetry=1.7,
                                                                 target_peak_shift=-5., target_ramp_width=144.)
             target_delta_ramp_2 = np.subtract(target_delta_ramp_2_pot, target_delta_ramp_2_dep)
-            target_ramp_2 = np.add(induction_context.target_ramp['before']['control'], target_delta_ramp_2)
-            induction_context.target_ramp['after']['control'], \
-            induction_context.LSA_weights['after']['control'], _, _ = \
+            target_ramp_2 = np.add(induction_context.target_ramp['before'], target_delta_ramp_2)
+            induction_context.target_ramp['after'], \
+            induction_context.LSA_weights['after'], _, _ = \
                 get_delta_weights_LSA(target_ramp_2, ramp_x=context.binned_x, input_x=context.binned_x,
                                       interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
                                       peak_locs=context.peak_locs, ramp_scaling_factor=context.ramp_scaling_factor,
@@ -276,53 +272,9 @@ def load_data(induction, condition='control'):
                                       track_length=context.track_length, target_range=context.target_range,
                                       bounds=(context.min_delta_weight, context.target_peak_delta_weight),
                                       verbose=context.verbose)
-            induction_context.target_ramp['after']['hyper'] = induction_context.target_ramp['after']['control']
-            induction_context.ramp_offset['control'] = np.zeros_like(context.binned_x)
-            induction_context.ramp_offset['hyper'] = np.zeros_like(context.binned_x)
-            offset_start_loc = induction_context.mean_induction_start_loc + 1. * context.default_run_vel
-            if offset_start_loc >= context.track_length:
-                offset_start_loc -= context.track_length
-            offset_start_index = np.where(context.binned_x >= offset_start_loc)[0][0]
-            offset_stop_loc = offset_start_loc + 2. * context.default_run_vel
-            if offset_stop_loc <= context.track_length:
-                offset_stop_index = np.where(context.binned_x >= offset_stop_loc)[0][0]
-                offset_indexes = list(range(offset_start_index, offset_stop_index + 1))
-            else:
-                offset_indexes = list(range(offset_start_index, len(context.binned_x)))
-                offset_stop_index = np.where(context.binned_x >= offset_stop_loc - context.track_length)[0][0]
-                offset_indexes.extend(list(range(offset_stop_index)))
-            induction_context.ramp_offset['hyper'][offset_indexes] = context.target_ramp_offset_2_hyper
-            if context.plot and context.condition == 'control':
-                x_start = induction_context.mean_induction_start_loc
-                x_end = induction_context.mean_induction_stop_loc
-                ylim = 13.
-                fig, axes = plt.subplots(2)
-                axes[0].plot(context.binned_x, induction_context.target_ramp['after']['control'],
-                             label='Control', color='k')
-                axes[0].hlines(ylim + 0.2, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
-                axes[0].set_xlabel('Location (cm)')
-                axes[0].set_ylabel('Ramp amplitude (mV)')
-                axes[0].set_xlim([0., context.track_length])
-                axes[0].set_ylim([-5., 15.])
-                axes[0].legend(loc='best', frameon=False, framealpha=0.5)
-                axes[0].set_title('Target: Induction 2')
-
-                ylim = 13.
-                axes[1].plot(context.binned_x, induction_context.ramp_offset['control'], c='k',
-                             label='Control')
-                axes[1].plot(context.binned_x, induction_context.ramp_offset['hyper'], c='r',
-                             label='Hyper')
-                axes[1].hlines(ylim + 0.2, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
-                axes[1].set_xlabel('Location (cm)')
-                axes[1].set_ylabel('Vm offset (mV)')
-                axes[1].set_xlim([0., context.track_length])
-                axes[1].set_ylim([-45., 15.])
-                clean_axes(axes)
-                fig.tight_layout()
-                fig.show()
         else:
-            induction_context.target_ramp['before']['control'] = np.zeros_like(context.binned_x)
-            induction_context.LSA_weights['before']['control'] = np.zeros_like(context.peak_locs)
+            induction_context.target_ramp['before'] = np.zeros_like(context.binned_x)
+            induction_context.LSA_weights['before'] = np.zeros_like(context.peak_locs)
             induction_loc = induction_context.mean_induction_start_loc
             induction_stop_loc = induction_context.mean_induction_stop_loc
 
@@ -332,8 +284,8 @@ def load_data(induction, condition='control'):
                                                     target_asymmetry=1.1,
                                                     target_peak_shift=context.target_peak_shift_1,
                                                     target_ramp_width=context.target_ramp_width)
-            induction_context.target_ramp['after']['control'], \
-            induction_context.LSA_weights['after']['control'], _, _ = \
+            induction_context.target_ramp['after'], \
+            induction_context.LSA_weights['after'], _, _ = \
                 get_delta_weights_LSA(target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
                                       interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
                                       peak_locs=context.peak_locs, ramp_scaling_factor=context.ramp_scaling_factor,
@@ -341,87 +293,6 @@ def load_data(induction, condition='control'):
                                       track_length=context.track_length, target_range=context.target_range,
                                       bounds=(context.min_delta_weight, context.target_peak_delta_weight),
                                       verbose=context.verbose)
-
-            target_ramp = get_target_synthetic_ramp(induction_loc, ramp_x=context.binned_x,
-                                                    track_length=context.track_length,
-                                                    target_peak_val=context.target_peak_val_1_depo, target_min_val=0.,
-                                                    target_asymmetry=1.1,
-                                                    target_peak_shift=context.target_peak_shift_1,
-                                                    target_ramp_width=context.target_ramp_width)
-            induction_context.target_ramp['after']['depo'], \
-            induction_context.LSA_weights['after']['depo'], _, _ = \
-                get_delta_weights_LSA(target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
-                                      interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
-                                      peak_locs=context.peak_locs, ramp_scaling_factor=context.ramp_scaling_factor,
-                                      induction_start_loc=induction_loc, induction_stop_loc=induction_stop_loc,
-                                      track_length=context.track_length, target_range=context.target_range,
-                                      bounds=(context.min_delta_weight, context.target_peak_delta_weight),
-                                      verbose=context.verbose)
-
-            induction_context.ramp_offset['control'] = np.zeros_like(context.binned_x)
-            induction_context.ramp_offset['depo'] = np.ones_like(context.binned_x) * context.target_ramp_offset_1_depo
-            induction_context.ramp_offset['hyper'] = np.zeros_like(context.binned_x)
-
-            offset_stop_loc = induction_loc - 1. * context.default_run_vel
-            if offset_stop_loc <= 0.:
-                offset_stop_loc += context.track_length
-            offset_stop_index = np.where(context.binned_x >= offset_stop_loc)[0][0]
-            delta_weights_stop_index = np.where(context.peak_locs >= offset_stop_loc)[0][0]
-            offset_start_loc = offset_stop_loc - 3. * context.default_run_vel
-            if offset_start_loc >= 0.:
-                offset_start_index = np.where(context.binned_x >= offset_start_loc)[0][0]
-                delta_weights_start_index = np.where(context.peak_locs >= offset_start_loc)[0][0]
-                offset_indexes = list(range(offset_start_index, offset_stop_index + 1))
-                delta_weights_offset_indexes = list(range(delta_weights_start_index, delta_weights_stop_index + 1))
-            else:
-                offset_indexes = list(range(offset_stop_index))
-                delta_weights_offset_indexes = list(range(delta_weights_stop_index))
-                offset_start_index = np.where(context.binned_x >= offset_start_loc + context.track_length)[0][0]
-                delta_weights_start_index = np.where(context.peak_locs >= offset_start_loc + context.track_length)[0][0]
-                offset_indexes.extend(list(range(offset_start_index, len(context.binned_x))))
-                delta_weights_offset_indexes.extend(list(range(delta_weights_start_index, len(context.peak_locs))))
-            induction_context.ramp_offset['hyper'][offset_indexes] = context.target_ramp_offset_1_hyper
-            induction_context.LSA_weights['after']['hyper'] = \
-                np.array(induction_context.LSA_weights['after']['control'])
-            induction_context.LSA_weights['after']['hyper'][delta_weights_offset_indexes] *= 0.5
-            induction_context.target_ramp['after']['hyper'], _ = \
-                get_model_ramp(induction_context.LSA_weights['after']['hyper'], context.binned_x, context.peak_locs,
-                               context.input_rate_maps, context.ramp_scaling_factor)
-            if context.plot and context.condition == 'control':
-                x_start = induction_context.mean_induction_start_loc
-                x_end = induction_context.mean_induction_stop_loc
-                ylim = 13.
-                fig, axes = plt.subplots(2)
-                axes[0].plot(context.binned_x, induction_context.target_ramp['after']['control'],
-                             label='Control', color='k')
-                axes[0].plot(context.binned_x, induction_context.target_ramp['after']['depo'],
-                             label='Depo', color='c')
-                axes[0].plot(context.binned_x, induction_context.target_ramp['after']['hyper'],
-                             label='Hyper', color='r')
-                axes[0].hlines(ylim + 0.2, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
-                axes[0].set_xlabel('Location (cm)')
-                axes[0].set_ylabel('Ramp amplitude (mV)')
-                axes[0].set_xlim([0., context.track_length])
-                axes[0].set_ylim([-5., 15.])
-                axes[0].legend(loc='best', frameon=False, framealpha=0.5)
-                axes[0].set_title('Target: Induction 1')
-
-                ylim = 13.
-                axes[1].plot(context.binned_x, induction_context.ramp_offset['control'], c='k',
-                             label='Control')
-                axes[1].plot(context.binned_x, induction_context.ramp_offset['depo'], c='c',
-                             label='Depo')
-                axes[1].plot(context.binned_x, induction_context.ramp_offset['hyper'], c='r',
-                             label='Hyper')
-                axes[1].hlines(ylim + 0.2, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
-                axes[1].set_xlabel('Location (cm)')
-                axes[1].set_ylabel('Vm offset (mV)')
-                axes[1].set_xlim([0., context.track_length])
-                axes[1].set_ylim([-45., 15.])
-                clean_axes(axes)
-                fig.tight_layout()
-                fig.show()
-
         context.data_cache[induction] = induction_context
     context.update(induction_context())
 
@@ -463,42 +334,35 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     """
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
         get_dual_exp_decay_signal_filters(context.local_signal_decay, context.global_signal_decay, context.down_dt,
-                                          plot and context.induction == 1 and context.condition == 'control')
+                                          plot and context.induction == 1)
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
     global_signal_peak = np.max(global_signal)
     global_signal /= global_signal_peak
-    local_signal_peak = np.max(get_local_signal_population(local_signal_filter, context.down_rate_maps,
-                                                           context.down_dt))
+    local_signals = get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt)
+    local_signal_peak = np.max(local_signals)
+    local_signals /= local_signal_peak
 
     signal_xrange = np.linspace(0., 1., 10000)
-    vrange = np.linspace(context.min_delta_ramp, context.peak_delta_ramp, 10000)
     pot_rate = lambda x: x
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
-    phi_pot = np.vectorize(lambda x: 1.)
-    phi_dep = np.vectorize(lambda x: 1.)
 
-    if plot and context.induction == 1 and context.condition == 'control':
-        fig, axes = plt.subplots(1, 2)
+    if plot and context.induction == 1:
+        fig, axes = plt.subplots(1)
         dep_scale = context.k_dep / context.k_pot
-        axes[0].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='Potentiation rate')
-        axes[0].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='Depression rate')
-        axes[0].set_xlabel('Normalized eligibility signal amplitude (a.u.)')
-        axes[0].set_ylabel('Normalized rate')
-        axes[1].plot(vrange, phi_pot(vrange), c='c', label='Potentiation')
-        axes[1].plot(vrange, phi_dep(vrange), c='r', label='Depression')
-        axes[1].set_xlabel('Relative ramp amplitude')
-        axes[1].set_ylabel('Voltage-dependent modulation factor')
-        axes[0].legend(loc='best', frameon=False, framealpha=0.5)
-        axes[1].legend(loc='best', frameon=False, framealpha=0.5)
+        axes.plot(signal_xrange, pot_rate(signal_xrange), c='c', label='Potentiation rate')
+        axes.plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='Depression rate')
+        axes.set_xlabel('Plasticity signal\noverlap (a.u.)')
+        axes.set_ylabel('Normalized rate')
+        axes.legend(loc='best', frameon=False, framealpha=0.5)
         clean_axes(axes)
         fig.tight_layout()
         fig.show()
 
     peak_weight = context.peak_delta_weight + 1.
 
-    initial_delta_weights = context.LSA_weights['before']['control']
-    initial_ramp = context.target_ramp['before']['control']
+    initial_delta_weights = context.LSA_weights['before']
+    initial_ramp = context.target_ramp['before']
 
     # re-compute initial weights if they are out of the current weight bounds
     if context.induction == 2:
@@ -518,8 +382,8 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                       (os.getpid(), model_id, context.induction))
 
             # discard model if current peak_delta_weight constraint reduces accuracy of initial_ramp
-            if not 0.9 * np.max(context.target_ramp['before']['control']) < np.max(initial_ramp) < \
-                   1.1 * np.max(context.target_ramp['before']['control']):
+            if not 0.9 * np.max(context.target_ramp['before']) < np.max(initial_ramp) < \
+                   1.1 * np.max(context.target_ramp['before']):
                 if context.verbose > 0:
                     print(
                         'optimize_biBTSP_%s: calculate_model_ramp: pid: %i; model_id: %s: aborting - initial ramp is '
@@ -534,18 +398,17 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     initial_normalized_weights = np.divide(np.add(initial_delta_weights, 1.), peak_weight)
     current_normalized_weights = np.array(initial_normalized_weights)
 
-    target_ramp = context.target_ramp['after'][context.condition]
+    target_ramp = context.target_ramp['after']
 
     if plot:
-        fig, axes = plt.subplots(2, 2, sharex=True)
-        fig.suptitle('Induction: %i (%s)' % (context.induction, context.condition), y=1.)
-        axes[0][0].plot(context.down_t / 1000., global_signal, label='Instructive signal')
-        axes[1][0].set_xlabel('Time (s)')
-        axes[1][1].set_xlabel('Time (s)')
-        axes[1][0].set_ylabel('Relative ramp\namplitude (mV)')
+        fig, axes = plt.subplots()
+        fig.suptitle('Induction: %i' % (context.induction), y=1.)
+        axes.plot(context.down_t / 1000., global_signal, label='Instructive signal')
+        axes.set_ylabel('Plasticity signal amplitude (a.u.)')
+        axes.set_xlabel('Time (s)')
 
         fig2, axes2 = plt.subplots(1, 2, sharex=True)
-        fig2.suptitle('Induction: %i (%s)' % (context.induction, context.condition))
+        fig2.suptitle('Induction: %i' % context.induction)
         axes2[0].plot(context.binned_x, initial_ramp, c='k', label='Before')
         axes2[0].plot(context.binned_x, target_ramp, c='r', label='Target')
         axes2[0].set_ylabel('Ramp amplitude (mV)')
@@ -555,25 +418,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
 
     result = {}
 
-    this_ramp_offset = context.ramp_offset[context.condition]
-
     for induction_lap in range(len(context.induction_start_times)):
-        current_complete_ramp = \
-            np.maximum(context.min_delta_ramp, np.minimum(context.peak_delta_ramp,
-                       get_complete_ramp(np.add(current_ramp, this_ramp_offset), context.binned_x,
-                                         context.position, context.complete_run_vel_gate, context.induction_gate,
-                                         context.peak_delta_ramp)))
-        current_complete_down_ramp = np.interp(context.down_t, context.complete_t, current_complete_ramp)
-        vd_mod_pot = np.minimum(1., np.maximum(0., phi_pot(current_complete_down_ramp)))
-        vd_mod_dep = np.minimum(1., np.maximum(0., phi_dep(current_complete_down_ramp)))
-
-        local_signals_pot = np.divide(
-            get_local_signal_population(local_signal_filter, np.multiply(context.down_rate_maps, vd_mod_pot),
-                                        context.down_dt), local_signal_peak)
-        local_signals_dep = np.divide(
-            get_local_signal_population(local_signal_filter, np.multiply(context.down_rate_maps, vd_mod_dep),
-                                        context.down_dt), local_signal_peak)
-
         if induction_lap == 0:
             start_time = context.down_t[0]
         else:
@@ -586,30 +431,26 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
 
         next_normalized_weights = []
         overlap = []
-        for i, (this_local_signal_pot, this_local_signal_dep) in enumerate(zip(local_signals_pot, local_signals_dep)):
-            this_pot_rate = np.trapz(pot_rate(np.multiply(this_local_signal_pot[indexes], global_signal[indexes])),
-                                     dx=context.down_dt / 1000.)
-            this_dep_rate = np.trapz(dep_rate(np.multiply(this_local_signal_dep[indexes], global_signal[indexes])),
-                                     dx=context.down_dt / 1000.)
+        for i, this_local_signal in enumerate(local_signals):
+            this_signal_overlap = np.multiply(this_local_signal[indexes], global_signal[indexes])
+            this_pot_rate = np.trapz(pot_rate(this_signal_overlap), dx=context.down_dt / 1000.)
+            this_dep_rate = np.trapz(dep_rate(this_signal_overlap), dx=context.down_dt / 1000.)
             this_normalized_delta_weight = context.k_pot * this_pot_rate * (1. - current_normalized_weights[i]) - \
                                            context.k_dep * this_dep_rate * current_normalized_weights[i]
             this_next_normalized_weight = max(0., min(1., current_normalized_weights[i] + this_normalized_delta_weight))
             next_normalized_weights.append(this_next_normalized_weight)
-            overlap.append(np.trapz(np.multiply(this_local_signal_pot[indexes], global_signal[indexes]),
-                                    dx=context.down_dt / 1000.))
-        if induction_lap == 0:
+            overlap.append(np.trapz(this_signal_overlap, dx=context.down_dt / 1000.))
+        if plot and induction_lap == 0 and context.induction == 1:
             fig3, axes3 = plt.subplots()
             interp_overlap = np.interp(context.binned_x, context.peak_locs, overlap)
             axes3.plot(context.min_induction_t[context.clean_induction_t_indexes] / 1000.,
                        interp_overlap[context.clean_induction_t_indexes])
-            # axes3.plot(context.peak_locs, overlap)
-            axes3.set_title('Induction: %i (%s)' % (context.induction, context.condition))
+            axes3.set_title('Induction: %i' % (context.induction))
+            axes3.set_xlabel('Time relative to\nplateau onset (s)')
+            axes3.set_ylabel('Integrated plasticity\nsignal overlap')
+            clean_axes(axes3)
             fig3.show()
         if plot:
-            axes[0][1].plot(context.down_t[indexes] / 1000., vd_mod_pot[indexes])
-            axes[1][1].plot(context.down_t[indexes] / 1000., vd_mod_dep[indexes])
-            axes[1][0].plot(context.down_t[indexes] / 1000., current_complete_down_ramp[indexes],
-                            label='Induction lap: %i' % (induction_lap + 1))
             axes2[1].plot(context.peak_locs,
                           np.multiply(np.subtract(next_normalized_weights, current_normalized_weights), peak_weight),
                           label='Induction lap: %i' % (induction_lap + 1))
@@ -623,15 +464,11 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         if plot:
             axes2[0].plot(context.binned_x, current_ramp)
 
-        if context.induction == 1 and context.condition == 'control' and induction_lap == 0:
+        if context.induction == 1 and induction_lap == 0:
             result['ramp_amp_after_first_plateau'] = np.max(current_ramp)
         ramp_snapshots.append(current_ramp)
 
     if plot:
-        axes[0][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-        axes[0][1].set_title('Voltage-dependence (potentiation)')
-        axes[1][1].set_title('Voltage-dependence (depression)')
-        axes[1][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
         axes2[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
         axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
         clean_axes(axes)
@@ -684,7 +521,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                                 track_length=context.track_length)
 
     if context.verbose > 0:
-        print('Process: %i; induction: %i; condition: %s:' % (os.getpid(), context.induction, context.condition))
+        print('Process: %i; induction: %i; model_id: %s:' % (os.getpid(), context.induction, str(model_id)))
         print('exp: amp: %.1f, ramp_width: %.1f, peak_shift: %.1f, asymmetry: %.1f, start_loc: %.1f, peak_loc: %.1f, '
               'end_loc: %.1f, min_val: %.1f, min_loc: %.1f' %
               (ramp_amp['target'], ramp_width['target'], peak_shift['target'], ratio['target'], start_loc['target'],
@@ -748,7 +585,6 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                 group.create_dataset('peak_locs', compression='gzip', data=context.peak_locs)
                 group.create_dataset('binned_x', compression='gzip', data=context.binned_x)
                 group.create_dataset('signal_xrange', compression='gzip', data=signal_xrange)
-                group.create_dataset('vrange', compression='gzip', data=vrange)
                 group.create_dataset('param_names', compression='gzip', data=np.asarray(context.param_names, dtype='S'))
                 group.attrs['input_field_width'] = context.input_field_width
                 group.attrs['ramp_scaling_factor'] = context.ramp_scaling_factor
@@ -756,9 +592,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             description = 'model_ramp_features'
             cell_key = 'synthetic'
             induction_key = str(context.induction)
-            condition_key = str(context.condition)
-            group = get_h5py_group(f, [model_id, exported_data_key, cell_key, induction_key, condition_key,
-                                       description], create=True)
+            group = get_h5py_group(f, [model_id, exported_data_key, cell_key, induction_key, description], create=True)
             group.create_dataset('target_ramp', compression='gzip', data=target_ramp)
             group.create_dataset('initial_model_ramp', compression='gzip', data=initial_ramp)
             group.create_dataset('model_ramp', compression='gzip', data=model_ramp)
@@ -771,15 +605,12 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             group.create_dataset('local_signal_filter', compression='gzip', data=local_signal_filter)
             group.create_dataset('global_filter_t', compression='gzip', data=global_filter_t)
             group.create_dataset('global_filter', compression='gzip', data=global_filter)
-            group.create_dataset('ramp_offset', compression='gzip', data=this_ramp_offset)
             group.attrs['local_signal_peak'] = local_signal_peak
             group.attrs['global_signal_peak'] = global_signal_peak
             group.attrs['mean_induction_start_loc'] = context.mean_induction_start_loc
             group.attrs['mean_induction_stop_loc'] = context.mean_induction_stop_loc
             group.attrs['induction_start_times'] = context.induction_start_times
             group.attrs['induction_stop_times'] = context.induction_stop_times
-            # group.attrs['track_start_times'] = context.track_start_times
-            # group.attrs['track_stop_times'] = context.track_stop_times
             group.attrs['target_ramp_amp'] = ramp_amp['target']
             group.attrs['target_ramp_width'] = ramp_width['target']
             group.attrs['target_peak_shift'] = peak_shift['target']
@@ -810,15 +641,11 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                 group['delta_weights_snapshots'].create_dataset(str(i), data=this_delta_weights)
 
     # catch models with excessive fluctuations in weights across laps:
-    if weights_path_distance_exceeds_threshold(delta_weights_snapshots, context.weights_path_distance_threshold,
-                                               cumulative=True):
-        if context.verbose > 0:
-            print('optimize_biBTSP_%s: calculate_model_ramp: pid: %i; aborting - excessive fluctuations in weights '
-                  'across laps; induction: %i' %
-                  (BTSP_model_name, os.getpid(), context.induction))
-        return dict()
+    result['weights_path_distance'] = \
+        weights_path_distance_exceeds_threshold(delta_weights_snapshots, context.weights_path_distance_threshold,
+                                                cumulative=True, return_value=True)
 
-    return {context.induction: {context.condition: result}}
+    return {context.induction: result}
 
 
 def plot_model_summary_figure(export_file_path=None, exported_data_key=None, induction_lap=0):
@@ -844,7 +671,7 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     description = 'model_ramp_features'
     with h5py.File(export_file_path, 'r') as f:
         source = get_h5py_group(f, [exported_data_key, 'exported_data', 'synthetic'])
-        group = source['1']['control'][description]
+        group = source['1'][description]
         x = group['param_array'][:]
         if 'local_signal_peak' not in group.attrs or 'global_signal_peak' not in group.attrs:
             raise KeyError('plot_model_summary_figure: missing required attributes from file: %s' %
@@ -873,8 +700,12 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     update_source_contexts(x)
 
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
+    local_signals = \
+        np.divide(get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt),
+                  local_signal_peak)
+
     signal_xrange = np.linspace(0., 1., 10000)
-    vrange = np.linspace(context.min_delta_ramp, context.peak_delta_ramp, 10000)
+
     pot_rate = np.vectorize(scaled_single_sigmoid(
         context.f_pot_th, context.f_pot_th + context.f_pot_half_width, signal_xrange))
     dep_rate = np.vectorize(scaled_single_sigmoid(
@@ -1250,7 +1081,7 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     axes[1][0].set_title('Target (synthetic data)', fontsize=mpl.rcParams['font.size'], pad=10.)
 
     clean_axes(axes)
-    fig.suptitle('Hybrid weight-dependent model; synthetic data, induction: %i' % 2,
+    fig.suptitle('Weight-dependent model F; synthetic data, induction: %i' % 2,
                  fontsize=mpl.rcParams['font.size'], x=0.02, ha='left')
     fig.tight_layout()
     plt.subplots_adjust(hspace=0.5, wspace=0.65, top=0.9)
@@ -1266,32 +1097,30 @@ def get_args_static_model_ramp():
     :param x: array
     :return: list of list
     """
-    # return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
-    return [[1, 2], ['control', 'control']]
+    return [[1, 2]]
 
 
-def compute_features_model_ramp(x, induction=None, condition=None, model_id=None, export=False, plot=False):
+def compute_features_model_ramp(x, induction=None, model_id=None, export=False, plot=False):
     """
 
     :param x: array
     :param induction: str
-    :param condition: str
     :param model_id: int
     :param export: bool
     :param plot: bool
     :return: dict
     """
-    load_data(induction, condition)
+    load_data(induction)
     update_source_contexts(x, context)
     start_time = time.time()
     if context.disp:
-        print('Process: %i: computing model_ramp features for induction: %s, condition: %s with x: %s' % \
-              (os.getpid(), induction, condition, ', '.join('%.3E' % i for i in x)))
+        print('Process: %i: computing model_ramp features for induction: %s with x: %s' % \
+              (os.getpid(), induction, ', '.join('%.3E' % i for i in x)))
         sys.stdout.flush()
     result = calculate_model_ramp(export=export, plot=plot, model_id=model_id)
     if context.disp:
-        print('Process: %i: computing model_ramp features for induction: %s, condition: %s took %.1f s' % \
-              (os.getpid(), induction, condition, time.time() - start_time))
+        print('Process: %i: computing model_ramp features for induction: %s took %.1f s' % \
+              (os.getpid(), induction, time.time() - start_time))
         sys.stdout.flush()
     return result
 
@@ -1306,11 +1135,11 @@ def filter_features_model_ramp(primitives, current_features, model_id=None, expo
     :return: dict
     """
     features = {}
-    groups = ['induction1', 'induction1_depo', 'induction1_hyper', 'induction2', 'induction2_hyper']
+    groups = ['induction1', 'induction2']
     grouped_feature_names = ['delta_val_at_target_peak', 'delta_val_at_model_peak', 'delta_width', 'delta_peak_shift',
                              'delta_asymmetry', 'delta_min_loc', 'delta_val_at_target_min', 'delta_val_at_model_min',
                              'residual_score']
-    feature_names = ['ramp_amp_after_first_plateau']
+    feature_names = ['ramp_amp_after_first_plateau', 'weights_path_distance']
     for this_result_dict in primitives:
         if not this_result_dict:
             if context.verbose > 0:
@@ -1319,20 +1148,18 @@ def filter_features_model_ramp(primitives, current_features, model_id=None, expo
                 sys.stdout.flush()
             return dict()
         for induction in this_result_dict:
-            for condition in this_result_dict[induction]:
-                group = 'induction' + str(induction)
-                if condition in ['depo', 'hyper']:
-                    group += '_%s' % condition
-                for feature_name in grouped_feature_names:
-                    key = group + '_' + feature_name
-                    if key not in features:
-                        features[key] = []
-                    features[key].append(this_result_dict[induction][condition][feature_name])
-                for feature_name in feature_names:
-                    if feature_name in this_result_dict[induction][condition]:
-                        if feature_name not in features:
-                            features[feature_name] = []
-                        features[feature_name].append(this_result_dict[induction][condition][feature_name])
+            induction = int(induction)
+            group = 'induction' + str(induction)
+            for feature_name in grouped_feature_names:
+                key = group + '_' + feature_name
+                if key not in features:
+                    features[key] = []
+                features[key].append(this_result_dict[induction][feature_name])
+            for feature_name in feature_names:
+                if feature_name in this_result_dict[induction]:
+                    if feature_name not in features:
+                        features[feature_name] = []
+                    features[feature_name].append(this_result_dict[induction][feature_name])
 
     for feature_name in grouped_feature_names:
         for group in groups:
@@ -1362,21 +1189,24 @@ def get_objectives(features, model_id=None, export=False):
     objectives = {}
 
     grouped_feature_names = ['residual_score']
-    groups = ['induction1', 'induction1_depo', 'induction1_hyper', 'induction2', 'induction2_hyper']
+    groups = ['induction1', 'induction2']
     for feature_name in grouped_feature_names:
         for group in groups:
             objective_name = group + '_' + feature_name
             if objective_name in features:
                 objectives[objective_name] = features[objective_name]
 
-    feature_names = ['ramp_amp_after_first_plateau']
-    for feature_name in feature_names:
-        if feature_name in context.objective_names and feature_name in features:
-            if features[feature_name] < context.target_val[feature_name]:
-                objectives[feature_name] = ((features[feature_name] - context.target_val[feature_name]) /
-                                            context.target_range[feature_name]) ** 2.
-            else:
-                objectives[feature_name] = 0.
+    feature_name = 'ramp_amp_after_first_plateau'
+    if feature_name in context.objective_names and feature_name in features:
+        if features[feature_name] < context.target_val[feature_name]:
+            objectives[feature_name] = ((features[feature_name] - context.target_val[feature_name]) /
+                                        context.target_range[feature_name]) ** 2.
+        else:
+            objectives[feature_name] = 0.
+
+    feature_name = 'weights_path_distance'
+    if feature_name in context.objective_names and feature_name in features:
+        objectives[feature_name] = (features[feature_name] / context.target_range[feature_name]) ** 2.
 
     for objective_name in context.objective_names:
         if objective_name not in objectives:
