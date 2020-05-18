@@ -26,19 +26,10 @@ bounds:
   peak_delta_weight: !!python/tuple
   - 1.5
   - 5.
-  dend_depo_mod_min: !!python/tuple
-  - 0.
-  - 0.99
-  dend_depo_mod_max: !!python/tuple
-  - 1.01
-  - 3.
-  dend_depo_mod_width: !!python/tuple
+  dend_depo_mod_scale: !!python/tuple
   - 0.01
-  - 0.5
+  - 1.
 default_params:
-  dend_depo_mod_min: 0.99
-  dend_depo_mod_max: 1.01
-  dend_depo_mod_width: 0.5
 rel_bounds:
 #- - local_signal_decay
 #  - '>'
@@ -106,8 +97,8 @@ kwargs:
   verbose: 1
   num_induction_laps: 3
   min_delta_weight: -0.2
-  max_dend_depo: 25.
-  min_dend_depo: -40.
+  max_dend_depo: 20.
+  min_dend_depo: -20.
   default_run_vel: 25.
   induction_loc:
     '1': 120.
@@ -116,10 +107,10 @@ kwargs:
   target_peak_delta_weight: 3.
   target_peak_shift_1: -5.
   target_peak_val_1: 8.
-  target_peak_val_1_depo: 9.5
+  target_peak_val_1_depo: 8.5
   target_ramp_offset_1_depo: 10.
-  target_ramp_offset_1_hyper: -40.
-  target_ramp_offset_2_hyper: -25.
+  target_ramp_offset_1_hyper: -20.
+  target_ramp_offset_2_hyper: -20.
   weights_path_distance_threshold: 1.25
 objective_names:
 - induction1_residual_score
@@ -132,9 +123,7 @@ objective_names:
 optimization_title: biBTSP_synthetic_hybrid_alt2_step2
 param_gen: PopulationAnnealing
 param_names:
-- dend_depo_mod_min
-- dend_depo_mod_max
-- dend_depo_mod_width
+- dend_depo_mod_scale
 - phi_th
 - phi_half_width
 - f_dep_th
@@ -155,15 +144,13 @@ target_range:
 target_val:
   ramp_amp_after_first_plateau: 4.
 x0:
-  phi_th: 0.5
-  phi_half_width: 0.25
-  dend_depo_mod_min: 0.99
-  dend_depo_mod_max: 1.01
-  dend_depo_mod_width: 0.5
-  f_dep_th: 8.449156E-03
-  f_dep_half_width: 3.310570E-02
-  k_pot: 1.889704E+00
-  k_dep: 1.733164E-01
-  local_signal_decay: 7.602399E+02
-  global_signal_decay: 6.314786E+02
-  peak_delta_weight: 2.452824E+00
+  dend_depo_mod_scale: 0.5
+  f_dep_half_width: 9.653914E-02
+  f_dep_th: 2.976247E-03
+  global_signal_decay: 6.234602E+02
+  k_dep: 3.109035E-01
+  k_pot: 6.347702E-01
+  local_signal_decay: 8.146532E+02
+  peak_delta_weight: 4.899299E+00
+  phi_half_width: 2.414883E-02
+  phi_th: 3.196775E-02

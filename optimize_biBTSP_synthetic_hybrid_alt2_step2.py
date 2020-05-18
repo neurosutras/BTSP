@@ -459,18 +459,18 @@ def update_model_params(x, local_context):
     local_context.update(param_array_to_dict(x, local_context.param_names))
 
 
-def get_dend_depo_mod(mod_min, mod_max, width):
+def get_actual_norm_spine_depo_f(expected_norm_spine_depo, dend_depo_mod, phi_th, phi_half_width, spine_depo_range):
     """
 
-    :param mod_min: float
-    :param mod_max: float
-    :param width: float
-    :return: lambda
+    :param expected_norm_spine_depo: float
+    :param dend_depo_mod: float
+    :param phi_th: float
+    :param phi_half_width: float
+    :param spine_depo_range: array
+    :return: float
     """
-    if mod_min >= 1. or mod_max <= 1.:
-        raise RuntimeError('get_dend_depo_mod: invalid scale parameters')
-    th = width * np.log((mod_max - mod_min) / (1. - mod_min) - 1.)
-    return np.vectorize(lambda x: (mod_max - mod_min) / (1. + np.exp(-(x - th) / width)) + mod_min)
+    th = min(1., max(0., phi_th - dend_depo_mod))
+    return scaled_single_sigmoid(th, th + phi_half_width, spine_depo_range)(expected_norm_spine_depo)
 
 
 def calculate_model_ramp(model_id=None, export=False, plot=False):
@@ -493,30 +493,35 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     signal_xrange = np.linspace(0., 1., 10000)
     spine_depo_range = np.linspace(0., 1., 10000)
     dend_depo_range = np.linspace(context.min_dend_depo, context.max_dend_depo, 10000)
-    # pot_rate = lambda x: x
-    pot_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_pot_th, context.f_pot_th + context.f_pot_half_width, signal_xrange))
+    pot_rate = lambda x: x
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
-    get_norm_spine_depo = np.vectorize(scaled_single_sigmoid(
-        context.phi_th, context.phi_th + context.phi_half_width, spine_depo_range))
-    dend_depo_mod_f = get_dend_depo_mod(context.dend_depo_mod_min, context.dend_depo_mod_max,
-                                        context.dend_depo_mod_width * context.max_dend_depo)
+    get_actual_norm_spine_depo = \
+        np.vectorize(lambda expected_norm_spine_depo, dend_depo_mod:
+            get_actual_norm_spine_depo_f(expected_norm_spine_depo, dend_depo_mod,
+                                         context.phi_th, context.phi_half_width, spine_depo_range))
+    get_dend_depo_mod = lambda dend_depo: \
+        np.maximum(context.min_dend_depo, np.minimum(context.max_dend_depo, dend_depo) /
+                   context.max_dend_depo * context.dend_depo_mod_scale)
 
     if plot and context.induction == 1 and context.condition == 'control':
-        fig, axes = plt.subplots(1, 3, figsize=(10, 3.5))
+        fig, axes = plt.subplots(1, 2)
         dep_scale = context.k_dep / context.k_pot
         axes[0].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='Potentiation rate')
         axes[0].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='Depression rate')
         axes[0].set_xlabel('Plasticity signal\noverlap (a.u.)')
         axes[0].set_ylabel('Normalized rate')
-        axes[1].plot(spine_depo_range, get_norm_spine_depo(spine_depo_range), c='k')
+        axes[1].plot(spine_depo_range, get_actual_norm_spine_depo(spine_depo_range, 0.), c='k', label='Dend depo: 0 mV')
+        axes[1].plot(spine_depo_range,
+                     get_actual_norm_spine_depo(spine_depo_range, get_dend_depo_mod(context.max_dend_depo)), c='r',
+                     label='Dend depo: %i mV' % context.max_dend_depo)
+        axes[1].plot(spine_depo_range,
+                     get_actual_norm_spine_depo(spine_depo_range, get_dend_depo_mod(context.min_dend_depo)), c='c',
+                     label='Dend depo: %i mV' % context.min_dend_depo)
         axes[1].set_xlabel('Expected spine\ndepolarization (normalized)')
         axes[1].set_ylabel('Actual spine depolarization (normalized)')
-        axes[2].plot(dend_depo_range, dend_depo_mod_f(dend_depo_range), c='k')
-        axes[2].set_xlabel('Dendritic depolarization')
-        axes[2].set_ylabel('Modulation of spine depolarization')
         axes[0].legend(loc='best', frameon=False, framealpha=0.5)
+        axes[1].legend(loc='best', frameon=False, framealpha=0.5)
         clean_axes(axes)
         fig.tight_layout()
         fig.show()
@@ -585,8 +590,9 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
 
     for induction_lap in range(len(context.induction_start_times)):
         current_complete_dend_depo_mod = \
-            dend_depo_mod_f(get_complete_dend_depo(
-                this_ramp_offset, context.binned_x, context.position, context.induction_gate, context.max_dend_depo))
+            get_dend_depo_mod(
+                get_complete_dend_depo(this_ramp_offset, context.binned_x, context.position, context.induction_gate,
+                                       context.max_dend_depo))
         current_complete_down_dend_depo_mod = \
             np.interp(context.down_t, context.complete_t, current_complete_dend_depo_mod)
 
@@ -603,20 +609,19 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         next_normalized_weights = []
         for i, (this_rate_map, this_current_normalized_weight) in \
                 enumerate(zip(context.down_rate_maps, current_normalized_weights)):
-            this_expected_modulated_spine_depo = \
-                np.maximum(0., np.minimum(1., current_complete_down_dend_depo_mod * this_current_normalized_weight))
-            this_actual_modulated_spine_depo = get_norm_spine_depo(this_expected_modulated_spine_depo)
-            this_expected_nonmodulated_spine_depo = \
-                np.ones_like(current_complete_down_dend_depo_mod) * this_current_normalized_weight
-            this_actual_nonmodulated_spine_depo = get_norm_spine_depo(this_expected_nonmodulated_spine_depo)
+            this_actual_norm_spine_depo = \
+                get_actual_norm_spine_depo(this_current_normalized_weight, current_complete_down_dend_depo_mod)
             this_local_signal_pot = \
-                np.divide(get_local_signal(this_rate_map * this_actual_modulated_spine_depo, local_signal_filter,
+                np.divide(get_local_signal(this_rate_map * this_actual_norm_spine_depo, local_signal_filter,
                                            context.down_dt),
                           local_signal_peak)
+            this_local_signal_dep = this_local_signal_pot
+            """
             this_local_signal_dep = \
-                np.divide(get_local_signal(this_rate_map * this_actual_nonmodulated_spine_depo, local_signal_filter,
+                np.divide(get_local_signal(this_rate_map * this_actual_norm_spine_depo, local_signal_filter,
                                            context.down_dt),
                           local_signal_peak)
+            """
             this_pot_rate = np.trapz(pot_rate(np.multiply(this_local_signal_pot[indexes], global_signal[indexes])),
                                      dx=context.down_dt / 1000.)
             this_dep_rate = np.trapz(dep_rate(np.multiply(this_local_signal_dep[indexes], global_signal[indexes])),
@@ -1290,7 +1295,7 @@ def get_args_static_model_ramp_step2():
     :return: list of list
     """
     # return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
-    return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control']]
+    return [[1, 1, 2], ['control', 'hyper', 'control']]
 
 
 def compute_features_model_ramp(x, induction=None, condition=None, model_id=None, export=False, plot=False):

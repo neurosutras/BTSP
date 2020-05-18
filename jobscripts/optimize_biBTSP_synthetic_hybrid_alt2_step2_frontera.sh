@@ -7,8 +7,8 @@ sbatch <<EOT
 #SBATCH -o /scratch1/06441/aaronmil/src/BTSP/logs/$JOB_NAME.%j.o
 #SBATCH -e /scratch1/06441/aaronmil/src/BTSP/logs/$JOB_NAME.%j.e
 #SBATCH -p development
-#SBATCH -N 15
-#SBATCH -n 840
+#SBATCH -N 11
+#SBATCH -n 616
 #SBATCH -t 2:00:00
 #SBATCH --mail-user=aaronmil@stanford.edu
 #SBATCH --mail-type=BEGIN,END,FAIL
@@ -17,6 +17,6 @@ set -x
 
 cd $SCRATCH/src/BTSP
 
-ibrun -n 840 python3 -m nested.optimize --config-file-path=config/optimize_biBTSP_synthetic_hybrid_alt2_step2_config.yaml \
+ibrun -n 616 python3 -m nested.optimize --config-file-path=config/optimize_biBTSP_synthetic_hybrid_alt2_step2_config.yaml \
     --output-dir=data --pop_size=200 --max_iter=50 --path_length=3 --disp
 EOT
