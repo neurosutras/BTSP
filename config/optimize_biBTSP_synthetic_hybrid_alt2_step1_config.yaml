@@ -1,9 +1,9 @@
 bounds:
   phi_th: !!python/tuple
-  - 0.001
+  - 0.25
   - 1.
   phi_half_width: !!python/tuple
-  - 0.001
+  - 0.25
   - 1.
   f_dep_th: !!python/tuple
   - 0.001
