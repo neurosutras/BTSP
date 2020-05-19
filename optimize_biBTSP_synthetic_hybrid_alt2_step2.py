@@ -24,9 +24,9 @@ instructive signal, can activate both a forward process to increase synaptic str
 synaptic strength.
 3) Synaptic resources can be in 2 states (Markov-style kinetic scheme):
 
-        k_pot * global_signal * f_pot(local_signal)
+        k_pot * f_pot(local_signal * global_signal)
 I (inactive) <------------------------------> A (active)
-        k_dep * global_signal * f_dep(local_signal)
+        k_dep * f_dep(local_signal * global_signal)
 
 4) global_signals are pooled across all cells and normalized to a peak value of 1.
 5) local_signals are pooled across all cells and normalized to a peak value of 1.

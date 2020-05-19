@@ -16,7 +16,7 @@ plasticity.
 4) Changes in weight at each synapse are integrated over periods of nonzero overlap between eligibility and instructive
 signals, and updated once per lap.
 
-Features/assumptions of weight-dependent model B:
+Features/assumptions of weight-dependent model F:
 1) Dendritic plateaus generate a global instructive signal that provides a necessary cofactor required to convert
 plasticity eligibility signals at each synapse into either increases or decreases in synaptic strength.
 2) Activity at each synapse generates a local plasticity eligibility signal that, in conjunction with the global
@@ -24,14 +24,14 @@ instructive signal, can activate both a forward process to increase synaptic str
 synaptic strength.
 3) Synaptic resources can be in 2 states (Markov-style kinetic scheme):
 
-        k_pot * global_signal * f_pot(local_signal)
+        k_pot * f_pot(local_signal * global_signal)
 I (inactive) <------------------------------> A (active)
-        k_dep * global_signal * f_dep(local_signal)
+        k_dep * f_dep(local_signal * global_signal)
 
 4) global_signals are pooled across all cells and normalized to a peak value of 1.
 5) local_signals are pooled across all cells and normalized to a peak value of 1.
 6) f_pot represents the "sensitivity" of the forward process to the presence of the local_signal. The transformation
-f_pot has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
+f_pot is linear.
 7) f_dep represents the "sensitivity" of the reverse process to the presence of the local_signal. The transformation
 f_dep has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
 
