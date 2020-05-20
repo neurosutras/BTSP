@@ -299,14 +299,13 @@ def load_data(induction, condition='control'):
                 axes[0].legend(loc='best', frameon=False, framealpha=0.5)
                 axes[0].set_title('Target: Induction 2')
 
-                ylim = 13.
                 axes[1].plot(context.binned_x, induction_context.ramp_offset['control'], c='k', label='Control')
                 axes[1].plot(context.binned_x, induction_context.ramp_offset['hyper'], c='r', label='Hyper')
-                axes[1].hlines(ylim + 0.2, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
+                axes[1].hlines(context.max_dend_depo * 1.05, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
                 axes[1].set_xlabel('Location (cm)')
                 axes[1].set_ylabel('Vm offset (mV)')
                 axes[1].set_xlim([0., context.track_length])
-                axes[1].set_ylim([context.min_dend_depo, context.max_dend_depo])
+                axes[1].set_ylim([context.min_dend_depo * 1.1, context.max_dend_depo * 1.1])
                 clean_axes(axes)
                 fig.tight_layout()
                 fig.show()
@@ -377,8 +376,7 @@ def load_data(induction, condition='control'):
                 axes[0].set_ylim([-5., 15.])
                 axes[0].legend(loc='best', frameon=False, framealpha=0.5)
                 axes[0].set_title('Target: Induction 1')
-
-                ylim = 13.
+                
                 axes[1].plot(context.binned_x, induction_context.ramp_offset['control'], c='k', label='Control')
                 axes[1].plot(context.binned_x, induction_context.ramp_offset['depo'], c='c', label='Depo')
                 axes[1].plot(context.binned_x, induction_context.ramp_offset['hyper'], c='r', label='Hyper')
@@ -443,10 +441,10 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     pot_rate = lambda x: x
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
-    phi_slope = (context.phi_max - context.phi_min) / (context.max_dend_depo - context.min_dend_depo)
-    phi_offset = context.phi_max - phi_slope * context.max_dend_depo
-    get_dend_depo_mod = \
-        np.vectorize(lambda dend_depo: min(context.phi_max, max(context.phi_min, dend_depo * phi_slope + phi_offset)))
+    this_phi_th = context.phi_th * (context.max_dend_depo - context.min_dend_depo) + context.min_dend_depo
+    this_phi_half_width = context.phi_half_width * (context.max_dend_depo - context.min_dend_depo)
+    get_dend_depo_mod = np.vectorize(scaled_single_sigmoid(
+        this_phi_th, this_phi_th + this_phi_half_width, dend_depo_range, [context.phi_min, context.phi_max]))
 
     if plot and context.induction == 1 and context.condition == 'control':
         fig, axes = plt.subplots(1, 3, figsize=(10., 4.))

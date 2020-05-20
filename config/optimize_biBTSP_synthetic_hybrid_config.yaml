@@ -2,6 +2,12 @@ bounds:
   phi_min: !!python/tuple
   - 0
   - 1.
+  phi_th: !!python/tuple
+  - 0.05
+  - 1.
+  phi_half_width: !!python/tuple
+  - 0.05
+  - 1.
   f_dep_th: !!python/tuple
   - 0.001
   - 1.
@@ -120,6 +126,8 @@ optimization_title: biBTSP_synthetic_hybrid
 param_gen: PopulationAnnealing
 param_names:
 - phi_min
+- phi_th
+- phi_half_width
 - f_dep_th
 - f_dep_half_width
 - k_pot
@@ -146,3 +154,5 @@ x0:
   local_signal_decay: 8.146532E+02
   peak_delta_weight: 4.899299E+00
   phi_min: 0.25
+  phi_th: 0.5
+  phi_half_width: 0.5
