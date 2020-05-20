@@ -1,6 +1,6 @@
 #!/bin/bash -l
 export DATE=$(date +%Y%m%d_%H%M%S)
-export JOB_NAME=optimize_biBTSP_synthetic_hybrid_alt_step2"$DATE"
+export JOB_NAME=optimize_biBTSP_synthetic_hybrid_"$DATE"
 sbatch <<EOT
 #!/bin/bash -l
 #SBATCH -J $JOB_NAME
@@ -17,6 +17,6 @@ set -x
 
 cd $SCRATCH/src/BTSP
 
-ibrun -n 840 python3 -m nested.optimize --config-file-path=config/optimize_biBTSP_synthetic_hybrid_alt_step2_config.yaml \
+ibrun -n 840 python3 -m nested.optimize --config-file-path=config/optimize_biBTSP_synthetic_hybrid_config.yaml \
     --output-dir=data --pop_size=200 --max_iter=50 --path_length=3 --disp
 EOT
