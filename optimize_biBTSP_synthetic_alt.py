@@ -75,6 +75,9 @@ def init_context():
     if 'plot' not in context():
         context.plot = False
 
+    if 'truncate' not in context():
+        context.truncate = 2.5
+
     with h5py.File(context.data_file_path, 'r') as f:
         dt = f['defaults'].attrs['dt']  # ms
         input_field_peak_rate = f['defaults'].attrs['input_field_peak_rate']  # Hz
@@ -192,7 +195,7 @@ def load_data(induction):
                                 context.binned_x, context.track_length, induction_context.mean_induction_start_loc,
                                 context.num_induction_laps)
         induction_context.clean_induction_t_indexes = \
-            get_clean_induction_t_indexes(induction_context.min_induction_t)
+            get_clean_induction_t_indexes(induction_context.min_induction_t, context.truncate/1000.)
 
         induction_context.complete_run_vel = np.full_like(induction_context.complete_t, context.default_run_vel)
         induction_context.complete_run_vel_gate = np.ones_like(induction_context.complete_run_vel)
@@ -446,8 +449,8 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             axes3.plot(context.min_induction_t[context.clean_induction_t_indexes] / 1000.,
                        interp_overlap[context.clean_induction_t_indexes])
             axes3.set_title('Induction: %i' % (context.induction))
-            axes3.set_xlabel('Time relative to\nplateau onset (s)')
-            axes3.set_ylabel('Integrated plasticity\nsignal overlap')
+            axes3.set_xlabel('Time relative to plateau onset (s)')
+            axes3.set_ylabel('Integrated plasticity signal overlap')
             clean_axes(axes3)
             fig3.show()
         if plot:
@@ -605,6 +608,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             group.create_dataset('local_signal_filter', compression='gzip', data=local_signal_filter)
             group.create_dataset('global_filter_t', compression='gzip', data=global_filter_t)
             group.create_dataset('global_filter', compression='gzip', data=global_filter)
+            group.create_dataset('min_induction_t', compression='gzip', data=context.min_induction_t)
             group.attrs['local_signal_peak'] = local_signal_peak
             group.attrs['global_signal_peak'] = global_signal_peak
             group.attrs['mean_induction_start_loc'] = context.mean_induction_start_loc
@@ -648,26 +652,27 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     return {context.induction: result}
 
 
-def plot_model_summary_figure(export_file_path=None, exported_data_key=None, induction_lap=0):
+def plot_model_summary_figure(export_file_path=None, exported_data_key=None, induction_lap=0, target_min_delay=2750.,
+                              target_delay_range=250.):
     """
 
     :param export_file_path: str (path)
     :param exported_data_key: str
     :param induction_lap: int
+    :param target_min_delay: float
+    :param target_delay_range: float
     """
     if export_file_path is None:
         raise IOError('plot_model_summary_figure: no export_file_path provided')
     elif not os.path.isfile(export_file_path):
         raise IOError('plot_model_summary_figure: invalid export_file_path: %s' % export_file_path)
-    initial_weights = defaultdict(dict)
-    initial_ramp = defaultdict(dict)
-    model_ramp = defaultdict(dict)
-    final_weights = defaultdict(dict)
-    ramp_offset = defaultdict(dict)
-    induction_start_loc = defaultdict(dict)
-    induction_stop_loc = defaultdict(dict)
-    induction_start_times = defaultdict(dict)
-    induction_stop_times = defaultdict(dict)
+    initial_ramp = dict()
+    model_ramp = dict()
+    min_induction_t = dict()
+    induction_start_loc = dict()
+    induction_stop_loc = dict()
+    induction_start_times = dict()
+    induction_stop_times = dict()
     description = 'model_ramp_features'
     with h5py.File(export_file_path, 'r') as f:
         source = get_h5py_group(f, [exported_data_key, 'exported_data', 'synthetic'])
@@ -683,19 +688,26 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
         global_filter_t = group['global_filter_t'][:]
         global_filter = group['global_filter'][:]
         for induction_key in source:
-            for condition in source[induction_key]:
-                group = source[induction_key][condition][description]
-                initial_weights[int(induction_key)][condition] = group['initial_weights'][:]
-                initial_ramp[int(induction_key)][condition] = group['initial_model_ramp'][:]
-                model_ramp[int(induction_key)][condition] = group['model_ramp'][:]
-                final_weights[int(induction_key)][condition] = group['model_weights'][:]
-                ramp_offset[int(induction_key)][condition] = group['ramp_offset'][:]
-                induction_start_loc[int(induction_key)][condition] = group.attrs['mean_induction_start_loc']
-                induction_stop_loc[int(induction_key)][condition] = group.attrs['mean_induction_stop_loc']
-                induction_start_times[int(induction_key)][condition] = group.attrs['induction_start_times']
-                induction_stop_times[int(induction_key)][condition] = group.attrs['induction_stop_times']
+            group = source[induction_key][description]
+            initial_ramp[int(induction_key)] = group['initial_model_ramp'][:]
+            model_ramp[int(induction_key)] = group['model_ramp'][:]
+            min_induction_t[int(induction_key)] = group['min_induction_t'][:]
+            induction_start_loc[int(induction_key)] = group.attrs['mean_induction_start_loc']
+            induction_stop_loc[int(induction_key)] = group.attrs['mean_induction_stop_loc']
+            induction_start_times[int(induction_key)] = group.attrs['induction_start_times']
+            induction_stop_times[int(induction_key)] = group.attrs['induction_stop_times']
 
-    load_data(1)
+        induction_key = '2'
+        group = source[induction_key][description]
+        ramp_snapshots = []
+        for lap in range(len(group['ramp_snapshots'])):
+            ramp_snapshots.append(group['ramp_snapshots'][str(lap)][:])
+        delta_weights_snapshots = []
+        for lap in range(len(group['delta_weights_snapshots'])):
+            delta_weights_snapshots.append(group['delta_weights_snapshots'][str(lap)][:])
+        initial_weights = group['initial_weights'][:]
+        final_weights = group['model_weights'][:]
+
     load_data(2)
     update_source_contexts(x)
 
@@ -705,136 +717,9 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
                   local_signal_peak)
 
     signal_xrange = np.linspace(0., 1., 10000)
-
-    pot_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_pot_th, context.f_pot_th + context.f_pot_half_width, signal_xrange))
+    pot_rate = lambda x: x
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
-    phi_pot = np.vectorize(lambda x: 1.)
-    phi_dep = np.vectorize(lambda x: 1.)
-
-    fig, axes = plt.subplots(1, 3, figsize=(10, 3.5))
-    dep_scale = context.k_dep / context.k_pot
-    axes[0].plot(vrange, phi_pot(vrange), c='c', label='Potentiation')
-    axes[0].plot(vrange, phi_dep(vrange), c='r', label='Depression')
-    axes[0].set_xlabel('Relative ramp amplitude')
-    axes[0].set_ylabel('Modulation factor')
-    axes[0].set_xlim((context.min_delta_ramp, context.peak_delta_ramp))
-    axes[0].set_title('Voltage modulation', fontsize=mpl.rcParams['font.size'])
-    axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-
-    xmax = max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.
-    xmax = math.ceil(xmax)
-    axes[1].plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='gray',
-                   label='Synaptic\neligibility signal')
-    axes[1].plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
-                   label='Dendritic\ninstructive signal')
-    axes[1].set_xlabel('Time (s)')
-    axes[1].set_ylabel('Normalized amplitude')
-    axes[1].set_ylim(0., axes[1].get_ylim()[1])
-    axes[1].set_xlim(-0.5, xmax)
-    axes[1].set_title('Plasticity signal kinetics', fontsize=mpl.rcParams['font.size'])
-    axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-
-    axes[2].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='Potentiation')
-    axes[2].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='Depression')
-    axes[2].set_xlabel('Normalized eligibility\nsignal amplitude (a.u.)')
-    axes[2].set_ylabel('Normalized rate')
-    axes[2].set_xlim((0., 1.))
-    # axes[2].set_ylim((0., 1.))
-    axes[2].set_title('Rate of change in\nsynaptic weight', fontsize=mpl.rcParams['font.size'])
-    axes[2].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-    clean_axes(axes)
-    fig.tight_layout()
-    fig.subplots_adjust(wspace=0.35)
-    fig.show()
-
-    ordered_conditions = {1: ['control', 'depo', 'hyper'], 2: ['control', 'hyper']}
-    condition_labels = {'control': 'Control', 'depo': 'Depolarized', 'hyper': 'Hyperpolarized'}
-    condition_colors = {'control': 'k', 'depo': 'c', 'hyper': 'r'}
-
-    fig, axes = plt.subplots(2, 2, figsize=(8, 7))
-    ylim = 13.
-    for col, induction in enumerate(range(1, 3)):
-        for condition in ordered_conditions[induction]:
-            label = condition_labels[condition]
-            color = condition_colors[condition]
-            if condition == 'control':
-                x_start = induction_start_loc[induction][condition]
-                x_end = induction_stop_loc[induction][condition]
-                axes[0][col].hlines(ylim + 0.2, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
-                axes[0][col].set_xlabel('Location (cm)')
-                axes[0][col].set_ylabel('Change in ramp\namplitude (mV)')
-                axes[0][col].set_xlim([0., context.track_length])
-                axes[0][col].set_ylim([-5., 15.])
-                axes[0][col].set_title('Induction %i' % induction, fontsize=mpl.rcParams['font.size'])
-                axes[1][col].set_xlabel('Location (cm)')
-                axes[1][col].set_ylabel('Vm offset (mV)')
-                axes[1][col].set_xlim([0., context.track_length])
-                axes[1][col].set_ylim([-45., 15.])
-            axes[0][col].plot(context.binned_x, np.subtract(model_ramp[induction][condition],
-                                                            initial_ramp[induction][condition]),
-                              label=label, color=color)
-
-            this_ramp_offset = ramp_offset[induction][condition]
-            interp_ramp_offset = np.zeros_like(context.generic_x)
-            offset_indexes = np.where(this_ramp_offset != 0)[0]
-            if len(offset_indexes) > 0:
-                if offset_indexes[0] == 0:
-                    offset_start_loc = 0.
-                else:
-                    offset_start_loc = context.binned_x[offset_indexes[0]]
-                if offset_indexes[-1] == len(context.binned_x) - 1:
-                    offset_stop_loc = context.track_length
-                else:
-                    offset_stop_loc = context.binned_x[offset_indexes[-1]]
-                offset_val = this_ramp_offset[offset_indexes[0]]
-                indexes = np.where((context.generic_x >= offset_start_loc) &
-                                   (context.generic_x <= offset_stop_loc))[0]
-                interp_ramp_offset[indexes] = offset_val
-            axes[1][col].plot(context.generic_x, interp_ramp_offset, c=color)
-
-    axes[0][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-    axes[0][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-    clean_axes(axes)
-    fig.tight_layout()
-    fig.show()
-    """
-    resolution = 10
-    input_sample_indexes = np.arange(0, len(context.peak_locs), resolution)
-
-    example_input_dict = {}
-
-    sample_time_delays = []
-    for index in input_sample_indexes:
-        this_peak_loc = context.peak_locs[index]
-        this_delay = (this_peak_loc - context.mean_induction_start_loc) / context.default_run_vel / 1000.
-        sample_time_delays.append(this_delay)
-    sample_time_delays = np.abs(sample_time_delays)
-
-    target_time_delay = 5000.
-
-    relative_indexes = np.where((sample_time_delays > target_time_delay) &
-                                (final_weights[input_sample_indexes] > initial_weights[input_sample_indexes]))[0]
-    distant_potentiating_indexes = input_sample_indexes[relative_indexes]
-    if np.any(distant_potentiating_indexes):
-        relative_index = np.argmax(np.subtract(final_weights, initial_weights)[distant_potentiating_indexes])
-        this_example_index = distant_potentiating_indexes[relative_index]
-    else:
-        relative_index = np.argmax(np.subtract(final_weights, initial_weights)[input_sample_indexes])
-        this_example_index = input_sample_indexes[relative_index]
-    example_input_dict['Potentiating input example'] = this_example_index
-
-    relative_indexes = np.where((sample_time_delays > target_time_delay) &
-                                (final_weights[input_sample_indexes] < initial_weights[input_sample_indexes]))[0]
-    distant_depressing_indexes = input_sample_indexes[relative_indexes]
-    if np.any(distant_depressing_indexes):
-        relative_index = np.argmin(np.subtract(final_weights, initial_weights)[distant_depressing_indexes])
-        this_example_index = distant_depressing_indexes[relative_index]
-    else:
-        relative_index = np.argmin(np.subtract(final_weights, initial_weights)[input_sample_indexes])
-        this_example_index = input_sample_indexes[relative_index]
-    example_input_dict['Depressing input example'] = this_example_index
 
     import matplotlib as mpl
     mpl.rcParams['svg.fonttype'] = 'none'
@@ -844,249 +729,179 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     mpl.rcParams['axes.titlepad'] = 2.
     mpl.rcParams['mathtext.default'] = 'regular'
     mpl.rcParams['axes.unicode_minus'] = True
-    from matplotlib.pyplot import cm
-    import matplotlib.gridspec as gridspec
+    from matplotlib.lines import Line2D
 
-    fig, axes = plt.figure(figsize=(12, 8.5)), []
-    gs0 = gridspec.GridSpec(3, 4, wspace=0.55, hspace=0.9, left=0.075, right=0.965, top=0.925, bottom=0.075)
-    gs1 = gridspec.GridSpecFromSubplotSpec(2, 2, subplot_spec=gs0[1:, 1:], wspace=0.325, hspace=0.9)
-
-    this_axis = fig.add_subplot(gs0[0, 0])
-    axes.append(this_axis)
-    ymax = 0.
-    for color, label, ramp in zip(['k', 'c'], ['Before induction 2', 'After induction 2'],
-                                  [initial_ramp, model_ramp]):
-        this_axis.plot(context.binned_x, ramp, c=color, label=label)
-        ymax = max(ymax, np.max(ramp))
-    this_axis.set_ylabel('Ramp\namplitude (mV)')
-    this_axis.set_xlabel('Position (cm)')
-    ymax = math.ceil(ymax) + 1.
-    this_axis.set_ylim(-1., ymax)
-    this_axis.set_xlim(0., context.track_length)
-    bar_loc = ymax - 0.5
-    this_axis.hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
-    this_axis.legend(loc=(0.05, 0.95), frameon=False, framealpha=0.5, handlelength=1,
-                     fontsize=mpl.rcParams['font.size'])
-    this_axis.set_xticks(np.arange(0., context.track_length, 45.))
-
-    this_axis = fig.add_subplot(gs0[0, 2])
-    axes.append(this_axis)
-    xmax = max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.
-    xmax = math.ceil(xmax)
-    this_axis.plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='gray',
-                   label='Synaptic\neligibility signal')
-    this_axis.plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
-                   label='Dendritic\ngating signal')
-    this_axis.set_xlabel('Time (s)')
-    this_axis.set_ylabel('Normalized amplitude')
-    this_axis.set_ylim(0., this_axis.get_ylim()[1])
-    this_axis.set_xlim(-0.5, xmax)
-    this_axis.set_title('Plasticity signal kinetics', fontsize=mpl.rcParams['font.size'])
-    this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-
-    this_axis = fig.add_subplot(gs0[0, 3])
-    axes.append(this_axis)
+    fig, axes = plt.subplots(1, 2)
     dep_scale = context.k_dep / context.k_pot
-    this_axis.plot(signal_xrange, pot_rate(signal_xrange), label='Potentiation', c='c')
-    this_axis.plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, label='Depression', c='r')
-    this_axis.set_xlabel('Normalized eligibility signal')
-    this_axis.set_ylabel('Normalized rate')
-    this_axis.set_ylim(0., this_axis.get_ylim()[1])
-    this_axis.set_xlim(0., 1.)
-    this_axis.set_title('State transition rates', fontsize=mpl.rcParams['font.size'])
-    this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-    clean_axes(axes)
-
-    colors = ['c', 'r']
-    """
-    """
-    axes1 = [[fig.add_subplot(gs1[row, col]) for col in xrange(2)] for row in xrange(2)]
-    axes1[0][0].get_shared_x_axes().join(axes1[0][0], axes1[0][1], axes1[1][0], axes1[1][1])
-    axes1[0][0].get_shared_y_axes().join(axes1[0][0], axes1[0][1])
-    axes1[1][0].get_shared_y_axes().join(axes1[1][0], axes1[1][1])
-    ymax1 = np.max(global_signal)
-    ymax2 = 0.
-    axes1_0_right = [axes1[0][0].twinx(), axes1[0][1].twinx()]
-    for i, (name, index) in enumerate(example_input_dict.iteritems()):
-        this_rate_map = context.complete_rate_maps[index]
-        this_local_signal = local_signal_history[index]
-        this_weight_dynamics = weight_dynamics_history[index]
-        ymax1 = max(ymax1, np.max(this_local_signal))
-        axes1[0][i].plot(context.complete_t / 1000., this_rate_map, c='grey', linewidth=1.,
-                         label='Presynaptic firing rate', linestyle='--')
-        axes1_0_right[i].plot(context.down_t / 1000., this_local_signal, c=colors[i], label='Synaptic eligibility signal')
-        axes1_0_right[i].plot(context.down_t / 1000., global_signal, c='k', label='Dendritic gating signal', linewidth=0.75)
-        axes1_0_right[i].set_title('%s:' % name, fontsize=mpl.rcParams['font.size'])
-        axes1_0_right[i].fill_between(context.down_t / 1000., 0., np.minimum(this_local_signal, global_signal), alpha=0.5,
-                                facecolor=colors[i], label='Signal overlap')
-        axes1[1][i].plot(context.down_t / 1000., this_weight_dynamics, c=colors[i])
-        ymax2 = max(ymax2, np.max(this_weight_dynamics))
-        axes1[0][i].set_xlabel('Time (s)')
-        for label in axes1[0][i].get_xticklabels():
-            label.set_visible(True)
-        axes1[1][i].set_xlabel('Time (s)')
-        axes1_0_right[i].legend(loc=(0.4, 1.), frameon=False, framealpha=0.5, handlelength=1,
-                           fontsize=mpl.rcParams['font.size'])
-        axes1[0][i].legend(loc=(-0.2, 1.2), frameon=False, framealpha=0.5, handlelength=1,
-                                fontsize=mpl.rcParams['font.size'])
-        end = min(2, len(context.induction_start_times) - 1)
-        axes1[0][i].set_xlim(-2., context.induction_start_times[end] / 1000. + 5.)
-        axes1[1][i].set_xlim(-2., context.induction_start_times[end] / 1000. + 5.)
-    ymax1_right = ymax1 / 0.9
-    ymax1_left = context.input_field_peak_rate / 0.9
-    ymax1 = max(ymax1_left, ymax1_right)
-    ymax2 = math.ceil(ymax2 / 0.95)
-    axes1[0][0].set_ylim([0., ymax1_left])
-    axes1[0][1].set_ylim([0., ymax1_left])
-    axes1[1][0].set_ylim([0., ymax2])
-    axes1[1][1].set_ylim([0., ymax2])
-    axes1_0_right[0].set_ylim([0., ymax1_right])
-    axes1_0_right[1].set_ylim([0., ymax1_right])
-    bar_loc0 = ymax1 * 0.95
-    bar_loc1 = ymax2 * 0.95
-    axes1[0][0].hlines([bar_loc0] * len(context.induction_start_times),
-                   xmin=context.induction_start_times / 1000.,
-                   xmax=context.induction_stop_times / 1000., linewidth=2)
-    axes1[0][1].hlines([bar_loc0] * len(context.induction_start_times),
-                      xmin=context.induction_start_times / 1000.,
-                      xmax=context.induction_stop_times / 1000., linewidth=2)
-    axes1[1][0].hlines([bar_loc1] * len(context.induction_start_times),
-                      xmin=context.induction_start_times / 1000.,
-                      xmax=context.induction_stop_times / 1000., linewidth=2)
-    axes1[1][1].hlines([bar_loc1] * len(context.induction_start_times),
-                      xmin=context.induction_start_times / 1000.,
-                      xmax=context.induction_stop_times / 1000., linewidth=2)
-    axes1[0][0].set_ylabel('Firing rate (Hz)')
-    axes1[1][0].set_ylabel('Synaptic weight')
-    axes1[0][0].set_yticks(np.arange(0., context.input_field_peak_rate + 1., 10.))
-    axes1[0][1].set_yticks(np.arange(0., context.input_field_peak_rate + 1., 10.))
-    axes1_0_right[0].set_ylabel('Plasticity signal amplitude', rotation=-90, labelpad=15)
-    axes1_0_right[0].set_yticklabels([i * 0.2 for i in range(5)])
-    axes1_0_right[1].set_yticklabels([i * 0.2 for i in range(5)])
-    clean_twin_right_axes(axes1_0_right)
-    clean_axes(np.array(axes1))
-    """
-    """
-    axes2 = []
-    ymax = 0.
-    for row, weights in zip(range(1, 3), [initial_weights, final_weights]):
-        this_axis = fig.add_subplot(gs0[row, 0])
-        axes2.append(this_axis)
-        this_max_rate_map = np.zeros_like(context.input_rate_maps[0])
-        for i in (index for index in input_sample_indexes if index not in viewvalues(example_input_dict)):
-            rate_map = np.array(context.input_rate_maps[i])
-            rate_map *= weights[i] * context.ramp_scaling_factor
-            ymax = max(ymax, np.max(rate_map))
-            this_axis.plot(context.binned_x, rate_map, c='gray', zorder=0, linewidth=0.75)  # , alpha=0.5)
-        for i, (name, index) in enumerate(viewitems(example_input_dict)):
-            rate_map = np.array(context.input_rate_maps[index])
-            rate_map *= weights[index] * context.ramp_scaling_factor
-            ymax = max(ymax, np.max(rate_map))
-            this_axis.plot(context.binned_x, rate_map, c=colors[i], zorder=1, label=name)
-        this_axis.set_xlim(0., context.track_length)
-        this_axis.set_ylabel('Input\namplitude (mV)')
-        this_axis.set_xticks(np.arange(0., context.track_length, 45.))
-        this_axis.set_xlabel('Position (cm)')
-    axes2[0].legend(loc=(-0.1, 1.), frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-    ymax = math.ceil(10. * ymax / 0.95) / 10.
-    bar_loc = ymax * 0.95
-    for this_axis in axes2:
-        this_axis.set_ylim(0., ymax)
-        this_axis.hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
-    clean_axes(axes2)
-    fig.show()
-
-    fig2, axes2 = plt.subplots(1, 2, sharex=True)
-    fig2.suptitle('Induction: %i' % context.induction)
-    axes2[0].plot(context.binned_x, ramp_snapshots[0], c='k', label='Before')
-    axes2[0].set_ylabel('Ramp amplitude (mV)')
-    axes2[0].set_xlabel('Location (cm)')
-    axes2[1].set_ylabel('Change in synaptic weight')
-    axes2[1].set_xlabel('Location (cm)')
-    for i in range(1, len(ramp_snapshots)):
-        current_ramp = ramp_snapshots[i]
-        current_delta_weights = np.subtract(delta_weights_snapshots[i], delta_weights_snapshots[i - 1])
-        axes2[0].plot(context.binned_x, current_ramp)
-        axes2[1].plot(context.peak_locs, current_delta_weights, label='Induction lap: %i' % i)
-    axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-    clean_axes(axes2)
-    fig2.tight_layout()
-    fig2.show()
-
-    # New figures
-
-    fig, axes = plt.subplots(2, 3, figsize=(12., 6.5))
+    
     xmax = max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.
     xmax = math.ceil(xmax)
-    axes[0][0].plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='gray',
-                    label='Synaptic\neligibility signal')
-    axes[0][0].plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
-                    label='Dendritic\ngating signal')
-    axes[0][0].set_xlabel('Time (s)')
-    axes[0][0].set_ylabel('Normalized amplitude')
-    axes[0][0].set_xlim(-0.5, xmax)
-    axes[0][0].set_title('Plasticity signal kinetics', fontsize=mpl.rcParams['font.size'], pad=10.)
-    axes[0][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
+    axes[0].plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='gray',
+                   label='Synaptic\neligibility signal')
+    axes[0].plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
+                   label='Dendritic\ninstructive signal')
+    axes[0].set_xlabel('Time (s)')
+    axes[0].set_ylabel('Normalized amplitude')
+    axes[0].set_ylim(0., axes[0].get_ylim()[1])
+    axes[0].set_xlim(-0.5, xmax)
+    axes[0].set_title('Plasticity signal kinetics', fontsize=mpl.rcParams['font.size'])
+    axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
 
-    axes[0][1].set_xlabel('Normalized eligibility signal')
-    axes[0][1].set_ylabel('Normalized rate')
-    axes[0][1].set_title('Sigmoidal q$_{+}$, sigmoidal q$_{-}$', fontsize=mpl.rcParams['font.size'], pad=10.)
-    axes[0][1].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='q$_{+}$ (Potentiation)')
-    axes[0][1].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='q$_{-}$ (Depression)')
-    axes[0][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-
-    cmap = cm.jet
-    for w in np.linspace(0., 1., 10):
-        net_delta_weight = pot_rate(signal_xrange) * (1. - w) - dep_rate(signal_xrange) * dep_scale * w
-        axes[0][2].plot(signal_xrange, net_delta_weight, c=cmap(w))
-    axes[0][2].axhline(y=0., linestyle='--', c='grey')
-    axes[0][2].set_xlabel('Normalized eligibility signal')
-    axes[0][2].set_ylabel('Normalized rate')
-    axes[0][2].set_title('Net rate of change in synaptic weight', fontsize=mpl.rcParams['font.size'], pad=10.)
-    sm = cm.ScalarMappable(cmap=cmap)
-    sm.set_array([])
-    cbar = fig.colorbar(sm, ax=axes[0][2])
-    cbar.set_label('Initial synaptic weight\n(normalized)', rotation=270., labelpad=25.)
-
-    bar_loc = max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.) * 0.95
-    delta_weights = np.subtract(final_weights, initial_weights)
-    peak_weight = np.max(np.abs(delta_weights))
-    axes[1][2].plot(context.peak_locs, delta_weights, c='k')
-    axes[1][2].axhline(y=0., linestyle='--', c='grey')
-    axes[1][2].hlines(peak_weight * 1.05, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
-    axes[1][1].plot(context.binned_x, initial_ramp, label='Before', c='k')
-    axes[1][1].plot(context.binned_x, model_ramp, label='After', c='c')
-    axes[1][1].hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
-    axes[1][2].set_ylabel('Change in\nsynaptic weight')
-    axes[1][2].set_xlabel('Location (cm)')
-    axes[1][1].set_ylabel('Ramp amplitude (mV)')
-    axes[1][1].set_xlabel('Location (cm)')
-    axes[1][1].set_xticks(np.arange(0., context.track_length, 45.))
-    axes[1][2].set_xticks(np.arange(0., context.track_length, 45.))
-    axes[1][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-    axes[1][1].set_ylim([min(-1., np.min(model_ramp) - 1., np.min(target_ramp) - 1.),
-                         max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.)])
-    axes[1][2].set_ylim([-peak_weight, peak_weight * 1.1])
-    axes[1][1].set_title('Model fit', fontsize=mpl.rcParams['font.size'], pad=10.)
-
-    axes[1][0].plot(context.binned_x, initial_target_ramp, label='Before', c='k')
-    axes[1][0].plot(context.binned_x, target_ramp, label='After', c='c')
-    axes[1][0].hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
-    axes[1][0].set_ylabel('Ramp amplitude (mV)')
-    axes[1][0].set_xlabel('Location (cm)')
-    axes[1][0].set_xticks(np.arange(0., context.track_length, 45.))
-    axes[1][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-    axes[1][0].set_ylim([min(-1., np.min(model_ramp) - 1., np.min(target_ramp) - 1.),
-                         max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.)])
-    axes[1][0].set_title('Target (synthetic data)', fontsize=mpl.rcParams['font.size'], pad=10.)
-
+    axes[1].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='Potentiation')
+    axes[1].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='Depression')
+    axes[1].set_xlabel('Normalized eligibility\nsignal amplitude (a.u.)')
+    axes[1].set_ylabel('Normalized rate')
+    axes[1].set_xlim((0., 1.))
+    axes[1].set_title('Rate of change in\nsynaptic weight', fontsize=mpl.rcParams['font.size'])
+    axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
     clean_axes(axes)
-    fig.suptitle('Weight-dependent model F; synthetic data, induction: %i' % 2,
-                 fontsize=mpl.rcParams['font.size'], x=0.02, ha='left')
     fig.tight_layout()
-    plt.subplots_adjust(hspace=0.5, wspace=0.65, top=0.9)
+    fig.subplots_adjust(wspace=0.35)
     fig.show()
-    """
+    
+    fig, axes = plt.subplots(1, 2)
+    ylim = 13.
+    for col, induction in enumerate(range(1, 3)):
+        axes[col].set_xlabel('Time relative to plateau onset (s)')
+        axes[col].set_ylabel('Change in ramp\namplitude (mV)')
+        axes[col].set_xlim([-4., 4.])
+        axes[col].set_ylim([-5., 15.])
+        axes[col].set_title('Induction %i' % induction, fontsize=mpl.rcParams['font.size'])
+        clean_indexes = get_clean_induction_t_indexes(min_induction_t[induction], context.truncate * 1000.)
+        axes[col].plot(min_induction_t[induction][clean_indexes] / 1000.,
+                          np.subtract(model_ramp[induction], initial_ramp[induction])[clean_indexes])
+    clean_axes(axes)
+    fig.tight_layout()
+    fig.show()
+
+    peak_weight = context.peak_delta_weight + 1.
+    peak_ramp_amp = np.max(ramp_snapshots) + 5.
+
+    input_sample_indexes = np.arange(len(context.peak_locs))
+
+    example_input_dict = {}
+
+    sample_time_delays = []
+    induction = 2
+    this_min_induction_t = min_induction_t[induction]
+    for index in input_sample_indexes:
+        this_delay = this_min_induction_t[index // 2]
+        sample_time_delays.append(this_delay)
+    sample_time_delays = np.array(sample_time_delays)
+
+    relative_indexes = np.where((sample_time_delays > target_min_delay) &
+                                (sample_time_delays <= target_min_delay + target_delay_range) &
+                                (final_weights[input_sample_indexes] < initial_weights[input_sample_indexes]))[0]
+    distant_depressing_indexes = input_sample_indexes[relative_indexes]
+    if np.any(distant_depressing_indexes):
+        relative_index = np.argmin(np.subtract(final_weights, initial_weights)[distant_depressing_indexes])
+        depressing_example_index = distant_depressing_indexes[relative_index]
+    else:
+        relative_index = np.argmin(np.subtract(final_weights, initial_weights)[input_sample_indexes])
+        depressing_example_index = input_sample_indexes[relative_index]
+
+    fig, axes = plt.subplots(3, figsize=(5, 7.5))
+
+    current_weights = np.add(delta_weights_snapshots[induction_lap], 1.)
+    current_ramp = ramp_snapshots[induction_lap]
+    current_complete_ramp = get_complete_ramp(current_ramp, context.binned_x, context.position,
+                                              context.complete_run_vel_gate, context.induction_gate, peak_ramp_amp)
+
+    if induction_lap == 0:
+        start_time = context.down_t[0]
+    else:
+        start_time = context.induction_stop_times[induction_lap - 1]
+    if induction_lap == len(context.induction_start_times) - 1:
+        stop_time = context.down_t[-1]
+    else:
+        stop_time = context.induction_start_times[induction_lap + 1]
+    indexes = np.where((context.down_t >= start_time) & (context.down_t <= stop_time))
+
+    this_current_ramp = np.interp(context.down_t, context.complete_t, current_complete_ramp)[indexes]
+    this_t = context.down_t[indexes] / 1000.
+    this_global_signal = global_signal[indexes]
+
+    example_pre_rate = context.down_rate_maps[depressing_example_index][indexes]
+    example_current_normalized_weight = current_weights[depressing_example_index] / peak_weight
+    example_local_signal = local_signals[depressing_example_index][indexes]
+    example_pot_elig_signal = example_local_signal * (1. - example_current_normalized_weight)
+    example_dep_elig_signal = example_local_signal * example_current_normalized_weight
+    example_pot_rate = peak_weight * (1. - example_current_normalized_weight) * context.k_pot * \
+                       np.multiply(pot_rate(example_local_signal), this_global_signal)
+    example_dep_rate = peak_weight * example_current_normalized_weight * context.k_dep * \
+                       np.multiply(dep_rate(example_local_signal), this_global_signal)
+    example_net_dwdt = np.subtract(example_pot_rate, example_dep_rate)
+
+    axes[0].get_shared_x_axes().join(axes[0], axes[1], axes[2])
+    ymax1 = max(np.max(this_global_signal), np.max(example_pot_elig_signal), np.max(example_dep_elig_signal))
+    axes0_right = axes[0].twinx()
+
+    axes[0].plot(this_t, example_pre_rate, c='r', linewidth=1., label='Presynaptic\nfiring rate')
+    axes0_right.plot(this_t, this_current_ramp, c='grey', linewidth=1., label='Postsynaptic $V_{m}$')
+    handles, labels = axes[0].get_legend_handles_labels()
+    handles_right, labels_right = axes0_right.get_legend_handles_labels()
+    handles.extend(handles_right)
+    labels.extend(labels_right)
+    handles.append(Line2D([0], [0], color='k'))
+    labels.append('Postsynaptic\nplateau')
+    leg = axes[0].legend(handles=handles, labels=labels, loc=(0., 1.), frameon=False, framealpha=0.5, handlelength=1,
+                         fontsize=mpl.rcParams['font.size'])
+    for line in leg.get_lines():
+        line.set_linewidth(2.)
+
+    axes[1].plot(this_t, example_pot_elig_signal, c='c', linewidth=1., label='Potentiation $signal_{eligibility}$')
+    axes[1].plot(this_t, example_dep_elig_signal, c='r', linewidth=1.,
+                 label='Depression $signal_{eligibility}$')
+    axes[1].plot(this_t, this_global_signal, c='k', linewidth=1., label='Dendritic $signal_{instructive}$')
+    axes[1].fill_between(this_t, 0., np.minimum(example_pot_elig_signal, this_global_signal), alpha=0.5,
+                         facecolor='c', edgecolor='none', label='Potentiation signal overlap')
+    axes[1].fill_between(this_t, 0., np.minimum(example_dep_elig_signal, this_global_signal),
+                         alpha=0.5, facecolor='r', edgecolor='none', label='Depression signal overlap')
+    leg = axes[1].legend(loc=(0., 1.0), frameon=False, framealpha=0.5, handlelength=1,
+                         fontsize=mpl.rcParams['font.size'])
+    for line in leg.get_lines():
+        line.set_linewidth(2.)
+
+    axes[2].plot(this_t, example_pot_rate, c='c', linewidth=1., label='Potentiation rate')
+    axes[2].plot(this_t, example_dep_rate, c='r', linewidth=1., label='Depression rate')
+    axes[2].plot(this_t, example_net_dwdt, c='k', linewidth=1., label='Net dW/dt')
+    axes[2].set_xlabel('Time (s)')
+    leg = axes[2].legend(loc=(0., 1.0), frameon=False, framealpha=0.5, handlelength=1,
+                         fontsize=mpl.rcParams['font.size'])
+    for line in leg.get_lines():
+        line.set_linewidth(2.)
+
+    xmin = max(-5., np.min(this_t))
+    xmax = np.max(this_t)
+    axes[0].set_xlim(xmin, xmax)
+    axes[0].set_xticks(np.round((np.arange(xmin, xmax, 5.) / 5.)) * 5.)
+    axes[1].set_xticks(np.round((np.arange(xmin, xmax, 5.) / 5.)) * 5.)
+    axes[2].set_xticks(np.round((np.arange(xmin, xmax, 5.) / 5.)) * 5.)
+
+    ymax0_left = context.input_field_peak_rate / 0.85
+    ymax0_right = peak_ramp_amp / 0.85
+
+    axes[0].set_ylim([0., ymax0_left])
+    axes0_right.set_ylim([0., ymax0_right])
+    axes[1].set_ylim([0., axes[1].get_ylim()[1]])
+
+    bar_loc0 = ymax0_left * 0.95
+    axes[0].hlines(bar_loc0, xmin=context.induction_start_times[induction_lap] / 1000.,
+                   xmax=context.induction_stop_times[induction_lap] / 1000., linewidth=2.)
+
+    axes[0].set_ylabel('Firing rate (Hz)')
+    axes0_right.set_ylabel('Ramp\namplitude (mV)', rotation=-90, labelpad=30)
+    axes0_right.set_yticks(np.arange(0., np.max(this_current_ramp), 5.))
+    axes[0].set_yticks(np.arange(0., context.input_field_peak_rate + 1., 10.))
+    axes[1].set_ylabel('Plasticity signal\namplitude')
+    axes[2].set_ylabel('Rate of change\nin synaptic weight')
+
+    clean_twin_right_axes([axes0_right])
+    clean_axes(axes)
+    fig.suptitle('Weight-dependent model F (synthetic)', fontsize=mpl.rcParams['font.size'], x=0.02, ha='left')
+    fig.subplots_adjust(left=0.25, hspace=0.8, right=0.8, top=0.8, bottom=0.1)
+    fig.show()
+
     context.update(locals())
 
 

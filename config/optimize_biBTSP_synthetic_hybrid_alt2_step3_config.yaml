@@ -1,4 +1,10 @@
 bounds:
+  phi_th: !!python/tuple
+  - 0.001
+  - 1.
+  phi_half_width: !!python/tuple
+  - 0.05
+  - 1.
   f_dep_th: !!python/tuple
   - 0.001
   - 1.
@@ -19,16 +25,19 @@ bounds:
   - 1500.
   peak_delta_weight: !!python/tuple
   - 1.5
-  - 4.
+  - 5.
+  dend_depo_mod_scale: !!python/tuple
+  - 0.01
+  - 1.
 default_params:
 rel_bounds:
-# - - local_signal_decay
-#   - '>'
-#   - 1.0
-#   - global_signal_decay
-# - - k_pot
-#   - '>'
-#   - 1.0
+#- - local_signal_decay
+#  - '>'
+#  - 1.0
+#  - global_signal_decay
+#- - k_pot
+#  - '>'
+#  - 1.0
 #  - k_dep
 feature_names:
 - induction1_delta_val_at_target_peak
@@ -39,6 +48,22 @@ feature_names:
 - induction1_delta_min_loc
 - induction1_delta_val_at_target_min
 - induction1_delta_val_at_model_min
+- induction1_depo_delta_val_at_target_peak
+- induction1_depo_delta_val_at_model_peak
+- induction1_depo_delta_width
+- induction1_depo_delta_peak_shift
+- induction1_depo_delta_asymmetry
+- induction1_depo_delta_min_loc
+- induction1_depo_delta_val_at_target_min
+- induction1_depo_delta_val_at_model_min
+- induction1_hyper_delta_val_at_target_peak
+- induction1_hyper_delta_val_at_model_peak
+- induction1_hyper_delta_width
+- induction1_hyper_delta_peak_shift
+- induction1_hyper_delta_asymmetry
+- induction1_hyper_delta_min_loc
+- induction1_hyper_delta_val_at_target_min
+- induction1_hyper_delta_val_at_model_min
 - induction2_delta_val_at_target_peak
 - induction2_delta_val_at_model_peak
 - induction2_delta_width
@@ -47,17 +72,25 @@ feature_names:
 - induction2_delta_min_loc
 - induction2_delta_val_at_target_min
 - induction2_delta_val_at_model_min
+- induction2_hyper_delta_val_at_target_peak
+- induction2_hyper_delta_val_at_model_peak
+- induction2_hyper_delta_width
+- induction2_hyper_delta_peak_shift
+- induction2_hyper_delta_asymmetry
+- induction2_hyper_delta_min_loc
+- induction2_hyper_delta_val_at_target_min
+- induction2_hyper_delta_val_at_model_min
 - ramp_amp_after_first_plateau
 update_context:
-- - optimize_biBTSP_synthetic_alt
+- - optimize_biBTSP_synthetic_hybrid_alt2_step2
   - update_model_params
 get_features_stages:
-- source: optimize_biBTSP_synthetic_alt
-  get_args_static: get_args_static_model_ramp
+- source: optimize_biBTSP_synthetic_hybrid_alt2_step2
+  get_args_static: get_args_static_model_ramp_step3
   compute_features: compute_features_model_ramp
   filter_features: filter_features_model_ramp
 get_objectives:
-  optimize_biBTSP_synthetic_alt: get_objectives
+  optimize_biBTSP_synthetic_hybrid_alt2_step2: get_objectives
 kwargs:
   data_file_name: 20200427_biBTSP_data.hdf5
   input_field_width: 90.  # cm
@@ -65,6 +98,7 @@ kwargs:
   num_induction_laps: 3
   min_delta_weight: -0.2
   max_dend_depo: 20.
+  min_dend_depo: -20.
   default_run_vel: 25.
   induction_loc:
     '1': 120.
@@ -73,15 +107,25 @@ kwargs:
   target_peak_delta_weight: 3.
   target_peak_shift_1: -5.
   target_peak_val_1: 8.
+  target_peak_val_1_depo: 9.
+  target_ramp_offset_1_depo: 10.
+  target_ramp_offset_1_hyper: -20.
+  target_ramp_offset_2_hyper: -20.
   weights_path_distance_threshold: 1.25
 objective_names:
 - induction1_residual_score
+- induction1_depo_residual_score
+- induction1_hyper_residual_score
 - induction2_residual_score
+- induction2_hyper_residual_score
 - ramp_amp_after_first_plateau
 - weights_path_distance
-optimization_title: biBTSP_synthetic_alt
+optimization_title: biBTSP_synthetic_hybrid_alt2_step3
 param_gen: PopulationAnnealing
 param_names:
+- dend_depo_mod_scale
+- phi_th
+- phi_half_width
 - f_dep_th
 - f_dep_half_width
 - k_pot
@@ -100,10 +144,13 @@ target_range:
 target_val:
   ramp_amp_after_first_plateau: 4.
 x0:
-  f_dep_half_width: 4.063616E-02
-  f_dep_th: 4.085338E-02
-  global_signal_decay: 4.428467E+02
-  k_dep: 5.279940E-01
-  k_pot: 1.544540E+00
-  local_signal_decay: 1.5E+03
-  peak_delta_weight: 3.
+  dend_depo_mod_scale: 0.5
+  f_dep_half_width: 9.653914E-02
+  f_dep_th: 2.976247E-03
+  global_signal_decay: 6.234602E+02
+  k_dep: 3.109035E-01
+  k_pot: 6.347702E-01
+  local_signal_decay: 8.146532E+02
+  peak_delta_weight: 4.899299E+00
+  phi_half_width: 0.25
+  phi_th: 0.25
