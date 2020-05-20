@@ -376,7 +376,7 @@ def load_data(induction, condition='control'):
                 axes[0].set_ylim([-5., 15.])
                 axes[0].legend(loc='best', frameon=False, framealpha=0.5)
                 axes[0].set_title('Target: Induction 1')
-                
+
                 axes[1].plot(context.binned_x, induction_context.ramp_offset['control'], c='k', label='Control')
                 axes[1].plot(context.binned_x, induction_context.ramp_offset['depo'], c='c', label='Depo')
                 axes[1].plot(context.binned_x, induction_context.ramp_offset['hyper'], c='r', label='Hyper')
@@ -441,34 +441,41 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     pot_rate = lambda x: x
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
-    this_phi_th = context.phi_th * (context.max_dend_depo - context.min_dend_depo) + context.min_dend_depo
-    this_phi_half_width = context.phi_half_width * (context.max_dend_depo - context.min_dend_depo)
-    get_dend_depo_mod = np.vectorize(scaled_single_sigmoid(
-        this_phi_th, this_phi_th + this_phi_half_width, dend_depo_range, [context.phi_min, context.phi_max]))
+    phi_slope = (context.phi_max - context.phi_min) / (context.max_dend_depo - context.min_dend_depo)
+    phi_offset = context.phi_max - phi_slope * context.max_dend_depo
+    get_dend_depo_mod = \
+        np.vectorize(lambda dend_depo: min(context.phi_max, max(context.phi_min, dend_depo * phi_slope + phi_offset)))
+    get_spine_depo = np.vectorize(scaled_single_sigmoid(
+        context.spine_th, context.spine_th + context.spine_half_width, signal_xrange))
 
     if plot and context.induction == 1 and context.condition == 'control':
-        fig, axes = plt.subplots(1, 3, figsize=(10., 4.))
+        fig, axes = plt.subplots(2, 2)
+        axes[0][0].plot(dend_depo_range, get_dend_depo_mod(dend_depo_range), c='k')
+        axes[0][0].set_ylabel('Modulation factor')
+        axes[0][0].set_xlabel('Dendritic depolarization (mV)')
+        axes[0][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
 
-        axes[1].plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='r',
+        axes[0][1].plot(signal_xrange, get_spine_depo(signal_xrange), c='k')
+        axes[0][1].set_ylabel('Actual spine\ndepolarization (normalized)')
+        axes[0][1].set_xlabel('Expected spine depolarization (normalized)')
+        axes[0][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        
+        axes[1][0].plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='r',
                   label='Eligibility signal filter')
-        axes[1].plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
+        axes[1][0].plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
                   label='Instructive signal filter')
-        axes[1].set_xlabel('Time (s)')
-        axes[1].set_ylabel('Normalized amplitude')
-        axes[1].set_title('Plasticity signal filters')
-        axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-        axes[1].set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
+        axes[1][0].set_xlabel('Time (s)')
+        axes[1][0].set_ylabel('Normalized amplitude')
+        axes[1][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        axes[1][0].set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
 
         dep_scale = context.k_dep / context.k_pot
-        axes[2].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='Potentiation rate')
-        axes[2].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='Depression rate')
-        axes[2].set_xlabel('Plasticity signal\noverlap (a.u.)')
-        axes[2].set_ylabel('Normalized rate')
-        axes[0].plot(dend_depo_range, get_dend_depo_mod(dend_depo_range), c='k')
-        axes[0].set_xlabel('Modulation factor')
-        axes[0].set_ylabel('Dendritic depolarization (mV)')
-        axes[2].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-        axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        axes[1][1].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='Potentiation rate')
+        axes[1][1].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='Depression rate')
+        axes[1][1].set_xlabel('Plasticity signal overlap (a.u.)')
+        axes[1][1].set_ylabel('Normalized rate')
+        axes[1][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        
         clean_axes(axes)
         fig.tight_layout()
         fig.show()
@@ -559,10 +566,11 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         overlap = []
         for i, (this_rate_map, this_current_normalized_weight) in \
                 enumerate(zip(context.down_rate_maps, current_normalized_weights)):
-            this_local_signal = np.divide(
-                get_local_signal(np.multiply(this_rate_map, current_complete_down_dend_depo_mod), local_signal_filter,
-                                 context.down_dt),
-                local_signal_peak)
+            this_normalized_rate_map = this_rate_map / context.input_field_peak_rate
+            this_expected_input = np.multiply(this_rate_map, current_complete_down_dend_depo_mod)
+            this_actual_input = get_spine_depo(this_expected_input) * context.input_field_peak_rate
+            this_local_signal = \
+                np.divide(get_local_signal(this_actual_input, local_signal_filter, context.down_dt), local_signal_peak)
             this_pot_rate = np.trapz(pot_rate(np.multiply(this_local_signal[indexes], global_signal[indexes])),
                                      dx=context.down_dt / 1000.)
             this_dep_rate = np.trapz(dep_rate(np.multiply(this_local_signal[indexes], global_signal[indexes])),
