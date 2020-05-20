@@ -265,7 +265,7 @@ def get_complete_ramp(current_ramp, input_x, position, complete_run_vel_gate, in
     return complete_ramp
 
 
-def get_complete_dend_depo(current_depo, input_x, position, induction_gate, max_dend_depo):
+def get_complete_dend_depo(current_depo, input_x, position, induction_gate, max_dend_depo=None):
     """
 
     :param current_depo: array
@@ -282,7 +282,8 @@ def get_complete_dend_depo(current_depo, input_x, position, induction_gate, max_
             complete_dend_depo = np.append(complete_dend_depo, this_lap_vm)
     if len(complete_dend_depo) != len(induction_gate):
         print('get_complete_dend_depo: mismatched array length')
-    complete_dend_depo[np.where(induction_gate == 1.)[0]] = max_dend_depo
+    if max_dend_depo is not None:
+        complete_dend_depo[np.where(induction_gate == 1.)[0]] = max_dend_depo
 
     return complete_dend_depo
 

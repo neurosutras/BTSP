@@ -3,7 +3,7 @@ bounds:
   - 0.001
   - 1.
   phi_half_width: !!python/tuple
-  - 0.05
+  - 0.025
   - 1.
   f_dep_th: !!python/tuple
   - 0.001
@@ -82,15 +82,15 @@ feature_names:
 - induction2_hyper_delta_val_at_model_min
 - ramp_amp_after_first_plateau
 update_context:
-- - optimize_biBTSP_synthetic_hybrid_alt2_step2
+- - optimize_biBTSP_synthetic_hybrid_alt3_step3
   - update_model_params
 get_features_stages:
-- source: optimize_biBTSP_synthetic_hybrid_alt2_step2
+- source: optimize_biBTSP_synthetic_hybrid_alt3_step3
   get_args_static: get_args_static_model_ramp_step3
   compute_features: compute_features_model_ramp
   filter_features: filter_features_model_ramp
 get_objectives:
-  optimize_biBTSP_synthetic_hybrid_alt2_step2: get_objectives
+  optimize_biBTSP_synthetic_hybrid_alt3_step3: get_objectives
 kwargs:
   data_file_name: 20200427_biBTSP_data.hdf5
   input_field_width: 90.  # cm
@@ -120,7 +120,7 @@ objective_names:
 - induction2_hyper_residual_score
 - ramp_amp_after_first_plateau
 - weights_path_distance
-optimization_title: biBTSP_synthetic_hybrid_alt2_step3
+optimization_title: biBTSP_synthetic_hybrid_alt3_step3
 param_gen: PopulationAnnealing
 param_names:
 - dend_depo_mod_scale
