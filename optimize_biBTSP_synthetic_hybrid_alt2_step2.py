@@ -506,32 +506,32 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     if plot and context.induction == 1 and context.condition == 'control':
         fig, axes = plt.subplots(1, 3, figsize=(10., 4.))
 
-        axes[0].plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='r',
+        axes[1].plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='r',
                   label='Eligibility signal filter')
-        axes[0].plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
+        axes[1].plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
                   label='Instructive signal filter')
-        axes[0].set_xlabel('Time (s)')
-        axes[0].set_ylabel('Normalized amplitude')
-        axes[0].set_title('Plasticity signal filters')
-        axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-        axes[0].set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
+        axes[1].set_xlabel('Time (s)')
+        axes[1].set_ylabel('Normalized amplitude')
+        axes[1].set_title('Plasticity signal filters')
+        axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        axes[1].set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
         
         dep_scale = context.k_dep / context.k_pot
         axes[2].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='Potentiation rate')
         axes[2].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='Depression rate')
         axes[2].set_xlabel('Plasticity signal\noverlap (a.u.)')
         axes[2].set_ylabel('Normalized rate')
-        axes[1].plot(spine_depo_range, get_actual_norm_spine_depo(spine_depo_range, 0.), c='k', label='Dend depo: 0 mV')
-        axes[1].plot(spine_depo_range,
+        axes[0].plot(spine_depo_range, get_actual_norm_spine_depo(spine_depo_range, 0.), c='k', label='Dend depo: 0 mV')
+        axes[0].plot(spine_depo_range,
                      get_actual_norm_spine_depo(spine_depo_range, get_dend_depo_mod(context.max_dend_depo)), c='r',
                      label='Dend depo: %i mV' % context.max_dend_depo)
-        axes[1].plot(spine_depo_range,
+        axes[0].plot(spine_depo_range,
                      get_actual_norm_spine_depo(spine_depo_range, get_dend_depo_mod(context.min_dend_depo)), c='c',
                      label='Dend depo: %i mV' % context.min_dend_depo)
-        axes[1].set_xlabel('Expected spine\ndepolarization (normalized)')
-        axes[1].set_ylabel('Actual spine depolarization (normalized)')
-        axes[2].legend(loc='best', frameon=False, framealpha=0.5)
-        axes[1].legend(loc='best', frameon=False, framealpha=0.5)
+        axes[0].set_xlabel('Expected spine\ndepolarization (normalized)')
+        axes[0].set_ylabel('Actual spine depolarization (normalized)')
+        axes[2].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
         clean_axes(axes)
         fig.tight_layout()
         fig.show()
@@ -591,9 +591,9 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         axes2[0].plot(context.binned_x, target_ramp, c='r', label='Target')
         axes2[0].set_ylabel('Ramp amplitude (mV)')
         axes2[0].set_xlabel('Location (cm)')
-        axes2[1].set_ylabel('Change in synaptic weight')
+        axes2[1].set_ylabel('Change in synaptic\nweight (normalized)')
         axes2[1].set_xlabel('Location (cm)')
-        axes2[2].set_xlabel('Time relative to\nplateau onset (s)')
+        axes2[2].set_xlabel('Time relative to plateau onset (s)')
         axes2[2].set_ylabel('Change in ramp amplitude (mV)')
 
     result = {}
@@ -649,8 +649,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         if plot:
             axes[1].plot(context.down_t[indexes] / 1000., current_complete_down_dend_depo_mod[indexes],
                          label='Induction lap: %i' % (induction_lap + 1))
-            axes2[1].plot(context.peak_locs,
-                          np.multiply(np.subtract(next_normalized_weights, current_normalized_weights), peak_weight),
+            axes2[1].plot(context.peak_locs, np.subtract(next_normalized_weights, current_normalized_weights),
                           label='Induction lap: %i' % (induction_lap + 1))
         current_normalized_weights = np.array(next_normalized_weights)
         current_delta_weights = np.subtract(np.multiply(current_normalized_weights, peak_weight), 1.)

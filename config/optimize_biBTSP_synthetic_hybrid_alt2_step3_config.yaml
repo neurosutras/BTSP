@@ -97,7 +97,7 @@ kwargs:
   verbose: 1
   num_induction_laps: 3
   min_delta_weight: -0.2
-  max_dend_depo: 20.
+  max_dend_depo: 10.
   min_dend_depo: -20.
   default_run_vel: 25.
   induction_loc:
