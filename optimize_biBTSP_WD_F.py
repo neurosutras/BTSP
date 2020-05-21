@@ -35,7 +35,7 @@ f_pot is linear.
 7) f_dep represents the "sensitivity" of the reverse process to the presence of the local_signal. The transformation
 f_dep has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
 
-biBTSP_WD_F: Single eligibility signal filter.
+biBTSP_WD_F:
 Gain function f_pot is linear and f_dep is sigmoidal.
 """
 __author__ = 'milsteina'
@@ -72,7 +72,10 @@ def init_context():
         context.weights_path_distance_threshold = float(context.weights_path_distance_threshold)
 
     context.verbose = int(context.verbose)
-
+    
+    if 'plot' not in context():
+        context.plot = False
+        
     if 'truncate' not in context():
         context.truncate = 2.5
 
@@ -189,8 +192,8 @@ def import_data(cell_id, induction):
             calibrated_input_group = f['calibrated_input'][context.input_field_width_key][cell_key][induction_key]
             if 'before' in calibrated_input_group['LSA_ramp']:
                 induction_context.LSA_ramp['before'] = calibrated_input_group['LSA_ramp']['before'][:]
-                induction_context.LSA_ramp_offset['before'] = calibrated_input_group['LSA_ramp']['before'].attrs[
-                    'ramp_offset']
+                induction_context.LSA_ramp_offset['before'] = \
+                    calibrated_input_group['LSA_ramp']['before'].attrs['ramp_offset']
             induction_context.LSA_weights = {}
             induction_context.LSA_weights['before'] = calibrated_input_group['LSA_weights']['before'][:]
             induction_context.complete_run_vel = data_group['complete']['run_vel'][:]
@@ -210,10 +213,10 @@ def import_data(cell_id, induction):
     context.mean_induction_start_loc = np.mean(context.induction_locs)
     context.mean_induction_dur = np.mean(context.induction_durs)
     mean_induction_start_index = \
-    np.where(context.mean_position >= context.mean_induction_start_loc)[0][0]
+        np.where(context.mean_position >= context.mean_induction_start_loc)[0][0]
     mean_induction_stop_index = \
-    np.where(context.mean_t >= context.mean_t[mean_induction_start_index] +
-             context.mean_induction_dur)[0][0]
+        np.where(context.mean_t >= context.mean_t[mean_induction_start_index] + 
+                 context.mean_induction_dur)[0][0]
     context.mean_induction_stop_loc = context.mean_position[mean_induction_stop_index]
     induction_start_times = []
     induction_stop_times = []
@@ -346,9 +349,9 @@ def filter_features_signal_amplitudes(primitives, current_features, model_id=Non
         hist, edges = np.histogram(local_signal_peaks, bins=min(10, len(primitives)), density=True)
         bin_width = edges[1] - edges[0]
         axes.plot(edges[:-1] + bin_width / 2., hist * bin_width, c='r', label='Local eligibility signals')
-        axes.set_xlabel('Peak local plasticity signal amplitudes (a.u.)')
+        axes.set_xlabel('Peak eligibility signal amplitudes (a.u.)')
         axes.set_ylabel('Probability')
-        axes.set_title('Local signal amplitude distribution')
+        axes.set_title('Eligibility signal amplitude distribution')
         axes.legend(loc='best', frameon=False, framealpha=0.5)
         clean_axes(axes)
         fig.tight_layout()
@@ -358,9 +361,9 @@ def filter_features_signal_amplitudes(primitives, current_features, model_id=Non
         bin_width = edges[1] - edges[0]
         fig, axes = plt.subplots(1)
         axes.plot(edges[:-1] + bin_width / 2., hist * bin_width, c='k')
-        axes.set_xlabel('Peak global plasticity signal amplitudes (a.u.)')
+        axes.set_xlabel('Peak instructive signal amplitudes (a.u.)')
         axes.set_ylabel('Probability')
-        axes.set_title('Global signal amplitude distribution')
+        axes.set_title('Instructive signal amplitude distribution')
         clean_axes(axes)
         fig.tight_layout()
         fig.show()
@@ -386,7 +389,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
     """
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
         get_dual_exp_decay_signal_filters(context.local_signal_decay, context.global_signal_decay,
-                                          context.down_dt, plot and context.induction == 1)
+                                          context.down_dt)
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
     local_signals = \
         np.divide(get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt),
@@ -398,13 +401,21 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
 
     if plot and context.induction == 1:
-        fig, axes = plt.subplots(1)
+        fig, axes = plt.subplots(1, 2)
         dep_scale = context.k_dep / context.k_pot
-        axes.plot(signal_xrange, pot_rate(signal_xrange), c='c', label='Potentiation rate')
-        axes.plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='Depression rate')
-        axes.set_xlabel('Plasticity signal\noverlap (a.u.)')
-        axes.set_ylabel('Normalized rate')
-        axes.legend(loc='best', frameon=False, framealpha=0.5)
+        axes[1].plot(signal_xrange, pot_rate(signal_xrange), c='r', label='Potentiation rate')
+        axes[1].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='c', label='Depression rate')
+        axes[1].set_xlabel('Plasticity signal overlap (a.u.)')
+        axes[1].set_ylabel('Normalized rate')
+        axes[1].legend(loc='best', frameon=False, framealpha=0.5)
+        axes[0].plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='r',
+                     label='Eligibility signal filter')
+        axes[0].plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
+                     label='Instructive signal filter')
+        axes[0].set_xlabel('Time (s)')
+        axes[0].set_ylabel('Normalized amplitude')
+        axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        axes[0].set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
         clean_axes(axes)
         fig.tight_layout()
         fig.show()
@@ -454,20 +465,26 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
     target_ramp = context.exp_ramp['after']
 
     if plot:
-        fig, axes = plt.subplots()
+        fig, axes = plt.subplots(1, 2)
         fig.suptitle('Induction: %i' % (context.induction), y=1.)
-        axes.plot(context.down_t / 1000., global_signal, label='Instructive signal')
-        axes.set_ylabel('Plasticity signal amplitude (a.u.)')
-        axes.set_xlabel('Time (s)')
+        axes[0].set_ylabel('Instructive signal amplitude (a.u.)')
+        axes[0].set_xlabel('Time (s)')
+        axes[1].set_ylabel('Integrated plasticity signal overlap (a.u.)')
+        axes[1].set_xlabel('Time (s)')
 
-        fig2, axes2 = plt.subplots(1, 2, sharex=True)
+        fig2, axes2 = plt.subplots(1, 3, figsize=(10., 4.))
         fig2.suptitle('Induction: %i' % context.induction)
         axes2[0].plot(context.binned_x, initial_ramp, c='k', label='Before')
         axes2[0].plot(context.binned_x, target_ramp, c='r', label='Target')
         axes2[0].set_ylabel('Ramp amplitude (mV)')
         axes2[0].set_xlabel('Location (cm)')
-        axes2[1].set_ylabel('Change in synaptic weight')
+        axes2[1].set_ylabel('Change in synaptic\nweight (normalized)')
         axes2[1].set_xlabel('Location (cm)')
+        axes2[2].set_xlabel('Time relative to plateau onset (s)')
+        axes2[2].set_ylabel('Change in ramp amplitude (mV)')
+        axes2[2].plot(context.min_induction_t[context.clean_induction_t_indexes] / 1000.,
+                     np.zeros_like(context.clean_induction_t_indexes), c='darkgrey', alpha=0.75,
+                     zorder=1, linestyle='--')
 
     for induction_lap in range(len(context.induction_start_times)):
         start_time = context.induction_start_times[induction_lap]
@@ -475,7 +492,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
             stop_time = context.down_t[-1]
         else:
             stop_time = context.induction_start_times[induction_lap + 1]
-        indexes = np.where((context.down_t >= start_time) & (context.down_t < stop_time))
+        indexes = np.where((context.down_t >= start_time) & (context.down_t < stop_time))[0]
 
         next_normalized_weights = []
         overlap = []
@@ -488,19 +505,13 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
             this_next_normalized_weight = max(0., min(1., current_normalized_weights[i] + this_normalized_delta_weight))
             next_normalized_weights.append(this_next_normalized_weight)
             overlap.append(np.trapz(this_signal_overlap, dx=context.down_dt / 1000.))
-        if plot and induction_lap == 0 and context.induction == 1:
-            fig3, axes3 = plt.subplots()
-            interp_overlap = np.interp(context.binned_x, context.peak_locs, overlap)
-            axes3.plot(context.min_induction_t[context.clean_induction_t_indexes] / 1000.,
-                       interp_overlap[context.clean_induction_t_indexes])
-            axes3.set_title('Induction: %i' % (context.induction))
-            axes3.set_xlabel('Time relative to\nplateau onset (s)')
-            axes3.set_ylabel('Integrated plasticity\nsignal overlap')
-            clean_axes(axes3)
-            fig3.show()
         if plot:
-            axes2[1].plot(context.peak_locs,
-                          np.multiply(np.subtract(next_normalized_weights, current_normalized_weights), peak_weight),
+            interp_overlap = np.interp(context.binned_x, context.peak_locs, overlap)
+            axes[1].plot(context.min_induction_t[context.clean_induction_t_indexes] / 1000.,
+                         interp_overlap[context.clean_induction_t_indexes],
+                         label='Induction lap: %i' % (induction_lap + 1))
+            axes[0].plot(context.down_t[indexes] / 1000., global_signal[indexes])
+            axes2[1].plot(context.peak_locs, np.subtract(next_normalized_weights, current_normalized_weights),
                           label='Induction lap: %i' % (induction_lap + 1))
         current_normalized_weights = np.array(next_normalized_weights)
         current_delta_weights = np.subtract(np.multiply(current_normalized_weights, peak_weight), 1.)
@@ -514,15 +525,19 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
         ramp_snapshots.append(current_ramp)
 
     if plot:
-        axes2[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-        axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
         clean_axes(axes)
-        clean_axes(axes2)
         fig.tight_layout()
         fig.subplots_adjust(top=0.9)
+        fig.show()
+
+        axes2[2].plot(context.min_induction_t[context.clean_induction_t_indexes] / 1000.,
+                      np.subtract(current_ramp, initial_ramp)[context.clean_induction_t_indexes], c='k')
+        axes2[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        axes2[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        clean_axes(axes2)
         fig2.tight_layout()
         fig2.subplots_adjust(top=0.9)
-        fig.show()
         fig2.show()
 
     delta_weights = np.subtract(current_delta_weights, initial_delta_weights)
@@ -1379,8 +1394,6 @@ def filter_features_model_ramp(primitives, current_features, model_id=None, expo
     for feature_name in feature_names:
         if feature_name in features and len(features[feature_name]) > 0:
             features[feature_name] = np.mean(features[feature_name])
-            print('debug: value: %.1f' % features[feature_name])
-            sys.stdout.flush()
         else:
             features[feature_name] = 0.
 

@@ -16,7 +16,7 @@ plasticity.
 4) Changes in weight at each synapse are integrated over periods of nonzero overlap between eligibility and instructive
 signals, and updated once per lap.
 
-Features/assumptions of weight-dependent model B:
+Features/assumptions of hybrid model (dependent on both voltage and weight):
 1) Dendritic plateaus generate a global instructive signal that provides a necessary cofactor required to convert
 plasticity eligibility signals at each synapse into either increases or decreases in synaptic strength.
 2) Activity at each synapse generates a local plasticity eligibility signal that, in conjunction with the global
@@ -36,7 +36,7 @@ f_pot is linear.
 f_dep has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
 
 biBTSP_synthetic_hybrid:
-Spine depolarization is modulated (scaled) by loca dendritic depolarization.
+Spine depolarization is modulated by local dendritic depolarization.
 Eligibility signal filter acts on spine depolarization.
 Gain function f_pot is linear and f_dep is sigmoidal.
 
@@ -77,6 +77,9 @@ def init_context():
     context.verbose = int(context.verbose)
     if 'plot' not in context():
         context.plot = False
+
+    if 'truncate' not in context():
+        context.truncate = 2.5
 
     with h5py.File(context.data_file_path, 'r') as f:
         dt = f['defaults'].attrs['dt']  # ms
@@ -133,6 +136,7 @@ def load_data(induction, condition='control'):
     """
 
     :param induction: int
+    :param condition: str
     """
     induction = int(induction)
     context.condition = str(condition)
@@ -197,7 +201,7 @@ def load_data(induction, condition='control'):
                                 context.binned_x, context.track_length, induction_context.mean_induction_start_loc,
                                 context.num_induction_laps)
         induction_context.clean_induction_t_indexes = \
-            get_clean_induction_t_indexes(induction_context.min_induction_t)
+            get_clean_induction_t_indexes(induction_context.min_induction_t, context.truncate * 1000.)
 
         induction_context.complete_run_vel = np.full_like(induction_context.complete_t, context.default_run_vel)
         induction_context.complete_run_vel_gate = np.ones_like(induction_context.complete_run_vel)
@@ -302,7 +306,7 @@ def load_data(induction, condition='control'):
                 axes[1].plot(context.binned_x, np.ones_like(context.binned_x) *
                              induction_context.ramp_offset['control'], c='k', label='Control')
                 axes[1].plot(context.binned_x, np.ones_like(context.binned_x) *
-                             induction_context.ramp_offset['hyper'], c='r', label='Hyper')
+                             induction_context.ramp_offset['hyper'], c='c', label='Hyper')
                 axes[1].hlines(context.max_dend_depo * 1.05, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
                 axes[1].set_xlabel('Location (cm)')
                 axes[1].set_ylabel('Vm offset (mV)')
@@ -381,9 +385,9 @@ def load_data(induction, condition='control'):
                 axes[1].plot(context.binned_x, np.ones_like(context.binned_x) *
                              induction_context.ramp_offset['control'], c='k', label='Control')
                 axes[1].plot(context.binned_x, np.ones_like(context.binned_x) *
-                             induction_context.ramp_offset['depo'], c='c', label='Depo')
+                             induction_context.ramp_offset['depo'], c='r', label='Depo')
                 axes[1].plot(context.binned_x, np.ones_like(context.binned_x) *
-                             induction_context.ramp_offset['hyper'], c='r', label='Hyper')
+                             induction_context.ramp_offset['hyper'], c='c', label='Hyper')
                 axes[1].hlines(context.max_dend_depo * 1.05, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
                 axes[1].set_xlabel('Location (cm)')
                 axes[1].set_ylabel('Vm offset (mV)')
@@ -468,8 +472,8 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                      label='Depolarized')
         axes[0].plot(signal_xrange, get_spine_depo_f(context.ramp_offset['hyper'])(signal_xrange), c='c',
                      label='Hyperpolarized')
-        axes[0].set_ylabel('Actual spine\ndepolarization (normalized)')
-        axes[0].set_xlabel('Expected spine depolarization (normalized)')
+        axes[0].set_xlabel('Presynaptic firing rate (normalized)')
+        axes[0].set_ylabel('Spine depolarization (normalized)')
         axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
 
         axes[1].plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='r',
@@ -478,13 +482,12 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                   label='Instructive signal filter')
         axes[1].set_xlabel('Time (s)')
         axes[1].set_ylabel('Normalized amplitude')
-        axes[1].set_title('Plasticity signal filters')
         axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
         axes[1].set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
 
         dep_scale = context.k_dep / context.k_pot
-        axes[2].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='Potentiation rate')
-        axes[2].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='Depression rate')
+        axes[2].plot(signal_xrange, pot_rate(signal_xrange), c='r', label='Potentiation rate')
+        axes[2].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='c', label='Depression rate')
         axes[2].set_xlabel('Plasticity signal overlap (a.u.)')
         axes[2].set_ylabel('Normalized rate')
         axes[2].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
@@ -534,11 +537,10 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     target_ramp = context.target_ramp['after'][context.condition]
 
     if plot:
-        if context.induction == 1 and context.condition == 'control':
-            fig, axes = plt.subplots()
-            fig.suptitle('Induction: %i (%s)' % (context.induction, context.condition), y=1.)
-            axes.set_xlabel('Location (cm)')
-            axes.set_ylabel('Plasticity signal overlap (a.u.)')
+        fig, axes = plt.subplots()
+        fig.suptitle('Induction: %i (%s)' % (context.induction, context.condition), y=1.)
+        axes.set_xlabel('Time (s)')
+        axes.set_ylabel('Integrated plasticity\nsignal overlap (a.u.)')
 
         fig2, axes2 = plt.subplots(1, 3, figsize=(10., 4.))
         fig2.suptitle('Induction: %i (%s)' % (context.induction, context.condition))
@@ -550,6 +552,9 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         axes2[1].set_xlabel('Location (cm)')
         axes2[2].set_xlabel('Time relative to plateau onset (s)')
         axes2[2].set_ylabel('Change in ramp amplitude (mV)')
+        axes[2].plot(context.min_induction_t[context.clean_induction_t_indexes] / 1000.,
+                     np.zeros_like(context.clean_induction_t_indexes), c='darkgrey', alpha=0.75,
+                     zorder=1, linestyle='--')
 
     result = {}
 
@@ -559,7 +564,6 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             stop_time = context.down_t[-1]
         else:
             stop_time = context.induction_start_times[induction_lap + 1]
-        # print(induction_lap, start_time, stop_time)
         indexes = np.where((context.down_t >= start_time) & (context.down_t < stop_time))[0]
 
         next_normalized_weights = []
@@ -580,11 +584,10 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             next_normalized_weights.append(this_next_normalized_weight)
             overlap.append(np.trapz(this_signal_overlap, dx=context.down_dt / 1000.))
         if plot:
-            if context.induction == 1 and context.condition == 'control':
-                interp_overlap = np.interp(context.binned_x, context.peak_locs, overlap)
-                axes.plot(context.min_induction_t[context.clean_induction_t_indexes],
-                          interp_overlap[context.clean_induction_t_indexes],
-                          label='Induction lap: %i' % (induction_lap + 1))
+            interp_overlap = np.interp(context.binned_x, context.peak_locs, overlap)
+            axes.plot(context.min_induction_t[context.clean_induction_t_indexes] / 1000.,
+                      interp_overlap[context.clean_induction_t_indexes],
+                      label='Induction lap: %i' % (induction_lap + 1))
             # axes.plot(context.down_t[indexes], global_signal[indexes], label='Induction lap: %i' % (induction_lap + 1))
             axes2[1].plot(context.peak_locs, np.subtract(next_normalized_weights, current_normalized_weights),
                           label='Induction lap: %i' % (induction_lap + 1))
@@ -603,12 +606,12 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         ramp_snapshots.append(current_ramp)
 
     if plot:
-        if context.induction == 1 and context.condition == 'control':
-            axes.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-            clean_axes(axes)
-            fig.tight_layout()
-            fig.subplots_adjust(top=0.9)
-            fig.show()
+        axes.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        clean_axes(axes)
+        fig.tight_layout()
+        fig.subplots_adjust(top=0.9)
+        fig.show()
+
         axes2[2].plot(context.min_induction_t[context.clean_induction_t_indexes] / 1000.,
                       np.subtract(current_ramp, initial_ramp)[context.clean_induction_t_indexes], c='k')
         axes2[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
@@ -746,7 +749,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             group.create_dataset('local_signal_filter', compression='gzip', data=local_signal_filter)
             group.create_dataset('global_filter_t', compression='gzip', data=global_filter_t)
             group.create_dataset('global_filter', compression='gzip', data=global_filter)
-            group.create_dataset('ramp_offset', compression='gzip', data=this_ramp_offset)
+            group.create_dataset('dend_depo', compression='gzip', data=this_dend_depo)
             group.attrs['local_signal_peak'] = local_signal_peak
             group.attrs['global_signal_peak'] = global_signal_peak
             group.attrs['mean_induction_start_loc'] = context.mean_induction_start_loc
@@ -855,8 +858,8 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
 
     fig, axes = plt.subplots(1, 3, figsize=(10, 3.5))
     dep_scale = context.k_dep / context.k_pot
-    axes[0].plot(vrange, phi_pot(vrange), c='c', label='Potentiation')
-    axes[0].plot(vrange, phi_dep(vrange), c='r', label='Depression')
+    axes[0].plot(vrange, phi_pot(vrange), c='r', label='Potentiation')
+    axes[0].plot(vrange, phi_dep(vrange), c='c', label='Depression')
     axes[0].set_xlabel('Relative ramp amplitude')
     axes[0].set_ylabel('Modulation factor')
     axes[0].set_xlim((context.min_delta_ramp, context.peak_delta_ramp))
@@ -876,8 +879,8 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     axes[1].set_title('Plasticity signal kinetics', fontsize=mpl.rcParams['font.size'])
     axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
 
-    axes[2].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='Potentiation')
-    axes[2].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='Depression')
+    axes[2].plot(signal_xrange, pot_rate(signal_xrange), c='r', label='Potentiation')
+    axes[2].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='c', label='Depression')
     axes[2].set_xlabel('Normalized eligibility\nsignal amplitude (a.u.)')
     axes[2].set_ylabel('Normalized rate')
     axes[2].set_xlim((0., 1.))
@@ -1171,8 +1174,8 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     axes[0][1].set_xlabel('Normalized eligibility signal')
     axes[0][1].set_ylabel('Normalized rate')
     axes[0][1].set_title('Sigmoidal q$_{+}$, sigmoidal q$_{-}$', fontsize=mpl.rcParams['font.size'], pad=10.)
-    axes[0][1].plot(signal_xrange, pot_rate(signal_xrange), c='c', label='q$_{+}$ (Potentiation)')
-    axes[0][1].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='q$_{-}$ (Depression)')
+    axes[0][1].plot(signal_xrange, pot_rate(signal_xrange), c='r', label='q$_{+}$ (Potentiation)')
+    axes[0][1].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='c', label='q$_{-}$ (Depression)')
     axes[0][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
 
     cmap = cm.jet
@@ -1239,6 +1242,16 @@ def get_args_static_model_ramp():
     """
     # return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
     return [[1, 1, 1, 2], ['control', 'depo', 'hyper', 'control']]
+
+
+def get_args_static_model_ramp_include_hyper2():
+    """
+    A nested map operation is required to compute model_ramp features. The arguments to be mapped are the same
+    (static) for each set of parameters.
+    :param x: array
+    :return: list of list
+    """
+    return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
 
 
 def compute_features_model_ramp(x, induction=None, condition=None, model_id=None, export=False, plot=False):
