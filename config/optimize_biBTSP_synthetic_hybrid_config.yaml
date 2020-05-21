@@ -1,5 +1,5 @@
 bounds:
-  phi_min: !!python/tuple
+  dend_depo_mod_range: !!python/tuple
   - 0
   - 1.
   spine_th: !!python/tuple
@@ -99,7 +99,6 @@ kwargs:
   min_delta_weight: -0.2
   max_dend_depo: 20.
   min_dend_depo: -20.
-  phi_max: 1.
   default_run_vel: 25.
   induction_loc:
     '1': 120.
@@ -108,7 +107,7 @@ kwargs:
   target_peak_delta_weight: 3.
   target_peak_shift_1: -5.
   target_peak_val_1: 8.
-  target_peak_val_1_depo: 9.5
+  target_peak_val_1_depo: 9.
   target_peak_val_1_hyper: 6.5
   target_ramp_offset_1_depo: 10.
   target_ramp_offset_1_hyper: -20.
@@ -125,7 +124,7 @@ objective_names:
 optimization_title: biBTSP_synthetic_hybrid
 param_gen: PopulationAnnealing
 param_names:
-- phi_min
+- dend_depo_mod_range
 - spine_th
 - spine_half_width
 - f_dep_th
@@ -153,6 +152,6 @@ x0:
   k_pot: 6.347702E-01
   local_signal_decay: 8.146532E+02
   peak_delta_weight: 4.899299E+00
-  phi_min: 0.25
+  dend_depo_mod_range: 0.5
   spine_th: 0.5
   spine_half_width: 0.5

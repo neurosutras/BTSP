@@ -539,7 +539,7 @@ def sigmoid_segment(slope, th, xlim=None, ylim=None):
     return lambda x: (target_amp / current_amp) * (1. / (1. + np.exp(-slope * (x - th))) - y0) + ylim[0]
 
 
-def scaled_single_sigmoid(th, peak, x, ylim=None):
+def scaled_single_sigmoid(th, peak, x=None, ylim=None):
     """
     Transform a sigmoid to intersect x and y range limits.
     :param th: float
@@ -548,6 +548,8 @@ def scaled_single_sigmoid(th, peak, x, ylim=None):
     :param ylim: pair of float
     :return: callable
     """
+    if x is None:
+        x = (0., 1.)
     if ylim is None:
         ylim = (0., 1.)
     if th < x[0] or th > x[-1]:

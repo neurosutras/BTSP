@@ -470,15 +470,12 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
         axes2[1].set_xlabel('Location (cm)')
 
     for induction_lap in range(len(context.induction_start_times)):
-        if induction_lap == 0:
-            start_time = context.down_t[0]
-        else:
-            start_time = context.induction_stop_times[induction_lap - 1]
+        start_time = context.induction_start_times[induction_lap]
         if induction_lap == len(context.induction_start_times) - 1:
             stop_time = context.down_t[-1]
         else:
             stop_time = context.induction_start_times[induction_lap + 1]
-        indexes = np.where((context.down_t > start_time) & (context.down_t <= stop_time))
+        indexes = np.where((context.down_t >= start_time) & (context.down_t < stop_time))
 
         next_normalized_weights = []
         overlap = []
