@@ -17,9 +17,9 @@ bounds:
   global_signal_decay: !!python/tuple
   - 50.
   - 1750.
-  peak_delta_weight: !!python/tuple
-  - 1.5
-  - 6.
+  plateau_delta_depo: !!python/tuple
+  - 0.
+  - 20.
 default_params:
 rel_bounds:
 # - - local_signal_decay
@@ -64,19 +64,19 @@ feature_names:
 - exp3_delta_val_at_target_min
 - exp3_delta_val_at_model_min
 update_context:
-- - optimize_biBTSP_WD_F
+- - optimize_biBTSP_VD_F
   - update_model_params
 get_features_stages:
-- source: optimize_biBTSP_WD_F
+- source: optimize_biBTSP_VD_F
   get_args_static: get_args_static_signal_amplitudes
   compute_features: compute_features_signal_amplitudes
   filter_features: filter_features_signal_amplitudes
-- source: optimize_biBTSP_WD_F
+- source: optimize_biBTSP_VD_F
   get_args_dynamic: get_args_dynamic_model_ramp
   compute_features: compute_features_model_ramp
   filter_features: filter_features_model_ramp
 get_objectives:
-  optimize_biBTSP_WD_F: get_objectives
+  optimize_biBTSP_VD_F: get_objectives
 kwargs:
   data_file_name: 20200427_biBTSP_data.hdf5
   input_field_width: 90.  # cm
@@ -89,7 +89,7 @@ objective_names:
 - exp2_residual_score
 - exp3_residual_score
 - weights_path_distance
-optimization_title: biBTSP_WD_F
+optimization_title: biBTSP_VD_F
 param_gen: PopulationAnnealing
 param_names:
 - f_dep_th
@@ -98,7 +98,7 @@ param_names:
 - k_dep
 - local_signal_decay
 - global_signal_decay
-- peak_delta_weight
+- plateau_delta_depo
 target_range:
   ramp_offset: 0.01
   delta_min_val: 0.01
@@ -108,10 +108,10 @@ target_range:
   weights_path_distance: 0.1
 target_val:
 x0:
-  f_dep_half_width: 1.554989E-03
-  f_dep_th: 1.239571E-03
-  global_signal_decay: 5.505973E+02
-  k_dep: 5.073258E-02
-  k_pot: 2.197197E+00
-  local_signal_decay: 9.966217E+02
-  peak_delta_weight: 2.713324E+00
+  plateau_delta_depo: 5.
+  global_signal_decay: 5.117370E+02
+  k_dep: 2.577449E-01
+  k_pot: 2.691966E+00
+  local_signal_decay: 1.5E+03
+  f_dep_half_width: 1.526457E-03
+  f_dep_th: 1.000023E-03

@@ -17,7 +17,7 @@ plasticity.
 signals, and updated once per lap.
 
 Features/assumptions of voltage-dependent model D:
-1) Dendritic plateaus generate a global instructive signal that provides a necessary cofactor required to convert plasticity
+1) Dendritic plateaus generate a global instructive signal that provides a necessary cofactor required to convert
 plasticity eligibility signals at each synapse into either increases or decreases in synaptic strength.
 2) Activity at each synapse generates a local potentiation eligibility signal that, in conjunction with the global
 gating signal, can activate a forward process to increase synaptic strength. The amplitude of this eligibility signal
@@ -73,6 +73,12 @@ def init_context():
 
     context.verbose = int(context.verbose)
 
+    if 'plot' not in context():
+        context.plot = False
+
+    if 'truncate' not in context():
+        context.truncate = 2.5
+
     with h5py.File(context.data_file_path, 'r') as f:
         dt = f['defaults'].attrs['dt']  # ms
         input_field_peak_rate = f['defaults'].attrs['input_field_peak_rate']  # Hz
@@ -120,7 +126,8 @@ def init_context():
     if context.verbose > 1:
         print('optimize_biBTSP_%s: pid: %i; processing the following data_keys: %s' %
               (BTSP_model_name, os.getpid(), str(context.data_keys)))
-    largest_signal_amplitude_data_keys = [(6, 1), (18, 1), (23, 1), (24, 1), (25, 1), (31, 2), (46, 2), (5, 2)]
+    largest_signal_amplitude_data_keys = \
+        [(6, 1), (18, 1), (23, 1), (24, 1), (25, 1), (31, 2), (46, 2), (5, 2), (16, 1)]
     down_dt = 10.  # ms, to speed up optimization
     context.update(locals())
     context.cell_id = None
@@ -174,6 +181,9 @@ def import_data(cell_id, induction):
                 induction_context.current.append(data_group['processed']['current'][lap_key][:])
             induction_context.mean_position = data_group['processed']['mean_position'][:]
             induction_context.mean_t = data_group['processed']['mean_t'][:]
+            induction_context.min_induction_t = data_group['processed']['min_induction_t'][:]
+            induction_context.clean_induction_t_indexes = \
+                get_clean_induction_t_indexes(induction_context.min_induction_t, context.truncate * 1000.)
 
             if 'before' in data_group['processed']['exp_ramp']:
                 induction_context.exp_ramp['before'] = data_group['processed']['exp_ramp']['before'][:]
@@ -182,8 +192,8 @@ def import_data(cell_id, induction):
             calibrated_input_group = f['calibrated_input'][context.input_field_width_key][cell_key][induction_key]
             if 'before' in calibrated_input_group['LSA_ramp']:
                 induction_context.LSA_ramp['before'] = calibrated_input_group['LSA_ramp']['before'][:]
-                induction_context.LSA_ramp_offset['before'] = calibrated_input_group['LSA_ramp']['before'].attrs[
-                    'ramp_offset']
+                induction_context.LSA_ramp_offset['before'] = \
+                    calibrated_input_group['LSA_ramp']['before'].attrs['ramp_offset']
             induction_context.LSA_weights = {}
             induction_context.LSA_weights['before'] = calibrated_input_group['LSA_weights']['before'][:]
             induction_context.complete_run_vel = data_group['complete']['run_vel'][:]
@@ -203,10 +213,10 @@ def import_data(cell_id, induction):
     context.mean_induction_start_loc = np.mean(context.induction_locs)
     context.mean_induction_dur = np.mean(context.induction_durs)
     mean_induction_start_index = \
-    np.where(context.mean_position >= context.mean_induction_start_loc)[0][0]
+        np.where(context.mean_position >= context.mean_induction_start_loc)[0][0]
     mean_induction_stop_index = \
-    np.where(context.mean_t >= context.mean_t[mean_induction_start_index] +
-             context.mean_induction_dur)[0][0]
+        np.where(context.mean_t >= context.mean_t[mean_induction_start_index] +
+                 context.mean_induction_dur)[0][0]
     context.mean_induction_stop_loc = context.mean_position[mean_induction_stop_index]
     induction_start_times = []
     induction_stop_times = []
@@ -266,8 +276,8 @@ def get_args_static_signal_amplitudes():
     (static) for each set of parameters.
     :return: list of list
     """
-    return list(zip(*context.all_data_keys))
-    # return list(zip(*context.largest_signal_amplitude_data_keys))
+    # return list(zip(*context.all_data_keys))
+    return list(zip(*context.largest_signal_amplitude_data_keys))
 
 
 def compute_features_signal_amplitudes(x, cell_id=None, induction=None, model_id=None, export=False, plot=False):
@@ -290,7 +300,7 @@ def compute_features_signal_amplitudes(x, cell_id=None, induction=None, model_id
     start_time = time.time()
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
         get_dual_exp_decay_signal_filters(context.local_signal_decay, context.global_signal_decay,
-                                          context.down_dt, plot)
+                                          context.down_dt)
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
     local_signals = get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt)
 
@@ -339,9 +349,9 @@ def filter_features_signal_amplitudes(primitives, current_features, model_id=Non
         hist, edges = np.histogram(local_signal_peaks, bins=min(10, len(primitives)), density=True)
         bin_width = edges[1] - edges[0]
         axes.plot(edges[:-1] + bin_width / 2., hist * bin_width, c='r', label='Local eligibility signals')
-        axes.set_xlabel('Peak local plasticity signal amplitudes (a.u.)')
+        axes.set_xlabel('Peak eligibility signal amplitudes (a.u.)')
         axes.set_ylabel('Probability')
-        axes.set_title('Local signal amplitude distribution')
+        axes.set_title('Eligibility signal amplitude distribution')
         axes.legend(loc='best', frameon=False, framealpha=0.5)
         clean_axes(axes)
         fig.tight_layout()
@@ -351,9 +361,9 @@ def filter_features_signal_amplitudes(primitives, current_features, model_id=Non
         bin_width = edges[1] - edges[0]
         fig, axes = plt.subplots(1)
         axes.plot(edges[:-1] + bin_width / 2., hist * bin_width, c='k')
-        axes.set_xlabel('Peak global plasticity signal amplitudes (a.u.)')
+        axes.set_xlabel('Peak instructive signal amplitudes (a.u.)')
         axes.set_ylabel('Probability')
-        axes.set_title('Global signal amplitude distribution')
+        axes.set_title('Instructive signal amplitude distribution')
         clean_axes(axes)
         fig.tight_layout()
         fig.show()
@@ -379,7 +389,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
     """
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
         get_dual_exp_decay_signal_filters(context.local_signal_decay, context.global_signal_decay,
-                                          context.down_dt, plot)
+                                          context.down_dt)
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
 
     # BCM-like voltage dependence; linear
@@ -392,15 +402,27 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
 
-    if plot:
-        fig, axes = plt.subplots(1)
+    if plot and context.induction == 1:
+        fig, axes = plt.subplots(1, 3)
+        axes[0].plot(signal_xrange, pot_phi(signal_xrange), c='r', label='Potentiation')
+        axes[0].plot(signal_xrange, dep_phi(signal_xrange), c='c', label='Depression')
+        axes[0].set_xlabel('Ramp amplitude (normalized)')
+        axes[0].set_ylabel('Eligibility modulation factor')
+        axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
         dep_scale = context.k_dep / context.k_pot
-        axes.plot(signal_xrange, pot_rate(signal_xrange), c='c', label='Potentiation rate')
-        axes.plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='Depression rate')
-        axes.set_xlabel('Normalized signal overlap (a.u.)')
-        axes.set_ylabel('Normalized rate')
-        axes.set_title('Plasticity signal transformations')
-        axes.legend(loc='best', frameon=False, framealpha=0.5)
+        axes[2].plot(signal_xrange, pot_rate(signal_xrange), c='r', label='Potentiation rate')
+        axes[2].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='c', label='Depression rate')
+        axes[2].set_xlabel('Plasticity signal overlap (a.u.)')
+        axes[2].set_ylabel('Normalized rate')
+        axes[2].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        axes[1].plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='r',
+                     label='Eligibility signal filter')
+        axes[1].plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
+                     label='Instructive signal filter')
+        axes[1].set_xlabel('Time (s)')
+        axes[1].set_ylabel('Normalized amplitude')
+        axes[1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        axes[1].set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
         clean_axes(axes)
         fig.tight_layout()
         fig.show()
@@ -422,20 +444,26 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
     target_ramp = context.exp_ramp['after']
 
     if plot:
-        fig, axes = plt.subplots(2, sharex=True)
-        fig.suptitle('Induction: %i' % context.induction)
-        axes[0].plot(context.down_t / 1000., global_signal)
-        axes[0].set_ylabel('Instructive signal')
+        fig, axes = plt.subplots(1, 2)
+        fig.suptitle('Induction: %i' % (context.induction), y=1.)
+        axes[0].set_ylabel('Instructive signal amplitude (a.u.)')
+        axes[0].set_xlabel('Time (s)')
+        axes[1].set_ylabel('Integrated plasticity signal overlap (a.u.)')
         axes[1].set_xlabel('Time (s)')
-        axes[1].set_ylabel('Normalized ramp amplitude (mV)')
 
-        fig2, axes2 = plt.subplots(1, 2, sharex=True)
+        fig2, axes2 = plt.subplots(1, 3, figsize=(10., 4.))
         fig2.suptitle('Induction: %i' % context.induction)
         axes2[0].plot(context.binned_x, initial_ramp, c='k', label='Before')
+        axes2[0].plot(context.binned_x, target_ramp, c='r', label='Target')
         axes2[0].set_ylabel('Ramp amplitude (mV)')
         axes2[0].set_xlabel('Location (cm)')
-        axes2[1].set_ylabel('Change in synaptic weight')
+        axes2[1].set_ylabel('Change in synaptic\nweight (normalized)')
         axes2[1].set_xlabel('Location (cm)')
+        axes2[2].set_xlabel('Time relative to plateau onset (s)')
+        axes2[2].set_ylabel('Change in ramp amplitude (mV)')
+        axes2[2].plot(context.min_induction_t[context.clean_induction_t_indexes] / 1000.,
+                      np.zeros_like(context.clean_induction_t_indexes), c='darkgrey', alpha=0.75,
+                      zorder=1, linestyle='--')
 
     this_peak_ramp_amp = context.peak_delta_ramp
 
@@ -454,24 +482,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
                                                                 dep_phi, context.down_rate_maps, context.down_dt),
             local_signal_peak)
 
-        if plot and induction_lap == 0:
-            fig3, axes3 = plt.subplots()
-            voltage_range = np.linspace(np.min(current_complete_normalized_ramp),
-                                        np.max(current_complete_normalized_ramp), 10000)
-            axes3.plot(voltage_range, pot_phi(voltage_range), c='c', label='Potentiation')
-            axes3.plot(voltage_range, dep_phi(voltage_range), c='r', label='Depression')
-            axes3.set_ylabel('Voltage-dependent modulation factor')
-            axes3.set_xlabel('Normalized ramp amplitude')
-            axes3.set_title('Linear voltage-dependent modulation\nof synaptic eligibility')
-            axes3.legend(loc='best', frameon=False, framealpha=0.5)
-            clean_axes(axes3)
-            fig3.tight_layout()
-            fig3.show()
-
-        if induction_lap == 0:
-            start_time = context.down_t[0]
-        else:
-            start_time = context.induction_stop_times[induction_lap-1]
+        start_time = context.induction_start_times[induction_lap]
         if induction_lap == len(context.induction_start_times) - 1:
             stop_time = context.down_t[-1]
         else:
@@ -585,28 +596,6 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
         else:
             delta_min_loc = abs_delta_min_loc
     result['delta_min_loc'] = delta_min_loc
-    if plot:
-        bar_loc = max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.) * 0.95
-        fig, axes = plt.subplots(2)
-        axes[1].plot(context.peak_locs, delta_weights)
-        peak_delta_weight = np.max(delta_weights_snapshots)
-        axes[1].hlines(peak_delta_weight * 1.05, xmin=context.mean_induction_start_loc,
-                       xmax=context.mean_induction_stop_loc)
-        axes[0].plot(context.binned_x, target_ramp, label='Experiment')
-        axes[0].plot(context.binned_x, model_ramp, label='Model')
-        axes[0].hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
-        axes[1].set_ylabel('Change in\nsynaptic weight')
-        axes[1].set_xlabel('Location (cm)')
-        axes[0].set_ylabel('Subthreshold\ndepolarization (mV)')
-        axes[0].set_xlabel('Location (cm)')
-        axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-        axes[0].set_ylim([min(-1., np.min(model_ramp) - 1., np.min(target_ramp) - 1.),
-                          max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.)])
-        axes[1].set_ylim([-peak_delta_weight * 1.05, peak_delta_weight * 1.1])
-        clean_axes(axes)
-        fig.suptitle('Cell_id: %i, Induction: %i' % (context.cell_id, context.induction))
-        fig.tight_layout()
-        fig.show()
 
     local_peak_loc, local_peak_shift = {}, {}
     local_peak_loc['target'], local_peak_shift['target'] = \
@@ -870,10 +859,7 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
                                               context.complete_run_vel_gate, context.induction_gate,
                                               this_peak_ramp_amp)
 
-    if induction_lap == 0:
-        start_time = context.down_t[0]
-    else:
-        start_time = context.induction_stop_times[induction_lap - 1]
+    start_time = context.induction_start_times[induction_lap]
     if induction_lap == len(context.induction_start_times) - 1:
         stop_time = context.down_t[-1]
     else:
@@ -904,7 +890,7 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
         this_net_weight_rate = context.k_pot * this_pot_rate - context.k_dep * this_dep_rate
         example_net_dwdt[name] = this_net_weight_rate
 
-    colors = ['c', 'r']
+    colors = ['r', 'c']
 
     axes[0][1].get_shared_x_axes().join(axes[0][1], axes[0][2], axes[1][1], axes[1][2], axes[2][1], axes[2][2])
     axes[0][1].get_shared_y_axes().join(axes[0][1], axes[0][2])
@@ -1211,10 +1197,7 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
                                               context.complete_run_vel_gate, context.induction_gate,
                                               this_peak_ramp_amp)
 
-    if induction_lap == 0:
-        start_time = context.down_t[0]
-    else:
-        start_time = context.induction_stop_times[induction_lap - 1]
+    start_time = context.induction_start_times[induction_lap]
     if induction_lap == len(context.induction_start_times) - 1:
         stop_time = context.down_t[-1]
     else:
@@ -1370,6 +1353,7 @@ def filter_features_model_ramp(primitives, current_features, model_id=None, expo
     grouped_feature_names = ['delta_val_at_target_peak', 'delta_val_at_model_peak', 'delta_width', 'delta_peak_shift',
                              'delta_asymmetry', 'delta_min_loc', 'delta_val_at_target_min', 'delta_val_at_model_min',
                              'residual_score']
+    feature_names = ['weights_path_distance']
     for this_result_dict in primitives:
         if not this_result_dict:
             if context.verbose > 0:
@@ -1390,6 +1374,11 @@ def filter_features_model_ramp(primitives, current_features, model_id=None, expo
                     if key not in features:
                         features[key] = []
                     features[key].append(this_result_dict[cell_id][induction][feature_name])
+                for feature_name in feature_names:
+                    if feature_name in this_result_dict[cell_id][induction]:
+                        if feature_name not in features:
+                            features[feature_name] = []
+                        features[feature_name].append(this_result_dict[cell_id][induction][feature_name])
 
     for feature_name in grouped_feature_names:
         for group in groups:
@@ -1398,6 +1387,12 @@ def filter_features_model_ramp(primitives, current_features, model_id=None, expo
                 features[key] = np.mean(features[key])
             else:
                 features[key] = 0.
+
+    for feature_name in feature_names:
+        if feature_name in features and len(features[feature_name]) > 0:
+            features[feature_name] = np.mean(features[feature_name])
+        else:
+            features[feature_name] = 0.
 
     return features
 
@@ -1419,6 +1414,10 @@ def get_objectives(features, model_id=None, export=False):
             objective_name = group + '_' + feature_name
             if objective_name in features:
                 objectives[objective_name] = features[objective_name]
+
+    feature_name = 'weights_path_distance'
+    if feature_name in context.objective_names and feature_name in features:
+        objectives[feature_name] = (features[feature_name] / context.target_range[feature_name]) ** 2.
 
     for objective_name in context.objective_names:
         if objective_name not in objectives:
