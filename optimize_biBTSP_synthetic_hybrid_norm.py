@@ -81,11 +81,12 @@ def init_context():
     if 'truncate' not in context():
         context.truncate = 2.5
 
-    input_field_peak_rate = 1.
-    ramp_scaling_factor = 0.14970976921836665
+    # input_field_peak_rate = 1.
+    # ramp_scaling_factor = 0.14970976921836665
 
     with h5py.File(context.data_file_path, 'r') as f:
         dt = f['defaults'].attrs['dt']  # ms
+        input_field_peak_rate = f['defaults'].attrs['input_field_peak_rate']  # Hz
         num_inputs = f['defaults'].attrs['num_inputs']
         track_length = f['defaults'].attrs['track_length']  # cm
         binned_dx = f['defaults'].attrs['binned_dx']  # cm
@@ -120,6 +121,7 @@ def init_context():
         input_field_width = f['calibrated_input'][input_field_width_key].attrs['input_field_width']  # cm
         input_rate_maps, peak_locs = \
             generate_spatial_rate_maps(binned_x, num_inputs, input_field_peak_rate, input_field_width, track_length)
+        ramp_scaling_factor = f['calibrated_input'][input_field_width_key].attrs['ramp_scaling_factor']
 
     down_dt = 10.  # ms, to speed up optimization
     if 'num_induction_laps' not in context():

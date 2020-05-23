@@ -12,16 +12,16 @@ bounds:
   - 0.05
   - 1.
   f_dep_th: !!python/tuple
-  - 0.001
+  - 0.0001
   - 1.
   f_dep_half_width: !!python/tuple
-  - 0.001
+  - 0.0001
   - 1.
   k_pot: !!python/tuple
-  - 0.01
+  - 0.001
   - 10.
   k_dep: !!python/tuple
-  - 0.01
+  - 0.001
   - 10.
   local_signal_decay: !!python/tuple
   - 50.
