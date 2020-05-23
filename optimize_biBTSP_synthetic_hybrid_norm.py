@@ -35,7 +35,7 @@ f_pot is linear.
 7) f_dep represents the "sensitivity" of the reverse process to the presence of the local_signal. The transformation
 f_dep has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
 
-biBTSP_synthetic_hybrid:
+biBTSP_synthetic_hybrid_norm:
 Spine depolarization is modulated by local dendritic depolarization.
 Eligibility signal filter acts on spine depolarization.
 Gain function f_pot is linear and f_dep is sigmoidal.
@@ -50,7 +50,7 @@ import click
 context = Context()
 
 
-BTSP_model_name = 'synthetic_hybrid'
+BTSP_model_name = 'synthetic_hybrid_norm'
 
 
 def config_worker():
@@ -81,9 +81,11 @@ def init_context():
     if 'truncate' not in context():
         context.truncate = 2.5
 
+    input_field_peak_rate = 1.
+    ramp_scaling_factor = 0.14970976921836665
+
     with h5py.File(context.data_file_path, 'r') as f:
         dt = f['defaults'].attrs['dt']  # ms
-        input_field_peak_rate = f['defaults'].attrs['input_field_peak_rate']  # Hz
         num_inputs = f['defaults'].attrs['num_inputs']
         track_length = f['defaults'].attrs['track_length']  # cm
         binned_dx = f['defaults'].attrs['binned_dx']  # cm
@@ -118,7 +120,6 @@ def init_context():
         input_field_width = f['calibrated_input'][input_field_width_key].attrs['input_field_width']  # cm
         input_rate_maps, peak_locs = \
             generate_spatial_rate_maps(binned_x, num_inputs, input_field_peak_rate, input_field_width, track_length)
-        ramp_scaling_factor = f['calibrated_input'][input_field_width_key].attrs['ramp_scaling_factor']
 
     down_dt = 10.  # ms, to speed up optimization
     if 'num_induction_laps' not in context():
@@ -450,10 +451,6 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
         get_dual_exp_decay_signal_filters(context.local_signal_decay, context.global_signal_decay, context.down_dt)
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
-    global_signal_peak = np.max(global_signal)
-    global_signal /= global_signal_peak
-    local_signal_peak = np.max(get_local_signal_population(local_signal_filter, context.down_rate_maps,
-                                                           context.down_dt))
 
     signal_xrange = np.linspace(0., 1., 10000)
     dend_depo_range = np.linspace(context.min_dend_depo, context.max_dend_depo, 10000)
@@ -462,16 +459,24 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
 
     this_dend_depo = context.ramp_offset[context.condition]
-    get_spine_depo = get_spine_depo_f(this_dend_depo)
+    if context.condition == 'control':
+        this_spine_th = context.spine_th
+    elif context.condition == 'depo':
+        this_spine_th = context.spine_th_depo
+    elif context.condition == 'hyper':
+        this_spine_th = context.spine_th_hyper
+
+    get_spine_depo = np.vectorize(scaled_single_sigmoid(this_spine_th, this_spine_th + context.spine_half_width))
 
     if plot and context.induction == 1 and context.condition == 'control':
         fig, axes = plt.subplots(1, 3, figsize=(10., 4.))
-        axes[0].plot(signal_xrange, get_spine_depo_f(context.ramp_offset['control'])(signal_xrange), c='k',
-                     label='Control')
-        axes[0].plot(signal_xrange, get_spine_depo_f(context.ramp_offset['depo'])(signal_xrange), c='r',
-                     label='Depolarized')
-        axes[0].plot(signal_xrange, get_spine_depo_f(context.ramp_offset['hyper'])(signal_xrange), c='c',
-                     label='Hyperpolarized')
+        axes[0].plot(signal_xrange, get_spine_depo(signal_xrange), c='k', label='Control')
+        this_spine_depo_f = np.vectorize(scaled_single_sigmoid(context.spine_th_depo,
+                                                               context.spine_th_depo + context.spine_half_width))
+        axes[0].plot(signal_xrange, this_spine_depo_f(signal_xrange), c='r', label='Depolarized')
+        this_spine_depo_f = np.vectorize(scaled_single_sigmoid(context.spine_th_hyper,
+                                                               context.spine_th_hyper + context.spine_half_width))
+        axes[0].plot(signal_xrange, this_spine_depo_f(signal_xrange), c='c', label='Hyperpolarized')
         axes[0].set_xlabel('Presynaptic firing rate (normalized)')
         axes[0].set_ylabel('Spine depolarization (normalized)')
         axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
@@ -571,9 +576,8 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         for i, (this_rate_map, this_current_normalized_weight) in \
                 enumerate(zip(context.down_rate_maps, current_normalized_weights)):
             this_normalized_rate_map = this_rate_map / context.input_field_peak_rate
-            this_spine_depo = get_spine_depo(this_normalized_rate_map) * context.input_field_peak_rate
-            this_local_signal = \
-                np.divide(get_local_signal(this_spine_depo, local_signal_filter, context.down_dt), local_signal_peak)
+            this_spine_depo = get_spine_depo(this_normalized_rate_map)
+            this_local_signal = get_local_signal(this_spine_depo, local_signal_filter)
             this_signal_overlap = np.multiply(this_local_signal[indexes], global_signal[indexes])
             this_pot_rate = np.trapz(pot_rate(this_signal_overlap), dx=context.down_dt / 1000.)
             this_dep_rate = np.trapz(dep_rate(this_signal_overlap), dx=context.down_dt / 1000.)
@@ -1397,7 +1401,7 @@ def get_features_interactive(interface, x, model_id=None, plot=False):
 
 @click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True, ))
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/optimize_biBTSP_synthetic_hybrid_config.yaml')
+              default='config/optimize_biBTSP_synthetic_hybrid_norm_config.yaml')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
 @click.option("--export-file-path", type=str, default=None)
@@ -1413,17 +1417,17 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
          plot_summary_figure, exported_data_key):
     """
     To execute on a single process on one cell from the experimental dataset:
-    python -i optimize_biBTSP_synthetic_hybrid.py --plot --framework=serial --interactive
+    python -i optimize_biBTSP_synthetic_hybrid_norm.py --plot --framework=serial --interactive
 
     To execute using MPI parallelism with 1 controller process and N - 1 worker processes:
-    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_synthetic_hybrid.py --plot --framework=mpi --interactive
+    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_synthetic_hybrid_norm.py --plot --framework=mpi --interactive
 
     To optimize the models by running many instances in parallel:
     mpirun -n N python -m mpi4py.futures -m nested.optimize --config-file-path=$PATH_TO_CONFIG_FILE --disp --export \
         --framework=mpi --pop-size=200 --path-length=3 --max-iter=50
 
     To plot results previously exported to a file on a single process:
-    python -i optimize_biBTSP_synthetic_hybrid.py --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
+    python -i optimize_biBTSP_synthetic_hybrid_norm.py --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
         --framework=serial --interactive
 
     :param cli: contains unrecognized args as list of str

@@ -428,15 +428,14 @@ def get_triple_signal_filters(pot_signal_rise, pot_signal_decay, depot_signal_ri
            global_filter_t, global_filter
 
 
-def get_local_signal(rate_map, local_filter, dt):
+def get_local_signal(rate_map, local_filter):
     """
 
     :param rate_map: array
     :param local_filter: array
-    :param dt: float
     :return: array
     """
-    return np.convolve(0.001 * dt * rate_map, local_filter)[:len(rate_map)]
+    return np.convolve(rate_map, local_filter)[:len(rate_map)]
 
 
 def get_global_signal(induction_gate, global_filter):
@@ -449,7 +448,7 @@ def get_global_signal(induction_gate, global_filter):
     return np.convolve(induction_gate, global_filter)[:len(induction_gate)]
 
 
-def get_local_signal_population(local_filter, rate_maps, dt):
+def get_local_signal_population(local_filter, rate_maps):
     """
 
     :param local_filter: array
@@ -459,11 +458,11 @@ def get_local_signal_population(local_filter, rate_maps, dt):
     """
     local_signals = []
     for rate_map in rate_maps:
-        local_signals.append(get_local_signal(rate_map, local_filter, dt))
+        local_signals.append(get_local_signal(rate_map, local_filter))
     return local_signals
 
 
-def get_voltage_dependent_eligibility_signal_population(local_filter, normalized_ramp, phi, rate_maps, dt):
+def get_voltage_dependent_eligibility_signal_population(local_filter, normalized_ramp, phi, rate_maps):
     """
 
     :param local_filter: array
@@ -477,7 +476,7 @@ def get_voltage_dependent_eligibility_signal_population(local_filter, normalized
     this_phi = phi(normalized_ramp)
 
     for rate_map in rate_maps:
-        local_signals.append(get_local_signal(np.multiply(rate_map, this_phi), local_filter, dt))
+        local_signals.append(get_local_signal(np.multiply(rate_map, this_phi), local_filter))
 
     return local_signals
 

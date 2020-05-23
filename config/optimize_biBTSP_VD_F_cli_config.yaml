@@ -108,10 +108,10 @@ target_range:
   weights_path_distance: 0.1
 target_val:
 x0:
-  plateau_delta_depo: 5.
-  global_signal_decay: 5.117370E+02
-  k_dep: 2.577449E-01
-  k_pot: 2.691966E+00
-  local_signal_decay: 1.5E+03
-  f_dep_half_width: 1.526457E-03
-  f_dep_th: 1.000023E-03
+  f_dep_th: 2.666202E-03
+  f_dep_half_width: 1.274064E-03
+  k_pot: 6.494112E+00
+  k_dep: 1.374094E-01
+  local_signal_decay: 7.871259E+02
+  global_signal_decay: 1.169073E+03
+  plateau_delta_depo: 5.001556E+0
