@@ -1247,7 +1247,8 @@ def get_args_static_model_ramp():
     :return: list of list
     """
     # return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
-    return [[1, 1, 1, 2], ['control', 'depo', 'hyper', 'control']]
+    # return [[1, 1, 1, 2], ['control', 'depo', 'hyper', 'control']]
+    return [[1, 2], ['control', 'control']]
 
 
 def get_args_static_model_ramp_include_hyper2():
