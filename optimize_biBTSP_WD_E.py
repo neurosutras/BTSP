@@ -292,7 +292,7 @@ def compute_features_signal_amplitudes(x, cell_id=None, induction=None, model_id
         get_dual_exp_decay_signal_filters(context.local_signal_decay, context.global_signal_decay,
                                           context.down_dt, plot)
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
-    local_signals = get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt)
+    local_signals = get_local_signal_population(local_signal_filter, context.down_rate_maps)
 
     result = {'local_signal_peak': np.max(local_signals),
               'global_signal_peak': np.max(global_signal)}
@@ -382,7 +382,7 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
                                           context.down_dt, plot)
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
     local_signals = \
-        np.divide(get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt),
+        np.divide(get_local_signal_population(local_signal_filter, context.down_rate_maps),
                   local_signal_peak)
 
     signal_xrange = np.linspace(0., 1., 10000)
@@ -740,7 +740,7 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
 
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
     local_signals = \
-        np.divide(get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt),
+        np.divide(get_local_signal_population(local_signal_filter, context.down_rate_maps),
                   local_signal_peak)
 
     signal_xrange = np.linspace(0., 1., 10000)
@@ -1139,7 +1139,7 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
 
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
     local_signals = \
-        np.divide(get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt),
+        np.divide(get_local_signal_population(local_signal_filter, context.down_rate_maps),
                   local_signal_peak)
 
     signal_xrange = np.linspace(0., 1., 10000)

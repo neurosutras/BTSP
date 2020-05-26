@@ -452,8 +452,8 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
     global_signal_peak = np.max(global_signal)
     global_signal /= global_signal_peak
-    local_signal_peak = np.max(get_local_signal_population(local_signal_filter, context.down_rate_maps,
-                                                           context.down_dt))
+    local_signal_peak = np.max(get_local_signal_population(local_signal_filter, context.down_rate_maps /
+                                                           context.input_field_peak_rate))
 
     signal_xrange = np.linspace(0., 1., 10000)
     dend_depo_range = np.linspace(context.min_dend_depo, context.max_dend_depo, 10000)
@@ -571,9 +571,9 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         for i, (this_rate_map, this_current_normalized_weight) in \
                 enumerate(zip(context.down_rate_maps, current_normalized_weights)):
             this_normalized_rate_map = this_rate_map / context.input_field_peak_rate
-            this_spine_depo = get_spine_depo(this_normalized_rate_map) * context.input_field_peak_rate
+            this_spine_depo = get_spine_depo(this_normalized_rate_map)
             this_local_signal = \
-                np.divide(get_local_signal(this_spine_depo, local_signal_filter, context.down_dt), local_signal_peak)
+                np.divide(get_local_signal(this_spine_depo, local_signal_filter), local_signal_peak)
             this_signal_overlap = np.multiply(this_local_signal[indexes], global_signal[indexes])
             this_pot_rate = np.trapz(pot_rate(this_signal_overlap), dx=context.down_dt / 1000.)
             this_dep_rate = np.trapz(dep_rate(this_signal_overlap), dx=context.down_dt / 1000.)
