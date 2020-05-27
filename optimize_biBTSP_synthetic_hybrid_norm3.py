@@ -31,11 +31,11 @@ I (inactive) <------------------------------> A (active)
 4) global_signals are pooled across all cells and normalized to a peak value of 1.
 5) local_signals are pooled across all cells and normalized to a peak value of 1.
 6) f_pot represents the "sensitivity" of the forward process to the presence of the local_signal. The transformation
-f_pot is linear.
+f_pot has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
 7) f_dep represents the "sensitivity" of the reverse process to the presence of the local_signal. The transformation
 f_dep has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
 
-biBTSP_synthetic_hybrid_norm2:
+biBTSP_synthetic_hybrid_norm3:
 Spine depolarization is modulated by local dendritic depolarization.
 Eligibility signal filter acts on spine depolarization.
 Gain function f_pot is linear and f_dep is sigmoidal.
@@ -50,7 +50,7 @@ import click
 context = Context()
 
 
-BTSP_model_name = 'synthetic_hybrid_norm2'
+BTSP_model_name = 'synthetic_hybrid_norm3'
 
 
 def config_worker():
@@ -456,7 +456,8 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
 
     signal_xrange = np.linspace(0., 1., 10000)
     dend_depo_range = np.linspace(context.min_dend_depo, context.max_dend_depo, 10000)
-    pot_rate = lambda x: x
+    pot_rate = np.vectorize(scaled_single_sigmoid(
+        context.f_pot_th, context.f_pot_th + context.f_pot_half_width, signal_xrange))
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
 
@@ -847,7 +848,8 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
     signal_xrange = np.linspace(0., 1., 10000)
     vrange = np.linspace(context.min_delta_ramp, context.peak_delta_ramp, 10000)
-    pot_rate = lambda x: x
+    pot_rate = np.vectorize(scaled_single_sigmoid(
+        context.f_pot_th, context.f_pot_th + context.f_pot_half_width, signal_xrange))
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
     phi_pot = np.vectorize(lambda x: 1.)
@@ -1395,7 +1397,7 @@ def get_features_interactive(interface, x, model_id=None, plot=False):
 
 @click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True, ))
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/optimize_biBTSP_synthetic_hybrid_norm2_config.yaml')
+              default='config/optimize_biBTSP_synthetic_hybrid_norm3_config.yaml')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
 @click.option("--export-file-path", type=str, default=None)
@@ -1411,17 +1413,17 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
          plot_summary_figure, exported_data_key):
     """
     To execute on a single process on one cell from the experimental dataset:
-    python -i optimize_biBTSP_synthetic_hybrid_norm2.py --plot --framework=serial --interactive
+    python -i optimize_biBTSP_synthetic_hybrid_norm3.py --plot --framework=serial --interactive
 
     To execute using MPI parallelism with 1 controller process and N - 1 worker processes:
-    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_synthetic_hybrid_norm2.py --plot --framework=mpi --interactive
+    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_synthetic_hybrid_norm3.py --plot --framework=mpi --interactive
 
     To optimize the models by running many instances in parallel:
     mpirun -n N python -m mpi4py.futures -m nested.optimize --config-file-path=$PATH_TO_CONFIG_FILE --disp --export \
         --framework=mpi --pop-size=200 --path-length=3 --max-iter=50
 
     To plot results previously exported to a file on a single process:
-    python -i optimize_biBTSP_synthetic_hybrid_norm2.py --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
+    python -i optimize_biBTSP_synthetic_hybrid_norm3.py --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
         --framework=serial --interactive
 
     :param cli: contains unrecognized args as list of str
