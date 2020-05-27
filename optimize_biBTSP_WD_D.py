@@ -299,7 +299,8 @@ def compute_features_signal_amplitudes(x, cell_id=None, induction=None, model_id
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
         get_dual_exp_decay_signal_filters(context.local_signal_decay, context.global_signal_decay, context.down_dt)
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
-    local_signals = get_local_signal_population(local_signal_filter, context.down_rate_maps)
+    local_signals = get_local_signal_population(local_signal_filter,
+                                                context.down_rate_maps / context.input_field_peak_rate)
 
     result = {'local_signal_peak': np.max(local_signals),
               'global_signal_peak': np.max(global_signal)}
@@ -388,8 +389,8 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
         get_dual_exp_decay_signal_filters(context.local_signal_decay, context.global_signal_decay,
                                           context.down_dt)
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
-    local_signals = \
-        np.divide(get_local_signal_population(local_signal_filter, context.down_rate_maps), local_signal_peak)
+    local_signals = np.divide(get_local_signal_population(
+        local_signal_filter, context.down_rate_maps / context.input_field_peak_rate), local_signal_peak)
 
     signal_xrange = np.linspace(0., 1., 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(
@@ -743,8 +744,8 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
     target_ramp = context.exp_ramp['after']
 
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
-    local_signals = \
-        np.divide(get_local_signal_population(local_signal_filter, context.down_rate_maps), local_signal_peak)
+    local_signals = np.divide(get_local_signal_population(
+        local_signal_filter, context.down_rate_maps / context.input_field_peak_rate), local_signal_peak)
 
     signal_xrange = np.linspace(0., 1., 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(
@@ -1142,8 +1143,8 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     target_ramp = context.exp_ramp['after']
 
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
-    local_signals = \
-        np.divide(get_local_signal_population(local_signal_filter, context.down_rate_maps), local_signal_peak)
+    local_signals = np.divide(get_local_signal_population(
+        local_signal_filter, context.down_rate_maps / context.input_field_peak_rate), local_signal_peak)
 
     signal_xrange = np.linspace(0., 1., 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(

@@ -75,7 +75,7 @@ def init_context():
     
     if 'plot' not in context():
         context.plot = False
-        
+
     if 'truncate' not in context():
         context.truncate = 2.5
 
@@ -253,8 +253,7 @@ def import_data(cell_id, induction):
     context.complete_rate_maps = \
         get_complete_rate_maps(context.input_rate_maps, context.binned_x, context.position,
                                context.complete_run_vel_gate)
-    context.down_t = np.arange(context.complete_t[0],
-                                         context.complete_t[-1] + context.down_dt / 2., context.down_dt)
+    context.down_t = np.arange(context.complete_t[0], context.complete_t[-1] + context.down_dt / 2., context.down_dt)
     context.down_rate_maps = []
     for rate_map in context.complete_rate_maps:
         this_down_rate_map = np.interp(context.down_t, context.complete_t, rate_map)
@@ -309,10 +308,9 @@ def compute_features_signal_amplitudes(x, cell_id=None, induction=None, model_id
         sys.stdout.flush()
     start_time = time.time()
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
-        get_dual_exp_decay_signal_filters(context.local_signal_decay, context.global_signal_decay,
-                                          context.down_dt)
+        get_dual_exp_decay_signal_filters(context.local_signal_decay, context.global_signal_decay, context.down_dt)
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
-    local_signals = get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt)
+    local_signals = get_local_signal_population(local_signal_filter, context.down_rate_maps)
 
     result = {'local_signal_peak': np.max(local_signals),
               'global_signal_peak': np.max(global_signal)}
@@ -475,8 +473,8 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
         axes2[2].set_xlabel('Time relative to plateau onset (s)')
         axes2[2].set_ylabel('Change in ramp amplitude (mV)')
         axes2[2].plot(context.min_induction_t[context.clean_induction_t_indexes] / 1000.,
-                     np.zeros_like(context.clean_induction_t_indexes), c='darkgrey', alpha=0.75,
-                     zorder=1, linestyle='--')
+                      np.zeros_like(context.clean_induction_t_indexes), c='darkgrey', alpha=0.75,
+                      zorder=1, linestyle='--')
 
     this_peak_ramp_amp = context.peak_ramp_amp + context.plateau_delta_depo
 
@@ -1241,8 +1239,8 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
         np.divide(get_local_signal(np.multiply(example_pre_rate, dep_phi(this_normalized_current_ramp)),
                                    local_signal_filter, context.down_dt),
                   local_signal_peak)
-    example_pot_rate = context.k_pot * np.multiply(pot_rate(example_pot_elig_signal), this_global_signal)
-    example_dep_rate = context.k_dep * np.multiply(dep_rate(example_dep_elig_signal), this_global_signal)
+    example_pot_rate = context.k_pot * pot_rate(np.multiply(example_pot_elig_signal, this_global_signal))
+    example_dep_rate = context.k_dep * dep_rate(np.multiply(example_dep_elig_signal, this_global_signal))
     example_net_dwdt = np.subtract(example_pot_rate, example_dep_rate)
 
     axes[0].get_shared_x_axes().join(axes[0], axes[1], axes[2])

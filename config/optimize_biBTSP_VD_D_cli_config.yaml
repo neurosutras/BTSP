@@ -1,40 +1,41 @@
 bounds:
-  k_pot: !!python/tuple
-  - 0.1
-  - 10.
-  k_dep: !!python/tuple
-  - 0.1
-  - 10.
-  f_pot_th: !!python/tuple
-  - 0.001
-  - 1.
   f_pot_half_width: !!python/tuple
-  - 0.001
+  - 0.00001
+  - 1.
+  f_pot_th: !!python/tuple
+  - 0.00001
   - 1.
   f_dep_th: !!python/tuple
-  - 0.001
+  - 0.00001
   - 1.
   f_dep_half_width: !!python/tuple
-  - 0.001
+  - 0.00001
   - 1.
+  k_pot: !!python/tuple
+  - 0.001
+  - 10.
+  k_dep: !!python/tuple
+  - 0.001
+  - 10.
   local_signal_decay: !!python/tuple
   - 50.
-  - 1500.
+  - 1750.
   global_signal_decay: !!python/tuple
   - 50.
-  - 1500.
-  peak_delta_ramp: !!python/tuple
-  - 15.
-  - 40.
+  - 1750.
+  plateau_delta_depo: !!python/tuple
+  - 0.
+  - 20.
+default_params:
 rel_bounds:
-- - local_signal_decay
-  - '>'
-  - 1.0
-  - global_signal_decay
-- - k_pot
-  - '>'
-  - 1.0
-  - k_dep
+#- - local_signal_decay
+#  - '>'
+#  - 1.0
+#  - global_signal_decay
+#- - k_pot
+#  - '>'
+#  - 1.0
+#  - k_dep
 feature_names:
 - spont_delta_val_at_target_peak
 - spont_delta_val_at_model_peak
@@ -87,37 +88,40 @@ kwargs:
   input_field_width: 90.  # cm
   verbose: 1
   min_delta_weight: -0.2
+  weights_path_distance_threshold: 2.
 objective_names:
 - spont_residual_score
 - exp1_residual_score
 - exp2_residual_score
 - exp3_residual_score
+- weights_path_distance
 optimization_title: biBTSP_VD_D
 param_gen: PopulationAnnealing
 param_names:
-- k_pot
-- k_dep
-- f_pot_th
 - f_pot_half_width
+- f_pot_th
 - f_dep_th
 - f_dep_half_width
+- k_pot
+- k_dep
 - local_signal_decay
 - global_signal_decay
-- peak_delta_ramp
+- plateau_delta_depo
 target_range:
   ramp_offset: 0.01
   delta_min_val: 0.01
   delta_peak_val: 0.01
   residuals: 0.1
   weights_smoothness: 0.015
+  weights_path_distance: 0.1
 target_val:
 x0:
-  peak_delta_ramp: 15.
-  global_signal_decay: 5.117370E+02
-  k_dep: 2.577449E-01
-  k_pot: 2.691966E+00
-  local_signal_decay: 1.5E+03
-  f_dep_half_width: 1.526457E-03
-  f_dep_th: 1.000023E-03
-  f_pot_half_width: 3.882245E-02
-  f_pot_th: 1.593557E-01
+  plateau_delta_depo: 0.
+  f_dep_half_width: 0.12405841998346241
+  f_dep_th: 0.007534684168753068
+  f_pot_half_width: 0.003633506511866159
+  f_pot_th: 0.023798043271957506
+  global_signal_decay: 231.7718940543454
+  k_dep: 0.3635437674877981
+  k_pot: 0.53662771680921
+  local_signal_decay: 632.7236873611381
