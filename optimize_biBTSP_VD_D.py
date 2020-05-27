@@ -310,7 +310,8 @@ def compute_features_signal_amplitudes(x, cell_id=None, induction=None, model_id
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
         get_dual_exp_decay_signal_filters(context.local_signal_decay, context.global_signal_decay, context.down_dt)
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
-    local_signals = get_local_signal_population(local_signal_filter, context.down_rate_maps)
+    local_signals = get_local_signal_population(local_signal_filter,
+                                                context.down_rate_maps / context.input_field_peak_rate)
 
     result = {'local_signal_peak': np.max(local_signals),
               'global_signal_peak': np.max(global_signal)}
@@ -485,14 +486,12 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
                                                   this_peak_ramp_amp)
         current_complete_normalized_ramp = \
             np.divide(np.interp(context.down_t, context.complete_t, current_complete_ramp), this_peak_ramp_amp)
-        pot_eligibility_signals = np.divide(
-            get_voltage_dependent_eligibility_signal_population(local_signal_filter, current_complete_normalized_ramp,
-                                                                pot_phi, context.down_rate_maps),
-            local_signal_peak)
-        dep_eligibility_signals = np.divide(
-            get_voltage_dependent_eligibility_signal_population(local_signal_filter, current_complete_normalized_ramp,
-                                                                dep_phi, context.down_rate_maps),
-            local_signal_peak)
+        pot_eligibility_signals = np.divide(get_voltage_dependent_eligibility_signal_population(
+            local_signal_filter, current_complete_normalized_ramp, pot_phi,
+            context.down_rate_maps / context.input_field_peak_rate), local_signal_peak)
+        dep_eligibility_signals = np.divide(get_voltage_dependent_eligibility_signal_population(
+            local_signal_filter, current_complete_normalized_ramp, dep_phi,
+            context.down_rate_maps / context.input_field_peak_rate), local_signal_peak)
 
         start_time = context.induction_start_times[induction_lap]
         if induction_lap == len(context.induction_start_times) - 1:
