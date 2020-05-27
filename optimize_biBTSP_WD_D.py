@@ -771,7 +771,7 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
         sample_time_delays.append(this_delay)
     sample_time_delays = np.abs(sample_time_delays)
 
-    target_time_delay = 2500.
+    target_time_delay = 5000.
 
     relative_indexes = np.where((sample_time_delays > target_time_delay) &
                                 (final_weights[input_sample_indexes] > initial_weights[input_sample_indexes]))[0]
@@ -859,12 +859,12 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
                                               context.complete_run_vel_gate, context.induction_gate, peak_ramp_amp)
 
     start_time = context.induction_start_times[induction_lap]
-    buffer_start_time = max(context.down_t[0], start_time - 4000.)
+    buffer_start_time = max(context.down_t[0], start_time - 5000.)
     if induction_lap == len(context.induction_start_times) - 1:
         stop_time = context.down_t[-1]
     else:
         stop_time = context.induction_start_times[induction_lap + 1]
-    stop_time = min(stop_time, start_time + 4000.)
+    stop_time = min(stop_time, start_time + 5000.)
     indexes = np.where((context.down_t >= buffer_start_time) & (context.down_t < stop_time))[0]
 
     this_current_ramp = np.interp(context.down_t, context.complete_t, current_complete_ramp)[indexes]
@@ -905,10 +905,10 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
         axes0_1_right[i].legend(loc=(0., 1.0), frameon=False, framealpha=0.5, handlelength=1,
                                 fontsize=mpl.rcParams['font.size'])
 
-        axes[1][i + 1].plot(this_t, this_local_signal, c=colors[i], label='Synaptic eligibility signal')
-        axes[1][i + 1].plot(this_t, this_global_signal, c='k', label='Dendritic instructive signal', linewidth=0.75)
+        axes[1][i + 1].plot(this_t, this_local_signal, c=colors[i], label='Synaptic eligibility signal', linewidth=1.)
+        axes[1][i + 1].plot(this_t, this_global_signal, c='k', label='Dendritic instructive signal', linewidth=1.)
         axes[1][i + 1].fill_between(this_t, 0., np.minimum(this_local_signal, this_global_signal), alpha=0.5,
-                                    facecolor=colors[i], label='Signal overlap')
+                                    facecolor=colors[i], label='Signal overlap', linewidth=0.)
         axes[1][i + 1].set_xlabel('Time (s)')
         axes[1][i + 1].legend(loc=(0., 1.0), frameon=False, framealpha=0.5, handlelength=1,
                               fontsize=mpl.rcParams['font.size'])
@@ -920,13 +920,13 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
     xmin = max(-5., np.min(this_t))
     xmax = np.max(this_t)
     axes[0][1].set_xlim(xmin, xmax)
-    axes[0][1].set_xticks(np.round((np.arange(xmin, xmax, 5.) / 5.)) * 5.)
-    axes[0][2].set_xticks(np.round((np.arange(xmin, xmax, 5.) / 5.)) * 5.)
-    axes[1][1].set_xticks(np.round((np.arange(xmin, xmax, 5.) / 5.)) * 5.)
-    axes[1][2].set_xticks(np.round((np.arange(xmin, xmax, 5.) / 5.)) * 5.)
-    axes[2][1].set_xticks(np.round((np.arange(xmin, xmax, 5.) / 5.)) * 5.)
-    axes[2][2].set_xticks(np.round((np.arange(xmin, xmax, 5.) / 5.)) * 5.)
     """
+    axes[0][1].set_xticks(np.arange(-4., 5., 2))
+    axes[0][2].set_xticks(np.arange(-4., 5., 2))
+    axes[1][1].set_xticks(np.arange(-4., 5., 2))
+    axes[1][2].set_xticks(np.arange(-4., 5., 2))
+    axes[2][1].set_xticks(np.arange(-4., 5., 2))
+    axes[2][2].set_xticks(np.arange(-4., 5., 2))
 
     ymax0_left = context.input_field_peak_rate / 0.85
     ymax0_right = peak_ramp_amp / 0.85
@@ -1204,12 +1204,12 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
                                               context.complete_run_vel_gate, context.induction_gate, peak_ramp_amp)
 
     start_time = context.induction_start_times[induction_lap]
-    buffer_start_time = max(context.down_t[0], start_time - 4000.)
+    buffer_start_time = max(context.down_t[0], start_time - 2000.)
     if induction_lap == len(context.induction_start_times) - 1:
         stop_time = context.down_t[-1]
     else:
         stop_time = context.induction_start_times[induction_lap + 1]
-    stop_time = min(stop_time, start_time + 4000.)
+    stop_time = min(stop_time, start_time + 8000.)
     indexes = np.where((context.down_t >= buffer_start_time) & (context.down_t < stop_time))[0]
 
     this_current_ramp = np.interp(context.down_t, context.complete_t, current_complete_ramp)[indexes]
@@ -1219,8 +1219,6 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     example_pre_rate = context.down_rate_maps[depressing_example_index][indexes]
     example_current_normalized_weight = current_weights[depressing_example_index] / peak_weight
     example_local_signal = local_signals[depressing_example_index][indexes]
-    example_pot_elig_signal = example_local_signal * (1. - example_current_normalized_weight)
-    example_dep_elig_signal = example_local_signal * example_current_normalized_weight
     example_pot_rate = peak_weight * context.k_pot * (1. - example_current_normalized_weight) * \
                        pot_rate(np.multiply(example_local_signal, this_global_signal))
     example_dep_rate = peak_weight * context.k_dep * example_current_normalized_weight * \
@@ -1228,7 +1226,7 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     example_net_dwdt = np.subtract(example_pot_rate, example_dep_rate)
 
     axes[0].get_shared_x_axes().join(axes[0], axes[1], axes[2])
-    ymax1 = max(np.max(this_global_signal), np.max(example_pot_elig_signal), np.max(example_dep_elig_signal))
+    ymax1 = max(np.max(this_global_signal), np.max(example_local_signal))
     axes0_right = axes[0].twinx()
 
     axes[0].plot(this_t, example_pre_rate, c='r', linewidth=1., label='Presynaptic\nfiring rate')
@@ -1238,20 +1236,16 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     handles.extend(handles_right)
     labels.extend(labels_right)
     handles.append(Line2D([0], [0], color='k'))
-    labels.append('Postsynaptic\nplateau')
+    labels.append('Postsynaptic plateau')
     leg = axes[0].legend(handles=handles, labels=labels, loc=(0., 1.), frameon=False, framealpha=0.5, handlelength=1,
                          fontsize=mpl.rcParams['font.size'])
     for line in leg.get_lines():
         line.set_linewidth(2.)
 
-    axes[1].plot(this_t, example_pot_elig_signal, c='r', linewidth=1., label='Potentiation $signal_{eligibility}$')
-    axes[1].plot(this_t, example_dep_elig_signal, c='c', linewidth=1.,
-                 label='Depression $signal_{eligibility}$')
-    axes[1].plot(this_t, this_global_signal, c='k', linewidth=1., label='Dendritic $signal_{instructive}$')
-    axes[1].fill_between(this_t, 0., np.minimum(example_pot_elig_signal, this_global_signal), alpha=0.5,
-                         facecolor='r', edgecolor='none', label='Potentiation signal overlap')
-    axes[1].fill_between(this_t, 0., np.minimum(example_dep_elig_signal, this_global_signal),
-                         alpha=0.5, facecolor='c', edgecolor='none', label='Depression signal overlap')
+    axes[1].plot(this_t, example_local_signal, c='purple', linewidth=1., label='Eligibility signal')
+    axes[1].plot(this_t, this_global_signal, c='k', linewidth=1., label='Instructive signal')
+    axes[1].fill_between(this_t, 0., np.minimum(example_local_signal, this_global_signal), alpha=0.5,
+                         facecolor='purple', edgecolor='none', label='Signal overlap', linewidth=0)
     leg = axes[1].legend(loc=(0., 1.0), frameon=False, framealpha=0.5, handlelength=1,
                          fontsize=mpl.rcParams['font.size'])
     for line in leg.get_lines():

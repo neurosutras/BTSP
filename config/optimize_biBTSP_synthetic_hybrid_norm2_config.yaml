@@ -30,6 +30,16 @@ bounds:
   - 1.5
   - 6.
 default_params:
+  dend_depo_mod_range: 6.536533E-01
+  # f_dep_half_width: 9.091255E-02
+  # f_dep_th: 8.894545E-03
+  global_signal_decay: 7.416242E+02
+  # k_dep: 3.161347E-01
+  # k_pot: 6.702605E-01
+  local_signal_decay: 1.012450E+03
+  peak_delta_weight: 4.650342E+00
+  spine_half_width: 4.077459E-01
+  spine_th: 5.531024E-01
 rel_bounds:
 #- - local_signal_decay
 #  - '>'
@@ -146,11 +156,11 @@ target_val:
   ramp_amp_after_first_plateau: 4.
 x0:
   dend_depo_mod_range: 6.536533E-01
-  f_dep_half_width: 9.091255E-03
-  f_dep_th: 1.294545E-03
+  f_dep_half_width: 0.01818251
+  f_dep_th:  0.001778909
   global_signal_decay: 7.416242E+02
-  k_dep: 2.161347E-01
-  k_pot: 3.002605
+  k_dep: 0.06322694
+  k_pot: 0.1340521
   local_signal_decay: 1.012450E+03
   peak_delta_weight: 4.650342E+00
   spine_half_width: 4.077459E-01
