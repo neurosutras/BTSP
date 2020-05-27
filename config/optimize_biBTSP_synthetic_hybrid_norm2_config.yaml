@@ -156,11 +156,11 @@ target_val:
   ramp_amp_after_first_plateau: 4.
 x0:
   dend_depo_mod_range: 6.536533E-01
-  f_dep_half_width: 0.024546388499999995
-  f_dep_th:  0.0177890
+  f_dep_half_width: 1.990673E-02
+  f_dep_th: 8.277872E-04
   global_signal_decay: 7.416242E+02
-  k_dep: 6.702605E-01
-  k_pot: 2.482446296296296
+  k_dep: 2.792824E-01
+  k_pot: 2.799519E+00
   local_signal_decay: 1.012450E+03
   peak_delta_weight: 4.650342E+00
   spine_half_width: 4.077459E-01
