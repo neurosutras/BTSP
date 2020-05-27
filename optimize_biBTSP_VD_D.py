@@ -902,10 +902,12 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
         this_down_rate_map = context.down_rate_maps[i]
         example_pre_rates[name] = this_down_rate_map[indexes]
 
-        this_pot_signal = np.divide(get_local_signal(np.multiply(this_down_rate_map, this_pot_phi), local_signal_filter,
-                                                     context.down_dt)[indexes], local_signal_peak)
-        this_dep_signal = np.divide(get_local_signal(np.multiply(this_down_rate_map, this_dep_phi), local_signal_filter,
-                                                     context.down_dt)[indexes], local_signal_peak)
+        this_pot_signal = np.divide(get_local_signal(np.multiply(this_down_rate_map / context.input_field_peak_rate,
+                                                                 this_pot_phi), local_signal_filter)[indexes],
+                                    local_signal_peak)
+        this_dep_signal = np.divide(get_local_signal(np.multiply(this_down_rate_map / context.input_field_peak_rate,
+                                                                 this_dep_phi), local_signal_filter)[indexes],
+                                    local_signal_peak)
         example_pot_signals[name] = this_pot_signal
         example_dep_signals[name] = this_dep_signal
         this_pot_rate = pot_rate(np.multiply(this_pot_signal, this_global_signal))
@@ -1234,13 +1236,13 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
 
     example_pre_rate = context.down_rate_maps[depressing_example_index][indexes]
     example_pot_elig_signal = \
-        np.divide(get_local_signal(np.multiply(example_pre_rate, pot_phi(this_normalized_current_ramp)),
-                                   local_signal_filter, context.down_dt),
-                  local_signal_peak)
+        np.divide(get_local_signal(np.multiply(example_pre_rate / context.input_field_peak_rate,
+                                               pot_phi(this_normalized_current_ramp)),
+                                   local_signal_filter), local_signal_peak)
     example_dep_elig_signal = \
-        np.divide(get_local_signal(np.multiply(example_pre_rate, dep_phi(this_normalized_current_ramp)),
-                                   local_signal_filter, context.down_dt),
-                  local_signal_peak)
+        np.divide(get_local_signal(np.multiply(example_pre_rate / context.input_field_peak_rate,
+                                               dep_phi(this_normalized_current_ramp)),
+                                   local_signal_filter), local_signal_peak)
     example_pot_rate = context.k_pot * pot_rate(np.multiply(example_pot_elig_signal, this_global_signal))
     example_dep_rate = context.k_dep * dep_rate(np.multiply(example_dep_elig_signal, this_global_signal))
     example_net_dwdt = np.subtract(example_pot_rate, example_dep_rate)
