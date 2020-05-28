@@ -166,14 +166,14 @@ target_range:
 target_val:
   ramp_amp_after_first_plateau: 4.
 x0:
-  spine_th_depo: 0.3
-  spine_th_hyper: 0.8
-  f_dep_half_width: 1.990673E-02
-  f_dep_th: 8.277872E-04
+  f_dep_half_width: 1.225082E-02
+  f_dep_th: 5.874827E-03
   global_signal_decay: 7.416242E+02
-  k_dep: 2.792824E-01
-  k_pot: 2.799519E+00
+  k_dep: 2.285727E-01
+  k_pot: 2.406468E+00
   local_signal_decay: 1.012450E+03
-  peak_delta_weight: 4.650342E+00
+  peak_delta_weight: 4.622392E+00
   spine_half_width: 4.077459E-01
   spine_th: 5.531024E-01
+  spine_th_depo: 3.140178E-01
+  spine_th_hyper: 8.621754E-01

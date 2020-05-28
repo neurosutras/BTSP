@@ -809,7 +809,7 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
 
     this_axis = axes[3][0]
     ymax = 0.
-    for color, label, ramp in zip(['darkgrey', 'k'], ['Before induction 2', 'After induction 2'],
+    for color, label, ramp in zip(['darkgrey', 'k'], ['Before Induction 2', 'After Induction 2'],
                                   [initial_ramp, model_ramp]):
         this_axis.plot(context.binned_x, ramp, c=color, label=label)
         ymax = max(ymax, np.max(ramp))
@@ -1029,8 +1029,8 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
     axes[0][2].plot(context.peak_locs, delta_weights, c='k')
     axes[0][2].axhline(y=0., linestyle='--', c='grey')
     axes[0][2].hlines(peak_weight * 1.05, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
-    axes[0][1].plot(context.binned_x, initial_ramp, label='Before induction 2', c='darkgrey')
-    axes[0][1].plot(context.binned_x, model_ramp, label='After induction 2', c='k')
+    axes[0][1].plot(context.binned_x, initial_ramp, label='Before Induction 2', c='darkgrey')
+    axes[0][1].plot(context.binned_x, model_ramp, label='After Induction 2', c='k')
     axes[0][1].hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
     axes[0][2].set_ylabel('Change in\nsynaptic weight')
     axes[0][2].set_xlabel('Location (cm)')
@@ -1044,8 +1044,8 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
     axes[0][2].set_ylim([-peak_weight, peak_weight * 1.1])
     axes[0][1].set_title('Model fit', fontsize=mpl.rcParams['font.size'], pad=10.)
 
-    axes[0][0].plot(context.binned_x, initial_exp_ramp, label='Before induction 2', c='darkgrey')
-    axes[0][0].plot(context.binned_x, target_ramp, label='After induction 2', c='k')
+    axes[0][0].plot(context.binned_x, initial_exp_ramp, label='Before Induction 2', c='darkgrey')
+    axes[0][0].plot(context.binned_x, target_ramp, label='After Induction 2', c='k')
     axes[0][0].hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
     axes[0][0].set_ylabel('Ramp\namplitude (mV)')
     axes[0][0].set_xlabel('Location (cm)')
