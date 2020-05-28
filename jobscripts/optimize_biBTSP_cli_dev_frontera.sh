@@ -7,10 +7,10 @@ sbatch <<EOT
 #SBATCH -J $JOB_NAME
 #SBATCH -o /scratch1/06441/aaronmil/src/BTSP/logs/$JOB_NAME.%j.o
 #SBATCH -e /scratch1/06441/aaronmil/src/BTSP/logs/$JOB_NAME.%j.e
-#SBATCH -p normal
+#SBATCH -p development
 #SBATCH -N $2
 #SBATCH -n $cores
-#SBATCH -t 04:00:00
+#SBATCH -t 02:00:00
 #SBATCH --mail-user=aaronmil@stanford.edu
 #SBATCH --mail-type=BEGIN,END,FAIL
 
