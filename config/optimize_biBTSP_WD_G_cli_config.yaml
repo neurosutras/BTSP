@@ -1,0 +1,107 @@
+bounds:
+  k_pot: !!python/tuple
+  - 0.001
+  - 10.
+  k_dep: !!python/tuple
+  - 0.001
+  - 10.
+  local_signal_decay: !!python/tuple
+  - 50.
+  - 1750.
+  global_signal_decay: !!python/tuple
+  - 50.
+  - 1750.
+  peak_delta_weight: !!python/tuple
+  - 1.5
+  - 4.
+default_params:
+rel_bounds:
+#- - local_signal_decay
+#  - '>'
+#  - 1.0
+#  - global_signal_decay
+#- - k_pot
+#  - '>'
+#  - 1.0
+#  - k_dep
+feature_names:
+- spont_delta_val_at_target_peak
+- spont_delta_val_at_model_peak
+- spont_delta_width
+- spont_delta_peak_shift
+- spont_delta_asymmetry
+- spont_delta_min_loc
+- spont_delta_val_at_target_min
+- spont_delta_val_at_model_min
+- exp1_delta_val_at_target_peak
+- exp1_delta_val_at_model_peak
+- exp1_delta_width
+- exp1_delta_peak_shift
+- exp1_delta_asymmetry
+- exp1_delta_min_loc
+- exp1_delta_val_at_target_min
+- exp1_delta_val_at_model_min
+- exp2_delta_val_at_target_peak
+- exp2_delta_val_at_model_peak
+- exp2_delta_width
+- exp2_delta_peak_shift
+- exp2_delta_asymmetry
+- exp2_delta_min_loc
+- exp2_delta_val_at_target_min
+- exp2_delta_val_at_model_min
+- exp3_delta_val_at_target_peak
+- exp3_delta_val_at_model_peak
+- exp3_delta_width
+- exp3_delta_peak_shift
+- exp3_delta_asymmetry
+- exp3_delta_min_loc
+- exp3_delta_val_at_target_min
+- exp3_delta_val_at_model_min
+update_context:
+- - optimize_biBTSP_WD_G
+  - update_model_params
+get_features_stages:
+- source: optimize_biBTSP_WD_G
+  get_args_static: get_args_static_signal_amplitudes
+  compute_features: compute_features_signal_amplitudes
+  filter_features: filter_features_signal_amplitudes
+- source: optimize_biBTSP_WD_G
+  get_args_dynamic: get_args_dynamic_model_ramp
+  compute_features: compute_features_model_ramp
+  filter_features: filter_features_model_ramp
+get_objectives:
+  optimize_biBTSP_WD_G: get_objectives
+kwargs:
+  data_file_name: 20200527_biBTSP_data.hdf5
+  input_field_width: 90.  # cm
+  verbose: 1
+  min_delta_weight: -0.2
+  weights_path_distance_threshold: 2.
+objective_names:
+- spont_residual_score
+- exp1_residual_score
+- exp2_residual_score
+- exp3_residual_score
+- weights_path_distance
+optimization_title: biBTSP_WD_G
+param_gen: PopulationAnnealing
+param_names:
+- k_pot
+- k_dep
+- local_signal_decay
+- global_signal_decay
+- peak_delta_weight
+target_range:
+  ramp_offset: 0.01
+  delta_min_val: 0.01
+  delta_peak_val: 0.01
+  residuals: 0.1
+  weights_smoothness: 0.015
+  weights_path_distance: 0.1
+target_val:
+x0:
+  global_signal_decay: 5.505973E+02
+  k_dep: 5.073258E-02
+  k_pot: 2.197197E+00
+  local_signal_decay: 9.966217E+02
+  peak_delta_weight: 2.713324E+00
