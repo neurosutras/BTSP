@@ -108,10 +108,10 @@ target_range:
   weights_path_distance: 0.1
 target_val:
 x0:
-  f_dep_half_width: 1.554989E-03
-  f_dep_th: 1.239571E-03
-  global_signal_decay: 5.505973E+02
-  k_dep: 5.073258E-02
-  k_pot: 2.197197E+00
-  local_signal_decay: 9.966217E+02
-  peak_delta_weight: 2.713324E+00
+  f_dep_half_width: 1.829962E-04
+  f_dep_th: 1.032972E-04
+  global_signal_decay: 4.163098E+02
+  k_dep: 5.776883E-02
+  k_pot: 8.506520E+00
+  local_signal_decay: 5.784831E+02
+  peak_delta_weight: 2.125376E+00
