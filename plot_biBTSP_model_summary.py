@@ -24,7 +24,8 @@ context = Context()
 @click.option("--export", is_flag=True)
 @click.option("--show-traces", is_flag=True)
 @click.option("--label", type=str, default=None)
-def main(model_file_path, output_dir, export, show_traces, label):
+@click.option("--exported-data-key", type=str, default=None)
+def main(model_file_path, output_dir, export, show_traces, label, exported_data_key):
     """
 
     :param model_file_path: str (path)
@@ -32,6 +33,7 @@ def main(model_file_path, output_dir, export, show_traces, label):
     :param export: bool
     :param show_traces: bool
     :param label: str
+    :param exported_data_key: str
     """
     date_stamp = datetime.datetime.today().strftime('%Y%m%d_%H%M')
     if label is None:
@@ -42,14 +44,15 @@ def main(model_file_path, output_dir, export, show_traces, label):
         raise IOError('Invalid output_dir: %s' % output_dir)
 
     ramp_amp, ramp_width, peak_shift, min_val, ramp_mse_dict, ramp_sse_dict, delta_exp_ramp, delta_model_ramp = \
-        process_biBTSP_model_results(model_file_path, show_traces, export, output_dir, label)
+        process_biBTSP_model_results(model_file_path, show_traces, export, output_dir, label, exported_data_key)
 
     plot_biBTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, ramp_mse_dict, ramp_sse_dict, export,
                                   output_dir, label)
     context.update(locals())
 
 
-def process_biBTSP_model_results(file_path, show=False, export=False, output_dir=None, label=None):
+def process_biBTSP_model_results(file_path, show=False, export=False, output_dir=None, label=None,
+                                 exported_data_key=None):
     """
 
     :param file_path: str (path)
@@ -57,6 +60,7 @@ def process_biBTSP_model_results(file_path, show=False, export=False, output_dir
     :param export: bool
     :param output_dir: str (dir)
     :param label: str
+    :param exported_data_key: str
     :return: tuple of dict
     """
     ramp_amp = defaultdict(lambda: defaultdict(dict))
@@ -73,10 +77,10 @@ def process_biBTSP_model_results(file_path, show=False, export=False, output_dir
         peak_locs = group['peak_locs'][:]
         binned_x = group['binned_x'][:]
         param_names = group['param_names'][:]
-        exported_data_key = 'exported_data'
-        for cell_key in f[exported_data_key]:
+        source = get_h5py_group(f, [exported_data_key, 'exported_data'])
+        for cell_key in source:
             description = 'model_ramp_features'
-            group = next(iter(viewvalues(f[exported_data_key][cell_key])))[description]
+            group = next(iter(viewvalues(source[cell_key])))[description]
             param_array = group['param_array'][:]
             param_dict = param_array_to_dict(param_array, param_names)
             if 'peak_delta_weight' in param_dict:
@@ -84,9 +88,9 @@ def process_biBTSP_model_results(file_path, show=False, export=False, output_dir
             else:
                 peak_delta_weight = 1.
 
-            for induction_key in f[exported_data_key][cell_key]:
+            for induction_key in source[cell_key]:
                 description = 'model_ramp_features'
-                group = f[exported_data_key][cell_key][induction_key][description]
+                group = source[cell_key][induction_key][description]
                 ramp_amp[cell_key][induction_key]['target'] = group.attrs['target_ramp_amp']
                 ramp_width[cell_key][induction_key]['target'] = group.attrs['target_ramp_width']
                 local_peak_shift[cell_key][induction_key]['target'] = group.attrs['target_local_peak_shift']
@@ -99,10 +103,9 @@ def process_biBTSP_model_results(file_path, show=False, export=False, output_dir
             fig3, axes3 = plt.subplots(2, 3, figsize=[16, 6])
             ymin = -1.
             ymax = 10.
-            for induction_key in f[exported_data_key][cell_key]:
-                i = int(float(induction_key)) - 1
+            for i, induction_key in enumerate(list(source[cell_key].keys())):
                 description = 'model_ramp_features'
-                group = f[exported_data_key][cell_key][induction_key][description]
+                group = source[cell_key][induction_key][description]
                 model_weights = group['model_weights'][:]
                 initial_weights = group['initial_weights'][:]
                 delta_weights = np.subtract(model_weights, initial_weights)
@@ -143,10 +146,9 @@ def process_biBTSP_model_results(file_path, show=False, export=False, output_dir
                 xmin, xmax = axes3[i][2].get_xlim()
                 axes3[i][2].plot([xmin, xmax], [0., 0.], c='darkgrey', alpha=0.5, ls='--')
 
-            for induction_key in f[exported_data_key][cell_key]:
-                i = int(float(induction_key)) - 1
+            for i, induction_key in enumerate(list(source[cell_key].keys())):
                 description = 'model_ramp_features'
-                group = f[exported_data_key][cell_key][induction_key][description]
+                group = source[cell_key][induction_key][description]
                 mean_induction_start_loc = group.attrs['mean_induction_start_loc']
                 mean_induction_stop_loc = group.attrs['mean_induction_stop_loc']
                 axes3[i][0].set_ylim([ymin, ymax * 1.05])

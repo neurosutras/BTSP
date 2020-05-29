@@ -18,7 +18,7 @@ context = Context()
 
 @click.command()
 @click.option("--data-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='data/20200427_biBTSP_data.hdf5')
+              default='data/20200527_biBTSP_data.hdf5')
 @click.option("--model-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
               default='data/20200429_biBTSP_WD_E_90cm_exported_model_output.hdf5')
 @click.option("--vmax", type=float, default=12.97868)

@@ -760,39 +760,47 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
     input_sample_indexes = np.arange(0, len(context.peak_locs), resolution)
 
     example_input_dict = {}
-
     sample_time_delays = []
-    mean_induction_start_time_index = np.where(context.mean_position > context.mean_induction_start_loc)[0][0]
-    mean_induction_start_time = context.mean_t[mean_induction_start_time_index]
-    for index in input_sample_indexes:
+    input_sample_indexes_copy = copy.copy(input_sample_indexes)
+    start_time = context.induction_start_times[induction_lap]
+    for index in copy.copy(input_sample_indexes):
         this_peak_loc = context.peak_locs[index]
-        this_time_index = np.where(context.mean_position > this_peak_loc)[0][0]
-        this_delay = context.mean_t[this_time_index] - mean_induction_start_time
-        sample_time_delays.append(this_delay)
-    sample_time_delays = np.abs(sample_time_delays)
+        index = np.where(context.binned_x >= this_peak_loc)[0]
+        if len(index) == 0:
+            index = len(context.binned_x) - 1
+        else:
+            index = index[0]
+        this_delay = context.min_induction_t[index]
+        if np.isnan(this_delay):
+            input_sample_indexes_copy.remove(index)
+        else:
+            sample_time_delays.append(this_delay)
+    sample_time_delays = np.array(sample_time_delays)
 
-    target_time_delay = 5000.
-
-    relative_indexes = np.where((sample_time_delays > target_time_delay) &
-                                (final_weights[input_sample_indexes] > initial_weights[input_sample_indexes]))[0]
-    distant_potentiating_indexes = input_sample_indexes[relative_indexes]
+    target_time_delay = -1500.
+    relative_indexes = np.where((sample_time_delays <= target_time_delay) &
+                                (final_weights[input_sample_indexes_copy] >
+                                 initial_weights[input_sample_indexes_copy]))[0]
+    distant_potentiating_indexes = input_sample_indexes_copy[relative_indexes]
     if np.any(distant_potentiating_indexes):
         relative_index = np.argmax(np.subtract(final_weights, initial_weights)[distant_potentiating_indexes])
         this_example_index = distant_potentiating_indexes[relative_index]
     else:
-        relative_index = np.argmax(np.subtract(final_weights, initial_weights)[input_sample_indexes])
-        this_example_index = input_sample_indexes[relative_index]
+        relative_index = np.argmax(np.subtract(final_weights, initial_weights)[input_sample_indexes_copy])
+        this_example_index = input_sample_indexes_copy[relative_index]
     example_input_dict['Potentiating input example'] = this_example_index
 
-    relative_indexes = np.where((sample_time_delays > target_time_delay) &
-                                (final_weights[input_sample_indexes] < initial_weights[input_sample_indexes]))[0]
-    distant_depressing_indexes = input_sample_indexes[relative_indexes]
+    target_time_delay = 1500.
+    relative_indexes = np.where((sample_time_delays >= target_time_delay) &
+                                (final_weights[input_sample_indexes_copy] <
+                                 initial_weights[input_sample_indexes_copy]))[0]
+    distant_depressing_indexes = input_sample_indexes_copy[relative_indexes]
     if np.any(distant_depressing_indexes):
         relative_index = np.argmin(np.subtract(final_weights, initial_weights)[distant_depressing_indexes])
         this_example_index = distant_depressing_indexes[relative_index]
     else:
-        relative_index = np.argmin(np.subtract(final_weights, initial_weights)[input_sample_indexes])
-        this_example_index = input_sample_indexes[relative_index]
+        relative_index = np.argmin(np.subtract(final_weights, initial_weights)[input_sample_indexes_copy])
+        this_example_index = input_sample_indexes_copy[relative_index]
     example_input_dict['Depressing input example'] = this_example_index
 
     import matplotlib as mpl
@@ -859,12 +867,12 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
                                               context.complete_run_vel_gate, context.induction_gate, peak_ramp_amp)
 
     start_time = context.induction_start_times[induction_lap]
-    buffer_start_time = max(context.down_t[0], start_time - 5000.)
+    buffer_start_time = max(context.down_t[0], start_time - 2000.)
     if induction_lap == len(context.induction_start_times) - 1:
         stop_time = context.down_t[-1]
     else:
         stop_time = context.induction_start_times[induction_lap + 1]
-    stop_time = min(stop_time, start_time + 5000.)
+    stop_time = min(stop_time, start_time + 4500.)
     indexes = np.where((context.down_t >= buffer_start_time) & (context.down_t < stop_time))[0]
 
     this_current_ramp = np.interp(context.down_t, context.complete_t, current_complete_ramp)[indexes]
@@ -921,12 +929,12 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
     xmax = np.max(this_t)
     axes[0][1].set_xlim(xmin, xmax)
     """
-    axes[0][1].set_xticks(np.arange(-4., 5., 2))
-    axes[0][2].set_xticks(np.arange(-4., 5., 2))
-    axes[1][1].set_xticks(np.arange(-4., 5., 2))
-    axes[1][2].set_xticks(np.arange(-4., 5., 2))
-    axes[2][1].set_xticks(np.arange(-4., 5., 2))
-    axes[2][2].set_xticks(np.arange(-4., 5., 2))
+    axes[0][1].set_xticks(np.arange(-2., 5., 2))
+    axes[0][2].set_xticks(np.arange(-2., 5., 2))
+    axes[1][1].set_xticks(np.arange(-2., 5., 2))
+    axes[1][2].set_xticks(np.arange(-2., 5., 2))
+    axes[2][1].set_xticks(np.arange(-2., 5., 2))
+    axes[2][2].set_xticks(np.arange(-2., 5., 2))
 
     ymax0_left = context.input_field_peak_rate / 0.85
     ymax0_right = peak_ramp_amp / 0.85
@@ -1002,8 +1010,10 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
         this_axis.set_xlim(0., context.track_length)
         this_axis.set_xticks(np.arange(0., context.track_length, 45.))
         this_axis.set_xlabel('Position (cm)')
-    axes[3][1].legend(loc=(-0.1, 1.), frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
+    axes[3][1].legend(loc=(0.8, 1.35), frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
     axes[3][1].set_ylabel('Input\namplitude (mV)')
+    axes[3][1].set_title('Before Induction 2', fontsize=mpl.rcParams['font.size'], y=1.)
+    axes[3][2].set_title('After Induction 2', fontsize=mpl.rcParams['font.size'], y=1.)
     ymax3 = math.ceil(10. * ymax3 / 0.95) / 10.
     bar_loc = ymax3 * 0.95
     for col in range(1, 3):

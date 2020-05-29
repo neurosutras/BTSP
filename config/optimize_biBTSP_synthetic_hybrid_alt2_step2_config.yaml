@@ -92,7 +92,7 @@ get_features_stages:
 get_objectives:
   optimize_biBTSP_synthetic_hybrid_alt2_step2: get_objectives
 kwargs:
-  data_file_name: 20200427_biBTSP_data.hdf5
+  data_file_name: 20200527_biBTSP_data.hdf5
   input_field_width: 90.  # cm
   verbose: 1
   num_induction_laps: 3
