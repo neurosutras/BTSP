@@ -481,8 +481,8 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
         axes2[2].set_xlabel('Time relative to plateau onset (s)')
         axes2[2].set_ylabel('Change in ramp amplitude (mV)')
         axes2[2].plot(context.min_induction_t[context.clean_induction_t_indexes] / 1000.,
-                     np.zeros_like(context.clean_induction_t_indexes), c='darkgrey', alpha=0.75,
-                     zorder=1, linestyle='--')
+                      np.zeros_like(context.clean_induction_t_indexes), c='darkgrey', alpha=0.75,
+                      zorder=1, linestyle='--')
 
     for induction_lap in range(len(context.induction_start_times)):
         start_time = context.induction_start_times[induction_lap]
@@ -611,6 +611,27 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
         else:
             delta_min_loc = abs_delta_min_loc
     result['delta_min_loc'] = delta_min_loc
+    if plot:
+        bar_loc = max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.) * 0.95
+        fig, axes = plt.subplots(2)
+        axes[1].plot(context.peak_locs, delta_weights)
+        axes[1].hlines(context.peak_delta_weight * 1.05, xmin=context.mean_induction_start_loc,
+                       xmax=context.mean_induction_stop_loc)
+        axes[0].plot(context.binned_x, target_ramp, label='Experiment')
+        axes[0].plot(context.binned_x, model_ramp, label='Model')
+        axes[0].hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
+        axes[1].set_ylabel('Change in\nsynaptic weight')
+        axes[1].set_xlabel('Location (cm)')
+        axes[0].set_ylabel('Ramp amplitude (mV)')
+        axes[0].set_xlabel('Location (cm)')
+        axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        axes[0].set_ylim([min(-1., np.min(model_ramp) - 1., np.min(target_ramp) - 1.),
+                          max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.)])
+        axes[1].set_ylim([-context.peak_delta_weight * 1.05, context.peak_delta_weight * 1.1])
+        clean_axes(axes)
+        fig.suptitle('Cell_id: %i, Induction: %i' % (context.cell_id, context.induction))
+        fig.tight_layout()
+        fig.show()
 
     local_peak_loc, local_peak_shift = {}, {}
     local_peak_loc['target'], local_peak_shift['target'] = \
@@ -937,7 +958,7 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
     axes[2][2].set_xticks(np.arange(-2., 5., 2))
 
     ymax0_left = context.input_field_peak_rate / 0.85
-    ymax0_right = peak_ramp_amp / 0.85
+    ymax0_right = max(10., peak_ramp_amp / 0.85)
     ymax1 /= 0.85
     axes[0][1].set_ylim([0., ymax0_left])
     # axes[0][2].set_ylim([0., ymax1_left])
@@ -975,8 +996,8 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
 
     axes[0][1].set_ylabel('Firing rate (Hz)')
     axes0_1_right[0].set_ylabel('Ramp\namplitude (mV)', rotation=-90, labelpad=20)
-    axes0_1_right[0].set_yticks(np.arange(0., np.max(this_current_ramp), 5.))
-    axes0_1_right[1].set_yticks(np.arange(0., np.max(this_current_ramp), 5.))
+    axes0_1_right[0].set_yticks(np.arange(0., ymax0_right, 5.))
+    axes0_1_right[1].set_yticks(np.arange(0., ymax0_right, 5.))
     axes[0][1].set_yticks(np.arange(0., context.input_field_peak_rate + 1., 10.))
     axes[0][2].set_yticks(np.arange(0., context.input_field_peak_rate + 1., 10.))
     axes[1][1].set_ylabel('Plasticity signal\namplitude')
@@ -1246,7 +1267,7 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     handles.extend(handles_right)
     labels.extend(labels_right)
     handles.append(Line2D([0], [0], color='k'))
-    labels.append('Postsynaptic plateau')
+    labels.append('Plateau potential')
     leg = axes[0].legend(handles=handles, labels=labels, loc=(0., 1.), frameon=False, framealpha=0.5, handlelength=1,
                          fontsize=mpl.rcParams['font.size'])
     for line in leg.get_lines():

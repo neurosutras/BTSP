@@ -623,6 +623,28 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
         else:
             delta_min_loc = abs_delta_min_loc
     result['delta_min_loc'] = delta_min_loc
+    if plot:
+        bar_loc = max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.) * 0.95
+        fig, axes = plt.subplots(2)
+        axes[1].plot(context.peak_locs, delta_weights)
+        peak_delta_weight = np.max(delta_weights_snapshots)
+        axes[1].hlines(peak_delta_weight * 1.05, xmin=context.mean_induction_start_loc,
+                       xmax=context.mean_induction_stop_loc)
+        axes[0].plot(context.binned_x, target_ramp, label='Experiment')
+        axes[0].plot(context.binned_x, model_ramp, label='Model')
+        axes[0].hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
+        axes[1].set_ylabel('Change in\nsynaptic weight')
+        axes[1].set_xlabel('Location (cm)')
+        axes[0].set_ylabel('Ramp amplitude (mV)')
+        axes[0].set_xlabel('Location (cm)')
+        axes[0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
+        axes[0].set_ylim([min(-1., np.min(model_ramp) - 1., np.min(target_ramp) - 1.),
+                          max(10., np.max(model_ramp) + 1., np.max(target_ramp) + 1.)])
+        axes[1].set_ylim([-peak_delta_weight * 1.05, peak_delta_weight * 1.1])
+        clean_axes(axes)
+        fig.suptitle('Cell_id: %i, Induction: %i' % (context.cell_id, context.induction))
+        fig.tight_layout()
+        fig.show()
 
     local_peak_loc, local_peak_shift = {}, {}
     local_peak_loc['target'], local_peak_shift['target'] = \
@@ -1282,7 +1304,7 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     handles.extend(handles_right)
     labels.extend(labels_right)
     handles.append(Line2D([0], [0], color='k'))
-    labels.append('Postsynaptic plateau')
+    labels.append('Plateau potential')
     leg = axes[0].legend(handles=handles, labels=labels, loc=(0., 1.), frameon=False, framealpha=0.5, handlelength=1,
                          fontsize=mpl.rcParams['font.size'])
     for line in leg.get_lines():
