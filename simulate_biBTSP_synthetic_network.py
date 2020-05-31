@@ -11,30 +11,32 @@ Features/assumptions of the phenomenological model:
 1) Synaptic weights in a silent cell are all = 1 prior to field induction 1. w(t0) = 1
 2) Activity at each synapse generates a long duration 'local plasticity signal', or 'eligibility trace' for synaptic
 plasticity.
-3) Dendritic plateaus generate a long duration 'global plasticity signal', or a 'gating trace' for synaptic plasticity.
-4) Changes in weight at each synapse are integrated over periods of nonzero overlap between eligibility and gating
+3) Dendritic plateaus generate a long duration 'global plasticity signal', or an 'instructive trace' for synaptic
+plasticity.
+4) Changes in weight at each synapse are integrated over periods of nonzero overlap between eligibility and instructive
 signals, and updated once per lap.
 
-Features/assumptions of synaptic resource-limited model B:
-1) Dendritic plateaus generate a global gating signal that provides a necessary cofactor required to convert plasticity
-eligibility signals at each synapse into either increases or decreases in synaptic strength.
+Features/assumptions of weight-dependent model F:
+1) Dendritic plateaus generate a global instructive signal that provides a necessary cofactor required to convert
+plasticity eligibility signals at each synapse into either increases or decreases in synaptic strength.
 2) Activity at each synapse generates a local plasticity eligibility signal that, in conjunction with the global
-gating signal, can activate both a forward process to increase synaptic strength and a reverse process to decrease
+instructive signal, can activate both a forward process to increase synaptic strength and a reverse process to decrease
 synaptic strength.
 3) Synaptic resources can be in 2 states (Markov-style kinetic scheme):
 
-        k_pot * global_signal * f_pot(local_signal)
+        k_pot * f_pot(local_signal * global_signal)
 I (inactive) <------------------------------> A (active)
-        k_dep * global_signal * f_dep(local_signal)
+        k_dep * f_dep(local_signal * global_signal)
 
 4) global_signals are pooled across all cells and normalized to a peak value of 1.
 5) local_signals are pooled across all cells and normalized to a peak value of 1.
 6) f_pot represents the "sensitivity" of the forward process to the presence of the local_signal. The transformation
-f_pot has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
+f_pot is linear.
 7) f_dep represents the "sensitivity" of the reverse process to the presence of the local_signal. The transformation
 f_dep has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
 
-biBTSP_SRL_B: Single eligibility signal filter. Sigmoidal f_pot and f_dep.
+biBTSP_WD_F:
+Gain function f_pot is linear and f_dep is sigmoidal.
 """
 __author__ = 'milsteina'
 from biBTSP_utils import *
@@ -103,7 +105,7 @@ def init_context():
 
     down_dt = 10.  # ms, to speed up optimization
 
-    num_cells = context.num_cells
+    num_cells = int(context.num_cells)
     initial_fraction_active = context.initial_fraction_active
     initial_active_cells = int(num_cells * initial_fraction_active)
     basal_target_representation_density = context.basal_target_representation_density
@@ -171,7 +173,8 @@ def init_context():
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
         get_dual_signal_filters(context.local_signal_rise, context.local_signal_decay, context.global_signal_rise,
                                 context.global_signal_decay, context.down_dt)
-    local_signals = get_local_signal_population(local_signal_filter, context.down_rate_maps, context.down_dt)
+    local_signals = get_local_signal_population(local_signal_filter,
+                                                context.down_rate_maps / context.input_field_peak_rate)
     local_signal_peak = np.max(local_signals)
     local_signals /= local_signal_peak
     down_plateau_len = int(plateau_dur / down_dt)

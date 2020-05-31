@@ -81,9 +81,6 @@ def init_context():
     if 'truncate' not in context():
         context.truncate = 2.5
 
-    # input_field_peak_rate = 1.
-    # ramp_scaling_factor = 0.14970976921836665
-
     with h5py.File(context.data_file_path, 'r') as f:
         dt = f['defaults'].attrs['dt']  # ms
         input_field_peak_rate = f['defaults'].attrs['input_field_peak_rate']  # Hz
@@ -878,24 +875,31 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     example_input_index = np.where(context.peak_locs >=  context.complete_position[center_index])[0][0]
     example_input_rate_map = context.complete_rate_maps[example_input_index][start_index:end_index] / \
                              context.input_field_peak_rate
+    xlim = (this_t[0] / 1000., this_t[-1] / 1000.)
+    xticks = np.arange(-3., 4., 1.5)
     this_axis = axes[0][0]
-    this_axis.plot(this_t, example_input_rate_map, c='r')
+    this_axis.plot(this_t / 1000., example_input_rate_map, c='k')
     this_axis.set_ylabel('Presynaptic firing\nrate (normalized)')
-    this_axis.set_title(r'$R_i$', fontsize=mpl.rcParams['font.size'])
+    this_axis.set_title(r'$R_i$', fontsize=mpl.rcParams['font.size'] + 2)
+    this_axis.set_xlim(xlim)
+    this_axis.set_xticks(xticks)
 
     this_axis = axes[1][0]
     for condition in dend_depo[induction]:
-        this_axis.plot(this_t, np.ones_like(this_t) * dend_depo[1][condition], label=condition_labels[condition],
+        this_axis.plot(this_t / 1000., np.ones_like(this_t) * dend_depo[1][condition], label=condition_labels[condition],
                        c=condition_colors[condition])
     this_axis.set_ylabel('Local dendritic\ndepolarization (mV)')
     this_axis.set_ylim([-25., 15.])
-    this_axis.set_title(r'$V_i$', fontsize=mpl.rcParams['font.size'])
+    this_axis.set_xlim(xlim)
+    this_axis.set_title(r'$V_i$', fontsize=mpl.rcParams['font.size'] + 2)
 
     this_axis = axes[2][0]
-    this_axis.plot(this_t, context.induction_gate[start_index:end_index])
-    this_axis.set_ylabel('Instructive input\n(normalized)')
+    this_axis.plot(this_t / 1000., context.induction_gate[start_index:end_index], c='k')
+    this_axis.set_ylabel('Plateau potential\namplitude (normalized)')
     this_axis.set_ylim([-0.2, 1.2])
-    this_axis.set_title(r'$I$', fontsize=mpl.rcParams['font.size'])
+    this_axis.set_xlim(xlim)
+    this_axis.set_xticks(xticks)
+    this_axis.set_title(r'$P$', fontsize=mpl.rcParams['font.size'] + 2)
     this_axis.set_xlabel('Time relative to\nplateau onset (s)')
 
     this_axis = axes[0][1]
@@ -911,23 +915,22 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     this_axis.set_xlabel('Presynaptic firing\nrate (normalized)')
     this_axis.set_ylabel('Spine depolarization\n(normalized)')
     this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-    this_axis.set_title(r'$\phi(R_i,V_i)$', fontsize=mpl.rcParams['font.size'])
+    this_axis.set_xlim((signal_xrange[0], signal_xrange[-1]))
+    this_axis.set_title(r'$\phi(R_i,V_i)$', fontsize=mpl.rcParams['font.size'] + 2)
 
     this_axis = axes[0][2]
-    this_axis.plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='grey')
-    this_axis.plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k',
-                 label='Instructive signal filter')
+    this_axis.plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='k')
     this_axis.set_xlabel('Time (s)')
     this_axis.set_ylabel('Normalized amplitude')
-    this_axis.set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
-    this_axis.set_title(r'$E_i$ filter', fontsize=mpl.rcParams['font.size'])
+    this_axis.set_xlim(-0.25, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
+    this_axis.set_title(r'$E_i$ filter', fontsize=mpl.rcParams['font.size'] + 2)
 
     this_axis = axes[1][2]
     this_axis.plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k')
     this_axis.set_xlabel('Time (s)')
     this_axis.set_ylabel('Normalized amplitude')
-    this_axis.set_xlim(-0.5, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
-    this_axis.set_title(r'$P$ filter', fontsize=mpl.rcParams['font.size'])
+    this_axis.set_xlim(-0.25, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
+    this_axis.set_title(r'$I$ filter', fontsize=mpl.rcParams['font.size'] + 2)
 
     this_axis = axes[1][1]
     dep_scale = context.k_dep / context.k_pot
@@ -936,14 +939,17 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     this_axis.set_xlabel('Plasticity signal overlap (a.u.)')
     this_axis.set_ylabel('dW/dt')
     this_axis.set_yticks([dep_scale, 1.])
-    this_axis.set_yticklabels([r'$k^-\cdot W$', r'$k^+\cdot (1-W)$'])
+    this_axis.set_yticklabels([r'$W \cdot k^-$', r'$(1-W) \cdot k^+$'])
+    this_axis.set_xlim((0., 1.))
     this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
 
+    xlim = (np.min(this_min_induction_t[this_clean_induction_t_indexes] / 1000.),
+            np.max(this_min_induction_t[this_clean_induction_t_indexes] / 1000.))
     this_axis = axes[2][1]
     for condition in ordered_conditions[induction]:
         label = condition_labels[condition]
         color = condition_colors[condition]
-        this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes],
+        this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
                        np.subtract(model_ramp[induction][condition], initial_ramp[induction][condition])[
                            this_clean_induction_t_indexes], label=label, color=color)
     this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes], np.zeros_like(this_clean_induction_t_indexes),
@@ -952,7 +958,9 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     this_axis.set_xlabel('Time relative to\nplateau onset (s)')
     this_axis.set_ylabel('Change in ramp\namplitude (mV)')
     this_axis.set_ylim([-6., 12.])
-    this_axis.set_title('Silent -> Place1', fontsize=mpl.rcParams['font.size'])
+    this_axis.set_xlim(xlim)
+    this_axis.set_xticks(xticks)
+    this_axis.set_title('Silent -> Place1', fontsize=mpl.rcParams['font.size'] + 2)
 
     this_axis = axes[2][2]
     load_data(2)
@@ -962,7 +970,7 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     condition = 'control'
     label = condition_labels[condition]
     color = condition_colors[condition]
-    this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes],
+    this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
                    np.subtract(model_ramp[induction][condition], initial_ramp[induction][condition])[
                        this_clean_induction_t_indexes], label=label, color=color)
     this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes], np.zeros_like(this_clean_induction_t_indexes),
@@ -971,49 +979,14 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     this_axis.set_xlabel('Time relative to\nplateau onset (s)')
     this_axis.set_ylabel('Change in ramp\namplitude (mV)')
     this_axis.set_ylim([-6., 12.])
-    this_axis.set_title('Place1 -> Place2', fontsize=mpl.rcParams['font.size'])
+    this_axis.set_xlim(xlim)
+    this_axis.set_xticks(xticks)
+    this_axis.set_title('Place1 -> Place2', fontsize=mpl.rcParams['font.size'] + 2)
 
     clean_axes(axes)
     fig.tight_layout()
     fig.subplots_adjust(hspace=0.5, wspace=0.4)
     fig.show()
-    context.update(locals())
-    return
-
-    load_data(2)
-
-    fig, axes = plt.subplots(2, 2, figsize=(8, 7))
-    ylim = 13.
-    for col, induction in enumerate(range(1, 3)):
-        for condition in ordered_conditions[induction]:
-            label = condition_labels[condition]
-            color = condition_colors[condition]
-            if condition == 'control':
-                x_start = induction_start_loc[induction][condition]
-                x_end = induction_stop_loc[induction][condition]
-                axes[0][col].hlines(ylim + 0.2, xmin=x_start, xmax=x_end, linewidth=2, colors='k')
-                axes[0][col].set_xlabel('Location (cm)')
-                axes[0][col].set_ylabel('Change in ramp\namplitude (mV)')
-                axes[0][col].set_xlim([0., context.track_length])
-                axes[0][col].set_ylim([-5., 15.])
-                axes[0][col].set_title('Induction %i' % induction, fontsize=mpl.rcParams['font.size'])
-                axes[1][col].set_xlabel('Location (cm)')
-                axes[1][col].set_ylabel('Dendritic depolarization (mV)')
-                axes[1][col].set_xlim([0., context.track_length])
-                axes[1][col].set_ylim([-45., 15.])
-            this_dend_depo = dend_depo[induction][condition]
-            axes[0][col].plot(context.binned_x, np.subtract(model_ramp[induction][condition],
-                                                            initial_ramp[induction][condition]),
-                              label=label, color=color)
-            this_dend_depo_array = np.ones_like(context.binned_x) * this_dend_depo
-            axes[1][col].plot(context.binned_x, this_dend_depo_array, c=color)
-
-    axes[0][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-    axes[0][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-    clean_axes(axes)
-    fig.tight_layout()
-    fig.show()
-
     context.update(locals())
 
 

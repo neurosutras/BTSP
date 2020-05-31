@@ -1,6 +1,6 @@
 bounds:
   f_dep_th: !!python/tuple
-  - 0.001
+  - 0.0001
   - 1.
   f_dep_half_width: !!python/tuple
   - 0.001
@@ -19,7 +19,7 @@ bounds:
   - 1500.
   peak_delta_weight: !!python/tuple
   - 1.5
-  - 4.
+  - 6.
 default_params:
 rel_bounds:
 # - - local_signal_decay
@@ -64,7 +64,7 @@ kwargs:
   verbose: 1
   num_induction_laps: 3
   min_delta_weight: -0.2
-  max_dend_depo: 20.
+  max_dend_depo: 10.
   default_run_vel: 25.
   induction_loc:
     '1': 120.
@@ -77,7 +77,7 @@ kwargs:
 objective_names:
 - induction1_residual_score
 - induction2_residual_score
-- ramp_amp_after_first_plateau
+# - ramp_amp_after_first_plateau
 - weights_path_distance
 optimization_title: biBTSP_synthetic_alt
 param_gen: PopulationAnnealing
@@ -100,10 +100,10 @@ target_range:
 target_val:
   ramp_amp_after_first_plateau: 4.
 x0:
-  f_dep_half_width: 4.063616E-02
-  f_dep_th: 4.085338E-02
-  global_signal_decay: 4.428467E+02
-  k_dep: 5.279940E-01
-  k_pot: 1.544540E+00
-  local_signal_decay: 1.5E+03
-  peak_delta_weight: 3.
+  f_dep_half_width: 5.580701E-02
+  f_dep_th: 1.274501E-02
+  global_signal_decay: 7.770232E+02
+  k_dep: 1.181237E-01
+  k_pot: 6.399787E-01
+  local_signal_decay: 6.577856E+02
+  peak_delta_weight: 2.810966E+00
