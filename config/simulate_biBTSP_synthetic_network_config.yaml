@@ -4,6 +4,7 @@ min_delta_weight: -0.2
 initial_ramp_peak_val: 8.
 target_peak_shift: -5.
 target_ramp_width: 150.
+default_run_vel: 25.
 num_cells: 500
 initial_fraction_active: 0.
 basal_target_representation_density: 0.5

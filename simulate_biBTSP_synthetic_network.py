@@ -198,7 +198,10 @@ def init_context():
                                             target_peak_shift=context.target_peak_shift,
                                             target_ramp_width=context.target_ramp_width)
 
-    max_ramp_population_sum = np.mean(target_initial_ramp) * num_cells
+    spike_threshold = 2.  # mV
+    f_I_slope = context.input_field_peak_rate / (context.initial_ramp_peak_val * 1.5 - spike_threshold)
+    f_I = np.vectorize(lambda x: 0. if x < spike_threshold else (x - spike_threshold) * f_I_slope)
+    max_population_rate_sum = np.mean(f_I(target_initial_ramp)) * num_cells
 
     initial_weights_population = [np.ones_like(peak_locs) for _ in range(num_cells)]
 
@@ -263,10 +266,10 @@ def get_population_representation_density(ramp_population):
     :param ramp_population: list of array (like binned_x)
     :return: array (like default_interp_t)
     """
-    binned_ramp_population_sum = np.sum(ramp_population, axis=0)
-    ramp_population_sum = np.interp(context.default_interp_x, context.binned_x, binned_ramp_population_sum,
+    binned_population_rate_sum = np.sum([context.f_I(this_ramp) for this_ramp in ramp_population], axis=0)
+    population_rate_sum = np.interp(context.default_interp_x, context.binned_x, binned_population_rate_sum,
                                     period=context.track_length)
-    population_representation_density = ramp_population_sum / context.max_ramp_population_sum
+    population_representation_density = population_rate_sum / context.max_population_rate_sum
     return population_representation_density
 
 
@@ -569,19 +572,19 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
                     delta_reward_distance_by_track_phase[reward_loc][label].append(this_delta_reward_distance)
 
     fig1, axes1 = plt.subplots(3, 3, figsize=(11, 9))
-    this_cmap = 'viridis' # 'binary' # 'Reds'  # 'viridis'  # 'plasma' # 'jet'  # 'viridis'  # 'plasma'
+    this_cmap = 'viridis'
 
     norm_basal_plateau_prob = context.basal_plateau_prob_f(context.basal_representation_xscale) / context.dt * 1000.
     norm_reward_plateau_prob = context.reward_plateau_prob_f(context.reward_representation_xscale) / context.dt * 1000.
-    axes1[0][1].plot(context.basal_representation_xscale, norm_basal_plateau_prob, label='No reward', c='k')
-    axes1[0][1].plot(context.reward_representation_xscale, norm_reward_plateau_prob, label='Reward', c='r')
+    axes1[0][1].plot(context.basal_representation_xscale, norm_basal_plateau_prob, label='Outside goal', c='k')
+    axes1[0][1].plot(context.reward_representation_xscale, norm_reward_plateau_prob, label='Inside goal', c='r')
     axes1[0][1].set_xticks([i * 0.25 for i in range(5)])
     axes1[0][1].set_xlim(0., 1.)
     axes1[0][1].set_ylim(0., axes1[0][1].get_ylim()[1])
     axes1[0][1].set_xlabel('Normalized population activity')
     axes1[0][1].set_ylabel('Plateau probability / sec')
     axes1[0][1].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1)
-    axes1[0][1].set_title('Modulation of plateau probability\nby feedback inhibition and reward',
+    axes1[0][1].set_title('Modulation of plateau probability\nby feedback inhibition\nand instructive input',
                           fontsize=mpl.rcParams['font.size'], y=1.1)
 
     plateau_prob_ramp_modulation = context.plateau_prob_ramp_sensitivity_f(context.ramp_xscale)
@@ -629,12 +632,15 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
     axes1[2][2].set_xticks(np.arange(-90., 91., 45.))
     axes1[2][2].set_title('Translocation towards reward location', fontsize=mpl.rcParams['font.size'], y=1.1)
 
-    X, Y = np.meshgrid(context.default_interp_x, range(len(pop_rep_density_history)))
-    hm = axes1[0][2].pcolormesh(X, Y, pop_rep_density_history, cmap=this_cmap)  #, vmin=0., vmax=1.)
+    X, Y = np.meshgrid(context.default_interp_x, range(len(pop_rep_density_history) + 1))
+    hm = axes1[0][2].pcolormesh(X, Y, pop_rep_density_history, cmap=this_cmap, rasterized=True)  #, vmin=0., vmax=1.)
     cb = plt.colorbar(hm, ax=axes1[0][2])
     cb.ax.set_ylabel('Normalized\npopulation activity', rotation=270)
     cb.ax.get_yaxis().labelpad = 25
-    axes1[0][2].set_ylim(len(pop_rep_density_history) - 1, 0)
+    axes1[0][2].set_ylim(len(pop_rep_density_history), 0)
+    yticks = sorted(list(range(0, len(pop_rep_density_history), 5)), reverse=True)
+    axes1[0][2].set_yticks(np.add(yticks, 1))
+    axes1[0][2].set_yticklabels(yticks)
     axes1[0][2].set_ylabel('Lap #')
     axes1[0][2].set_xlabel('Location (cm)')
     axes1[0][2].set_xlim(0., context.track_length)
@@ -644,9 +650,6 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
     fig1.subplots_adjust(left=0.075, hspace=0.5, wspace=0.6, right=0.925)
     fig1.show()
 
-    peak_ramp_amp = np.max(ramp_pop_history)
-    f_I_slope = context.input_field_peak_rate / (peak_ramp_amp - 4.)
-    f_I = np.vectorize(lambda x: 0. if x < 4. else (x - 4.) * f_I_slope)
     max_count = len(initial_loc_by_cell)
     prev_sorted_cell_indexes = None
     for start_lap, end_lap, label in track_phase_summary:
@@ -665,14 +668,16 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
         for i in sorted_cell_indexes:
             this_ramp = ramp_pop[i]
             if np.max(this_ramp) - np.min(this_ramp) > 2.:
-                modulated_ramp_pop.append(f_I(this_ramp))
+                modulated_ramp_pop.append(context.f_I(this_ramp))
                 modulated_cell_indexes.append(i)
             else:
-                nonmodulated_ramp_pop.append(f_I(this_ramp))
+                nonmodulated_ramp_pop.append(context.f_I(this_ramp))
                 nonmodulated_cell_indexes.append(i)
         sorted_ramp_pop = modulated_ramp_pop + nonmodulated_ramp_pop
         X, Y = np.meshgrid(context.binned_x, range(len(sorted_ramp_pop)))
-        hm = axes2[0][2].pcolormesh(X, Y, sorted_ramp_pop, cmap=this_cmap, vmin=0., vmax=context.input_field_peak_rate)
+        hm = axes2[0][2].pcolormesh(X, Y, sorted_ramp_pop, cmap=this_cmap, vmin=0., vmax=context.input_field_peak_rate,
+                                antialiased=True) #,
+                                    # rasterized=True)
         cb = plt.colorbar(hm, ax=axes2[0][2])
         cb.ax.set_ylabel('Firing rate (Hz)', rotation=270, fontsize=mpl.rcParams['font.size'])
         cb.ax.get_yaxis().labelpad = 15
@@ -685,15 +690,15 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
         if prev_sorted_cell_indexes is not None:
             prev_sorted_delta_rate = []
             for i in prev_sorted_cell_indexes:
-                this_initial_rate = f_I(initial_ramp_by_track_phase[label][i])
-                this_rate = f_I(ramp_pop[i])
+                this_initial_rate = context.f_I(initial_ramp_by_track_phase[label][i])
+                this_rate = context.f_I(ramp_pop[i])
                 this_delta_rate = this_rate - this_initial_rate
                 prev_sorted_delta_rate.append(this_delta_rate)
             X, Y = np.meshgrid(context.binned_x, range(len(prev_sorted_delta_rate)))
             hm = axes2[0][1].pcolormesh(X, Y, prev_sorted_delta_rate, cmap='bwr', vmin=-context.input_field_peak_rate,
-                                        vmax=context.input_field_peak_rate)
+                                        vmax=context.input_field_peak_rate, antialiased=True) #, rasterized=True)
             cb = plt.colorbar(hm, ax=axes2[0][1])
-            cb.ax.set_ylabel('Firing rate (Hz)', rotation=270, fontsize=mpl.rcParams['font.size'])
+            cb.ax.set_ylabel('Change in firing rate (Hz)', rotation=270, fontsize=mpl.rcParams['font.size'])
             cb.ax.get_yaxis().labelpad = 15
             axes2[0][1].set_ylim(len(prev_sorted_delta_rate) - 1, 0)
             axes2[0][1].set_ylabel('Sorted cell #', fontsize=mpl.rcParams['font.size'])
