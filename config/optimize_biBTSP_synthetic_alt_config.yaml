@@ -100,10 +100,10 @@ target_range:
 target_val:
   ramp_amp_after_first_plateau: 4.
 x0:
-  f_dep_half_width: 5.580701E-02
-  f_dep_th: 1.274501E-02
-  global_signal_decay: 7.770232E+02
-  k_dep: 1.181237E-01
-  k_pot: 6.399787E-01
-  local_signal_decay: 6.577856E+02
-  peak_delta_weight: 2.810966E+00
+  f_dep_half_width: 8.100359E-02
+  f_dep_th: 1.279724E-02
+  global_signal_decay: 7.826026E+02
+  k_dep: 2.088454E-01
+  k_pot: 4.893109E-01
+  local_signal_decay: 1.075317E+03
+  peak_delta_weight: 4.392292E+00

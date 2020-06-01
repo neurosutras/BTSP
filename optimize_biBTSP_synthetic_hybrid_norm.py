@@ -852,6 +852,7 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     this_induction_start_time = induction_start_times[1]['control'][0]
     induction = 1
     update_source_contexts(x)
+    peak_weight = context.peak_delta_weight + 1.
 
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
     signal_xrange = np.linspace(0., 1., 10000)
@@ -884,6 +885,7 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     this_axis.set_xlim(xlim)
     this_axis.set_xticks(xticks)
 
+    """
     this_axis = axes[1][0]
     for condition in dend_depo[induction]:
         this_axis.plot(this_t / 1000., np.ones_like(this_t) * dend_depo[1][condition], label=condition_labels[condition],
@@ -892,8 +894,9 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     this_axis.set_ylim([-25., 15.])
     this_axis.set_xlim(xlim)
     this_axis.set_title(r'$V_i$', fontsize=mpl.rcParams['font.size'] + 2)
+    """
 
-    this_axis = axes[2][0]
+    this_axis = axes[1][0]
     this_axis.plot(this_t / 1000., context.induction_gate[start_index:end_index], c='k')
     this_axis.set_ylabel('Plateau potential\namplitude (normalized)')
     this_axis.set_ylim([-0.2, 1.2])
@@ -925,14 +928,14 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     this_axis.set_xlim(-0.25, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
     this_axis.set_title(r'$E_i$ filter', fontsize=mpl.rcParams['font.size'] + 2)
 
-    this_axis = axes[1][2]
+    this_axis = axes[1][1]
     this_axis.plot(global_filter_t / 1000., global_filter / np.max(global_filter), color='k')
     this_axis.set_xlabel('Time (s)')
     this_axis.set_ylabel('Normalized amplitude')
     this_axis.set_xlim(-0.25, max(5000., local_signal_filter_t[-1], global_filter_t[-1]) / 1000.)
     this_axis.set_title(r'$I$ filter', fontsize=mpl.rcParams['font.size'] + 2)
 
-    this_axis = axes[1][1]
+    this_axis = axes[1][2]
     dep_scale = context.k_dep / context.k_pot
     this_axis.plot(signal_xrange, pot_rate(signal_xrange), c='r', label=r'$q^+$')
     this_axis.plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='c', label=r'$q^-$')
@@ -949,15 +952,23 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     for condition in ordered_conditions[induction]:
         label = condition_labels[condition]
         color = condition_colors[condition]
+        """
         this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
                        np.subtract(model_ramp[induction][condition], initial_ramp[induction][condition])[
                            this_clean_induction_t_indexes], label=label, color=color)
+        """
+        this_interp_initial_weights = np.interp(context.binned_x, context.peak_locs,
+                                                initial_weights[induction][condition])
+        this_interp_final_weights = np.interp(context.binned_x, context.peak_locs, final_weights[induction][condition])
+        this_norm_delta_weights = np.subtract(this_interp_final_weights, this_interp_initial_weights) / peak_weight
+        this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
+                       this_norm_delta_weights[this_clean_induction_t_indexes], label=label, color=color)
     this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes], np.zeros_like(this_clean_induction_t_indexes),
                    '--', c='grey', alpha=0.5)
     this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
     this_axis.set_xlabel('Time relative to\nplateau onset (s)')
-    this_axis.set_ylabel('Change in ramp\namplitude (mV)')
-    this_axis.set_ylim([-6., 12.])
+    this_axis.set_ylabel('Change in weight\n(normalized)')
+    this_axis.set_ylim([-0.2, 0.4])
     this_axis.set_xlim(xlim)
     this_axis.set_xticks(xticks)
     this_axis.set_title('Silent -> Place1', fontsize=mpl.rcParams['font.size'] + 2)
@@ -970,15 +981,23 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     condition = 'control'
     label = condition_labels[condition]
     color = condition_colors[condition]
+    """
     this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
                    np.subtract(model_ramp[induction][condition], initial_ramp[induction][condition])[
                        this_clean_induction_t_indexes], label=label, color=color)
+    """
+    this_interp_initial_weights = np.interp(context.binned_x, context.peak_locs,
+                                            initial_weights[induction][condition])
+    this_interp_final_weights = np.interp(context.binned_x, context.peak_locs, final_weights[induction][condition])
+    this_norm_delta_weights = np.subtract(this_interp_final_weights, this_interp_initial_weights) / peak_weight
+    this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
+                   this_norm_delta_weights[this_clean_induction_t_indexes], color=color)
     this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes], np.zeros_like(this_clean_induction_t_indexes),
                    '--', c='grey', alpha=0.5)
-    this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
+    # this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
     this_axis.set_xlabel('Time relative to\nplateau onset (s)')
-    this_axis.set_ylabel('Change in ramp\namplitude (mV)')
-    this_axis.set_ylim([-6., 12.])
+    this_axis.set_ylabel('Change in weight\n(normalized)')
+    this_axis.set_ylim([-0.2, 0.4])
     this_axis.set_xlim(xlim)
     this_axis.set_xticks(xticks)
     this_axis.set_title('Place1 -> Place2', fontsize=mpl.rcParams['font.size'] + 2)
