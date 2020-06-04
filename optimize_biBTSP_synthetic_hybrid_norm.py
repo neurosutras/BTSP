@@ -796,12 +796,11 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     return {context.induction: {context.condition: result}}
 
 
-def plot_model_summary_figure(export_file_path=None, exported_data_key=None, induction_lap=0):
+def plot_model_summary_figure(export_file_path=None, exported_data_key=None):
     """
 
     :param export_file_path: str (path)
     :param exported_data_key: str
-    :param induction_lap: int
     """
     mpl.rcParams['svg.fonttype'] = 'none'
     mpl.rcParams['font.size'] = 12.
@@ -824,6 +823,7 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     induction_stop_loc = defaultdict(dict)
     induction_start_times = defaultdict(dict)
     induction_stop_times = defaultdict(dict)
+    ramp_snapshots = defaultdict(lambda: defaultdict(list))
     description = 'model_ramp_features'
     with h5py.File(export_file_path, 'r') as f:
         source = get_h5py_group(f, [exported_data_key, 'exported_data', 'synthetic'])
@@ -845,6 +845,8 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
                 induction_stop_loc[int(induction_key)][condition] = group.attrs['mean_induction_stop_loc']
                 induction_start_times[int(induction_key)][condition] = group.attrs['induction_start_times']
                 induction_stop_times[int(induction_key)][condition] = group.attrs['induction_stop_times']
+                for lap in range(len(group['ramp_snapshots'])):
+                    ramp_snapshots[int(induction_key)][condition].append(group['ramp_snapshots'][str(lap)][:])
 
     load_data(1)
     this_min_induction_t = context.min_induction_t
@@ -963,15 +965,44 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
         this_norm_delta_weights = np.subtract(this_interp_final_weights, this_interp_initial_weights) / peak_weight
         this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
                        this_norm_delta_weights[this_clean_induction_t_indexes], label=label, color=color)
-    this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes], np.zeros_like(this_clean_induction_t_indexes),
-                   '--', c='grey', alpha=0.5)
+    this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
+                   np.zeros_like(this_clean_induction_t_indexes), '--', c='grey', alpha=0.5)
     this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
     this_axis.set_xlabel('Time relative to\nplateau onset (s)')
     this_axis.set_ylabel('Change in weight\n(normalized)')
     this_axis.set_ylim([-0.2, 0.4])
     this_axis.set_xlim(xlim)
     this_axis.set_xticks(xticks)
-    this_axis.set_title('Silent -> Place1', fontsize=mpl.rcParams['font.size'] + 2)
+    this_axis.set_title('Silent -> Place 1', fontsize=mpl.rcParams['font.size'] + 2)
+
+    fig2, axes2 = plt.subplots(3, 3, figsize=(10., 11.))
+    prev_ramp = None
+    row = induction - 1
+    axes2[row][0].set_ylabel('Ramp amplitude (mV)')
+    axes2[row][0].set_ylim((-1., 9.))
+    axes2[row][0].set_title('Silent -> Place 1', fontsize=mpl.rcParams['font.size'] + 2)
+    axes2[row][1].set_ylabel('Change in ramp\namplitude (mV)')
+    axes2[row][1].set_ylim((-2., 8.))
+    for lap in range(len(ramp_snapshots[induction]['control'])):
+        this_ramp = ramp_snapshots[induction]['control'][lap]
+        if lap == 0:
+            axes2[row][0].plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
+                               this_ramp[this_clean_induction_t_indexes], c='k', label='Before')
+        else:
+            axes2[row][0].plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
+                               this_ramp[this_clean_induction_t_indexes], label='Induction lap %i' % lap)
+        if prev_ramp is not None:
+            this_delta_ramp = np.subtract(this_ramp, prev_ramp)
+            axes2[row][1].plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
+                               this_delta_ramp[this_clean_induction_t_indexes], label='Induction lap %i' % lap)
+        prev_ramp = this_ramp
+    for col in range(2):
+        axes2[row][col].plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
+                             np.zeros_like(this_clean_induction_t_indexes), '--', c='grey', alpha=0.5)
+        axes2[row][col].set_xlim(xlim)
+        axes2[row][col].set_xticks(xticks)
+        axes2[row][col].set_xlabel('Time relative to\nplateau onset (s)')
+    axes2[row][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
 
     this_axis = axes[2][2]
     load_data(2)
@@ -981,11 +1012,7 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     condition = 'control'
     label = condition_labels[condition]
     color = condition_colors[condition]
-    """
-    this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
-                   np.subtract(model_ramp[induction][condition], initial_ramp[induction][condition])[
-                       this_clean_induction_t_indexes], label=label, color=color)
-    """
+
     this_interp_initial_weights = np.interp(context.binned_x, context.peak_locs,
                                             initial_weights[induction][condition])
     this_interp_final_weights = np.interp(context.binned_x, context.peak_locs, final_weights[induction][condition])
@@ -1000,12 +1027,45 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     this_axis.set_ylim([-0.2, 0.4])
     this_axis.set_xlim(xlim)
     this_axis.set_xticks(xticks)
-    this_axis.set_title('Place1 -> Place2', fontsize=mpl.rcParams['font.size'] + 2)
+    this_axis.set_title('Place 1 -> Place 2', fontsize=mpl.rcParams['font.size'] + 2)
 
     clean_axes(axes)
     fig.tight_layout()
     fig.subplots_adjust(hspace=0.5, wspace=0.4)
     fig.show()
+
+    prev_ramp = None
+    row = induction - 1
+    axes2[row][0].set_ylabel('Ramp amplitude (mV)')
+    axes2[row][0].set_ylim((-1., 9.))
+    axes2[row][0].set_title('Place 1 -> Place 2', fontsize=mpl.rcParams['font.size'] + 2)
+    axes2[row][1].set_ylabel('Change in ramp\namplitude (mV)')
+    axes2[row][1].set_ylim((-2., 8.))
+    for lap in range(len(ramp_snapshots[induction]['control'])):
+        this_ramp = ramp_snapshots[induction]['control'][lap]
+        if lap == 0:
+            axes2[row][0].plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
+                               this_ramp[this_clean_induction_t_indexes], c='k', label='Before')
+        else:
+            axes2[row][0].plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
+                               this_ramp[this_clean_induction_t_indexes], label='Induction lap %i' % lap)
+        if prev_ramp is not None:
+            this_delta_ramp = np.subtract(this_ramp, prev_ramp)
+            axes2[row][1].plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
+                               this_delta_ramp[this_clean_induction_t_indexes], label='Induction lap %i' % lap)
+        prev_ramp = this_ramp
+    for col in range(2):
+        axes2[row][col].plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
+                             np.zeros_like(this_clean_induction_t_indexes), '--', c='grey', alpha=0.5)
+        axes2[row][col].set_xlim(xlim)
+        axes2[row][col].set_xticks(xticks)
+        axes2[row][col].set_xlabel('Time relative to\nplateau onset (s)')
+    # axes2[row][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
+    clean_axes(axes2)
+    fig2.tight_layout()
+    fig2.subplots_adjust(hspace=0.5, wspace=0.4)
+    fig2.show()
+
     context.update(locals())
 
 

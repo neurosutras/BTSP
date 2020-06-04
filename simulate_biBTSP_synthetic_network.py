@@ -675,9 +675,7 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
                 nonmodulated_cell_indexes.append(i)
         sorted_ramp_pop = modulated_ramp_pop + nonmodulated_ramp_pop
         X, Y = np.meshgrid(context.binned_x, range(len(sorted_ramp_pop)))
-        hm = axes2[0][2].pcolormesh(X, Y, sorted_ramp_pop, cmap=this_cmap, vmin=0., vmax=context.input_field_peak_rate,
-                                antialiased=True) #,
-                                    # rasterized=True)
+        hm = axes2[0][2].pcolormesh(X, Y, sorted_ramp_pop, cmap=this_cmap, vmin=0., vmax=context.input_field_peak_rate)
         cb = plt.colorbar(hm, ax=axes2[0][2])
         cb.ax.set_ylabel('Firing rate (Hz)', rotation=270, fontsize=mpl.rcParams['font.size'])
         cb.ax.get_yaxis().labelpad = 15
@@ -695,8 +693,8 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
                 this_delta_rate = this_rate - this_initial_rate
                 prev_sorted_delta_rate.append(this_delta_rate)
             X, Y = np.meshgrid(context.binned_x, range(len(prev_sorted_delta_rate)))
-            hm = axes2[0][1].pcolormesh(X, Y, prev_sorted_delta_rate, cmap='bwr', vmin=-context.input_field_peak_rate,
-                                        vmax=context.input_field_peak_rate, antialiased=True) #, rasterized=True)
+            hm = axes2[0][1].pcolormesh(X, Y, prev_sorted_delta_rate, vmin=-context.input_field_peak_rate,
+                                        vmax=context.input_field_peak_rate, cmap='seismic') # cmap='bwr',
             cb = plt.colorbar(hm, ax=axes2[0][1])
             cb.ax.set_ylabel('Change in firing rate (Hz)', rotation=270, fontsize=mpl.rcParams['font.size'])
             cb.ax.get_yaxis().labelpad = 15

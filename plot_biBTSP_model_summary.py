@@ -308,41 +308,52 @@ def plot_compare_models_mse_by_induction(model_file_path_dict):
     fig.show()
 
 
-def plot_compare_models_boxplot(model_file_path_dict, ordered_keys=None, ymax=6.):
+def plot_compare_models_boxplot(model_file_path_list, label_list, exported_data_key_list, ymax=6., control=None):
     """
 
-    :param model_file_path_dict: {label (str): file_path (str; path)}
-    :param ordered_keys: list of str
+    :param model_file_path_list: list of str (path)
+    :param label_list: list of str
+    :param exported_data_key_list: list of str
+    :param ymax: float
+    :param control: str (labeled data to act as control for statistical comparisons)
+    :return dict
     """
     mse_data = []
     sse_data = []
     mse_dict = {}
-    if ordered_keys is None:
-        ordered_keys = list(model_file_path_dict.keys())
-    for model in ordered_keys:
-        if model not in model_file_path_dict:
-            raise RuntimeError('plot_compare_models_sse_box: no model file specified for model name: %s' % model)
-        model_file_path = model_file_path_dict[model]
+    for model_file_path, label, exported_data_key in zip(model_file_path_list, label_list, exported_data_key_list):
         ramp_amp, ramp_width, peak_shift, min_val, this_mse_dict, this_sse_dict, discard_delta_exp_ramp, \
-            discard_delta_model_ramp = process_biBTSP_model_results(model_file_path)
+            discard_delta_model_ramp = \
+            process_biBTSP_model_results(model_file_path, exported_data_key=exported_data_key)
         this_sse_list = []
         this_mse_list = []
-        for induction_key in ['2']:  # this_sse_dict:
+        for induction_key in ['2', '3']:  # this_sse_dict:
             this_sse_list.extend(this_sse_dict[induction_key])
             this_mse_list.extend(this_mse_dict[induction_key])
         sse_data.append(this_sse_list)
         mse_data.append(this_mse_list)
-        mse_dict[model] = this_mse_list
+        mse_dict[label] = this_mse_list
 
-    fig, axes = plt.subplots(2, figsize=(8.25, 6))
-    axes[0].boxplot(mse_data, showfliers=False)
-    axes[0].set_xticklabels(ordered_keys)
-    axes[0].set_ylabel('Mean squared error')
-    axes[0].set_ylim(axes[0].get_ylim()[0], ymax)
-    axes[0].set_title('Model ramp residual error', fontsize=mpl.rcParams['font.size'])
+    fig, axes = plt.subplots(figsize=(6, 3.5))
+    axes.boxplot(mse_data, showfliers=False, medianprops=dict(color='k'))
+    axes.set_xticklabels(label_list)
+    axes.set_ylabel('Mean squared error')
+    axes.set_ylim(axes.get_ylim()[0], ymax)
     clean_axes(axes)
-    fig.subplots_adjust(left=0.125, hspace=0.5, wspace=0.6, right=0.925)
+    fig.suptitle('Model ramp residual error', y=0.95, x=0.05, ha='left', fontsize=mpl.rcParams['font.size'])
+    fig.subplots_adjust(top=0.75, hspace=0.2, wspace=0.6)
     fig.show()
+
+    if control is not None:
+        from scipy.stats import friedmanchisquare
+        from scipy.stats import wilcoxon
+        stats, p = friedmanchisquare(*list(mse_dict.values()))
+        print('Friedman test: p = %.5f' % p)
+        if p < 0.05:
+            for label in [label for label in label_list if label != control]:
+                stat, p = wilcoxon(mse_dict[control], mse_dict[label])
+                p *= len(label_list) - 1
+                print('Wilcoxon signed rank: %s vs %s; p = %.5f' % (control, label, p))
 
     return mse_dict
 

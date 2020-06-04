@@ -20,28 +20,21 @@ mpl.rcParams['axes.unicode_minus'] = True
 
 context = Context()
 
-param_labels = {'local_signal_rise': r'signal$_{eligibility}$ tau$_{rise}$ (ms)',
-                'local_signal_decay': r'signal$_{eligibility}$ tau$_{decay}$ (ms)',
-                'pot_signal_rise': r'signal$_{eligibility,+}$ tau$_{rise}$ (ms)',
-                'pot_signal_decay': r'signal$_{eligibility,+}$ tau$_{decay}$ (ms)',
-                'dep_signal_rise': r'signal$_{eligibility,-}$ tau$_{rise}$ (ms)',
-                'dep_signal_decay': r'signal$_{eligibility,-}$ tau$_{decay}$ (ms)',
-                'global_signal_rise': r'signal$_{gating}$ tau$_{rise}$ (ms)',
-                'global_signal_decay': r'signal$_{gating}$ tau$_{decay}$ (ms)',
-                'k_pot': r'k$_{(+)}$ (Hz)',
-                'f_pot_th': r'gain$_{(+)}$ th',
-                'f_pot_peak': r'gain$_{(+)}$ peak',
-                'k_dep': r'k$_{(-)}$ (Hz)',
-                'f_dep_th': r'gain$_{(-)}$ th',
-                'f_dep_peak': r'gain$_{(-)}$ peak',
-                'peak_delta_weight': u'\u0394weight$_{max}$',
-                'delta_peak_ramp_amp': u'\u0394V$_{max}$'
+param_labels = {'local_signal_decay': r'$\tau_E$ (ms)',
+                'global_signal_decay': r'$\tau_I$ (ms)',
+                'k_pot': r'$k^+$ (Hz)',
+                'f_pot_th': r'$q^+$ threshold',
+                'f_pot_half_width': r'$q^+$ half width',
+                'k_dep': r'$k^-$ (Hz)',
+                'f_dep_th': r'$q^-$ threshold',
+                'f_dep_half_width': r'$q^-$ half width',
+                'peak_delta_weight': u'\u0394$W_{max}$',
+                'plateau_delta_depo': u'\u0394$V_{max}$'
                 }
 
-ordered_param_names = ['local_signal_rise', 'local_signal_decay', 'pot_signal_rise', 'pot_signal_decay',
-                       'dep_signal_rise', 'dep_signal_decay', 'global_signal_rise', 'global_signal_decay',
-                       'k_pot', 'k_dep', 'f_pot_th', 'f_pot_peak', 'f_dep_th', 'f_dep_peak',
-                       'peak_delta_weight', 'delta_peak_ramp_amp']
+ordered_param_names = ['local_signal_decay', 'global_signal_decay', 'k_pot', 'k_dep',
+                       'f_pot_th', 'f_pot_half_width', 'f_dep_th', 'f_dep_half_width',
+                       'peak_delta_weight', 'plateau_delta_depo']
 
 
 @click.command()
@@ -106,12 +99,16 @@ def plot_BTSP_model_param_cdfs(param_dict, config_dict, export=False, output_dir
             this_axis = fig.add_subplot(gs0[row, col])
             axes.append(this_axis)
     ordered_param_keys = [param_name for param_name in ordered_param_names if param_name in params]
+    for param_name in ordered_param_keys:
+        print(param_name)
+    print('mean: ')
     for i, param_name in enumerate(ordered_param_keys):
         params[param_name].sort()
         vals = params[param_name]
         n = len(vals)
+        print(u'%.2f \u00B1 %.2f' % (np.mean(vals), np.std(vals) / np.sqrt(n)))
         xlim = np.array(bounds[param_name])
-        xlim[0] = xlim[0] -0.05 * xlim[1]
+        xlim[0] = xlim[0] - 0.05 * xlim[1]
         xlim[1] *= 1.05
         axes[i].plot(vals, np.add(np.arange(n), 1.)/float(n), c='k')
         axes[i].set_xlim(xlim)
