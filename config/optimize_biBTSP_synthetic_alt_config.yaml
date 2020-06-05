@@ -69,10 +69,15 @@ kwargs:
   induction_loc:
     '1': 120.
     '2': 45.
-  target_ramp_width: 150.
+  target_ramp_width_1: 150.
+  target_ramp_width_2: 80.
   target_peak_delta_weight: 3.
-  target_peak_shift_1: -5.
+  target_peak_shift_1: -10.
+  target_peak_shift_2: -10.
   target_peak_val_1: 8.
+  target_asymmetry_1: 1.8
+  target_asymmetry_2: 2.2
+  target_delta_peak_val_2: -5.
   weights_path_distance_threshold: 1.25
 objective_names:
 - induction1_residual_score

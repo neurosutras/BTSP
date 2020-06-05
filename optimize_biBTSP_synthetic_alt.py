@@ -228,41 +228,47 @@ def load_data(induction):
         induction_context.target_ramp = {}
         induction_context.LSA_weights = {}
         if induction == 2:
+            induction_loc_1 = context.induction_loc['1']
             if 1 in context.data_cache:
                 induction_context.target_ramp['before'] = context.data_cache[1].target_ramp['after']
                 induction_context.LSA_weights['before'] = context.data_cache[1].LSA_weights['after']
             else:
-                induction_loc = context.induction_loc['1']
-                induction_stop_index = np.where(context.default_interp_x >= induction_loc)[0][0] + \
+                induction_stop_index = np.where(context.default_interp_x >= induction_loc_1)[0][0] + \
                                          int(context.induction_dur / context.dt)
                 induction_stop_loc = context.default_interp_x[induction_stop_index]
 
-                target_ramp = get_target_synthetic_ramp(induction_loc, ramp_x=context.binned_x,
+                target_ramp = get_target_synthetic_ramp(induction_loc_1, ramp_x=context.binned_x,
                                                         track_length=context.track_length,
                                                         target_peak_val=context.target_peak_val_1,
-                                                        target_min_val=0., target_asymmetry=1.1,
+                                                        target_min_val=0., target_asymmetry=context.target_asymmetry_1,
                                                         target_peak_shift=context.target_peak_shift_1,
-                                                        target_ramp_width=context.target_ramp_width)
+                                                        target_ramp_width=context.target_ramp_width_1)
                 induction_context.target_ramp['before'], \
                 induction_context.LSA_weights['before'], _, _ = \
                     get_delta_weights_LSA(target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,
                                           interp_x=context.default_interp_x, input_rate_maps=context.input_rate_maps,
                                           peak_locs=context.peak_locs, ramp_scaling_factor=context.ramp_scaling_factor,
-                                          induction_start_loc=induction_loc, induction_stop_loc=induction_stop_loc,
+                                          induction_start_loc=induction_loc_1, induction_stop_loc=induction_stop_loc,
                                           track_length=context.track_length, target_range=context.target_range,
                                           bounds=(context.min_delta_weight, context.target_peak_delta_weight),
                                           verbose=context.verbose)
 
             # the shape of this target_ramp was estimated from gaussian regression from experimental data
-            target_delta_ramp_2_dep = get_target_synthetic_ramp(110., ramp_x=context.binned_x,
-                                                                track_length=context.track_length, target_peak_val=4.5,
-                                                                target_min_val=0., target_asymmetry=0.6,
-                                                                target_peak_shift=0., target_ramp_width=90.)
+            target_delta_ramp_2_dep = get_target_synthetic_ramp(induction_loc_1, ramp_x=context.binned_x,
+                                                                track_length=context.track_length,
+                                                                target_peak_val=-context.target_delta_peak_val_2,
+                                                                target_min_val=0.,
+                                                                target_asymmetry=context.target_asymmetry_2,
+                                                                target_peak_shift=context.target_peak_shift_2,
+                                                                target_ramp_width=context.target_ramp_width_2)
             target_delta_ramp_2_pot = get_target_synthetic_ramp(induction_context.mean_induction_start_loc,
                                                                 ramp_x=context.binned_x,
-                                                                track_length=context.track_length, target_peak_val=8.,
-                                                                target_min_val=0., target_asymmetry=1.7,
-                                                                target_peak_shift=-5., target_ramp_width=144.)
+                                                                track_length=context.track_length,
+                                                                target_peak_val=context.target_peak_val_1,
+                                                                target_min_val=0.,
+                                                                target_asymmetry=context.target_asymmetry_1,
+                                                                target_peak_shift=context.target_peak_shift_1,
+                                                                target_ramp_width=context.target_ramp_width_1)
             target_delta_ramp_2 = np.subtract(target_delta_ramp_2_pot, target_delta_ramp_2_dep)
             target_ramp_2 = np.add(induction_context.target_ramp['before'], target_delta_ramp_2)
             induction_context.target_ramp['after'], \
@@ -284,9 +290,9 @@ def load_data(induction):
             target_ramp = get_target_synthetic_ramp(induction_loc, ramp_x=context.binned_x,
                                                     track_length=context.track_length,
                                                     target_peak_val=context.target_peak_val_1, target_min_val=0.,
-                                                    target_asymmetry=1.1,
+                                                    target_asymmetry=context.target_asymmetry_1,
                                                     target_peak_shift=context.target_peak_shift_1,
-                                                    target_ramp_width=context.target_ramp_width)
+                                                    target_ramp_width=context.target_ramp_width_1)
             induction_context.target_ramp['after'], \
             induction_context.LSA_weights['after'], _, _ = \
                 get_delta_weights_LSA(target_ramp, ramp_x=context.binned_x, input_x=context.binned_x,

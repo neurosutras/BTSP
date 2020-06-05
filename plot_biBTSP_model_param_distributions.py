@@ -101,7 +101,7 @@ def plot_BTSP_model_param_cdfs(param_dict, config_dict, export=False, output_dir
     ordered_param_keys = [param_name for param_name in ordered_param_names if param_name in params]
     for param_name in ordered_param_keys:
         print(param_name)
-    print('mean: ')
+    print('%s:' % label)
     for i, param_name in enumerate(ordered_param_keys):
         params[param_name].sort()
         vals = params[param_name]
@@ -116,12 +116,67 @@ def plot_BTSP_model_param_cdfs(param_dict, config_dict, export=False, output_dir
         axes[i].set_xlabel(param_labels[param_name])
         if i % 4 == 0:
             axes[i].set_ylabel('Cum. fraction')
+    print_beta_values_from_half_widths(param_dict, config_dict, label)
     clean_axes(axes)
     fig.suptitle('%s:' % label, fontsize=mpl.rcParams['font.size'], x=0.1, y=0.99)
     if export:
         fig_path = '%s/%s_biBTSP_model_param_cdfs.svg' % (output_dir, label)
         fig.savefig(fig_path, format='svg')
     fig.show()
+
+
+def print_V_max_for_VD_models(param_dict, config_dict, data_file_path, param_name='plateau_delta_depo', label=None):
+    """
+
+    :param param_dict: dict
+    :param config_dict: dict
+    :param data_file_path: str (path)
+    :param_name: str
+    :label: str
+    """
+    V_max = defaultdict(lambda: 0.)
+    with h5py.File(data_file_path, 'r') as f:
+        for cell_key in f['data']:
+            for induction_key in f['data'][cell_key]:
+                if 'before' in f['data'][cell_key][induction_key]['processed']['exp_ramp']:
+                    V_max[cell_key] = \
+                        max(V_max[cell_key],
+                            np.max(f['data'][cell_key][induction_key]['processed']['exp_ramp']['before'][:]))
+                if 'after' in f['data'][cell_key][induction_key]['processed']['exp_ramp']:
+                    V_max[cell_key] = \
+                        max(V_max[cell_key],
+                            np.max(f['data'][cell_key][induction_key]['processed']['exp_ramp']['after'][:]))
+    for cell_key in context.param_dict:
+        V_max[str(cell_key)] += context.param_dict[cell_key][param_name]
+    vals = list(V_max.values())
+    n = len(vals)
+    print('%s:' % label)
+    print(u'%.2f \u00B1 %.2f' % (np.mean(vals), np.std(vals) / np.sqrt(n)))
+
+
+def print_beta_values_from_half_widths(param_dict, config_dict, label=None):
+    """
+
+    :param param_dict: dict
+    :param config_dict: dict
+    :label: str
+    """
+    cell_keys = [key for key in param_dict if key not in ['all', 'default']]
+    params = defaultdict(list)
+    for cell in cell_keys:
+        for param_name, param_val in viewitems(param_dict[cell]):
+            params[param_name].append(param_val)
+    param_keys = ['f_pot_half_width', 'f_dep_half_width']
+    new_labels = {'f_pot_half_width': 'beta_+', 'f_dep_half_width': 'beta_-'}
+    print(label)
+    for param_key in (param_key for param_key in param_keys if param_key in params):
+        vals = np.array(params[param_key])
+        n = len(vals)
+        print(param_key)
+        print(u'%.2f \u00B1 %.2f' % (np.mean(vals), np.std(vals) / np.sqrt(n)))
+        vals = 2. / vals
+        print(new_labels[param_key])
+        print(u'%.2f \u00B1 %.2f' % (np.mean(vals), np.std(vals) / np.sqrt(n)))
 
 
 def plot_BTSP_model_param_PCA(param_dict, config_dict, pcadim=None, export=False, output_dir=None, label=None):

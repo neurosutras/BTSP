@@ -308,7 +308,7 @@ def plot_compare_models_mse_by_induction(model_file_path_dict):
     fig.show()
 
 
-def plot_compare_models_boxplot(model_file_path_list, label_list, exported_data_key_list, ymax=6., control=None):
+def plot_compare_models_boxplot(model_file_path_list, label_list, exported_data_key_list, ymax=5., control=None):
     """
 
     :param model_file_path_list: list of str (path)
@@ -334,7 +334,7 @@ def plot_compare_models_boxplot(model_file_path_list, label_list, exported_data_
         mse_data.append(this_mse_list)
         mse_dict[label] = this_mse_list
 
-    fig, axes = plt.subplots(figsize=(6, 3.5))
+    fig, axes = plt.subplots(figsize=(8, 3.5))
     axes.boxplot(mse_data, showfliers=False, medianprops=dict(color='k'))
     axes.set_xticklabels(label_list)
     axes.set_ylabel('Mean squared error')
