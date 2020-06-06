@@ -31,11 +31,11 @@ I (inactive) <------------------------------> A (active)
 4) global_signals are pooled across all cells and normalized to a peak value of 1.
 5) local_signals are pooled across all cells and normalized to a peak value of 1.
 6) f_pot represents the "sensitivity" of the forward process to the presence of the local_signal. The transformation
-f_pot has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
+f_pot is linear.
 7) f_dep represents the "sensitivity" of the reverse process to the presence of the local_signal. The transformation
 f_dep has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
 
-biBTSP_WD_D:
+biBTSP_WD_F:
 Gain function f_pot is linear and f_dep is sigmoidal.
 """
 __author__ = 'milsteina'
@@ -60,7 +60,7 @@ def init_context():
 
     """
     if context.data_file_path is None or not os.path.isfile(context.data_file_path):
-        raise IOError('simulate_biBTSP_synthetic_network: init_context: invalid data_file_path: %s' %
+        raise IOError('simulate_biBTSP_synthetic_network_alt: init_context: invalid data_file_path: %s' %
                       context.data_file_path)
 
     context.verbose = int(context.verbose)
@@ -90,12 +90,12 @@ def init_context():
         extended_x = f['defaults']['extended_x'][:]
 
         if 'input_field_width' not in context() or context.input_field_width is None:
-            raise RuntimeError('simulate_biBTSP_synthetic_network: init context: missing required parameter: '
+            raise RuntimeError('simulate_biBTSP_synthetic_network_alt: init context: missing required parameter: '
                                'input_field_width')
         context.input_field_width = float(context.input_field_width)
         input_field_width_key = str(int(context.input_field_width))
         if 'calibrated_input' not in f or input_field_width_key not in f['calibrated_input']:
-            raise RuntimeError('simulate_biBTSP_synthetic_network: init context: data for input_field_width: %.1f not '
+            raise RuntimeError('simulate_biBTSP_synthetic_network_alt: init context: data for input_field_width: %.1f not '
                                'found in the provided data_file_path: %s' %
                                (float(context.input_field_width), context.data_file_path))
         input_field_width = f['calibrated_input'][input_field_width_key].attrs['input_field_width']  # cm
@@ -141,7 +141,7 @@ def init_context():
             if reward_loc is not None:
                 this_reward_start_index = np.where(default_interp_x >= reward_loc)[0]
                 if len(this_reward_start_index) == 0:
-                    raise RuntimeError('simulate_biBTSP_synthetic_network: invalid reward_loc: %.1f' % reward_loc)
+                    raise RuntimeError('simulate_biBTSP_synthetic_network_alt: invalid reward_loc: %.1f' % reward_loc)
                 this_reward_start_index = len(t) - len(default_interp_t) + this_reward_start_index[0]
                 reward_start_times.append(t[this_reward_start_index])
             else:
@@ -184,8 +184,7 @@ def init_context():
     global_signal_peak = np.max(example_global_signal)
 
     signal_xrange = np.linspace(0., 1., 10000)
-    pot_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_pot_th, context.f_pot_th + context.f_pot_half_width, signal_xrange))
+    pot_rate = lambda x: x
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
 
@@ -198,10 +197,10 @@ def init_context():
                                             target_min_val=0., target_asymmetry=1.8,
                                             target_peak_shift=context.target_peak_shift,
                                             target_ramp_width=context.target_ramp_width)
-    spike_threshold = 2.  # mV
+
+    spike_threshold = 0.  # 2. mV
     f_I_slope = context.input_field_peak_rate / (context.initial_ramp_peak_val * 1.5 - spike_threshold)
-    # f_I = np.vectorize(lambda x: 0. if x < spike_threshold else (x - spike_threshold) * f_I_slope)
-    f_I = lambda x: x
+    f_I = np.vectorize(lambda x: 0. if x < spike_threshold else (x - spike_threshold) * f_I_slope)
     max_population_rate_sum = np.mean(f_I(target_initial_ramp)) * num_cells
 
     initial_weights_population = [np.ones_like(peak_locs) for _ in range(num_cells)]
@@ -232,7 +231,8 @@ def init_context():
 
     basal_representation_xscale = np.linspace(0., basal_target_representation_density, 10000)
     basal_plateau_prob_f = \
-        scaled_single_sigmoid(basal_target_representation_density, basal_target_representation_density / 2.,
+        scaled_single_sigmoid(basal_target_representation_density,
+                              basal_target_representation_density + basal_target_representation_density / 3.,
                               basal_representation_xscale, ylim=[peak_basal_plateau_prob_per_dt, 0.])
     basal_plateau_prob_f = np.vectorize(basal_plateau_prob_f)
 
@@ -240,7 +240,7 @@ def init_context():
     reward_delta_representation_density = reward_target_representation_density - basal_target_representation_density
     reward_plateau_prob_f = \
         scaled_single_sigmoid(reward_target_representation_density,
-                              basal_target_representation_density / 2. + reward_delta_representation_density,
+                              reward_target_representation_density + reward_delta_representation_density / 2.,
                               reward_representation_xscale,
                               ylim=[peak_reward_plateau_prob_per_dt, 0.])
     reward_plateau_prob_f = np.vectorize(reward_plateau_prob_f)
@@ -436,7 +436,7 @@ def simulate_network(export=False, plot=False):
     context.update(locals())
 
     if context.disp:
-        print('simulate_biBTSP_synthetic_network: Process: %i: simulating network took %.1f s' %
+        print('simulate_biBTSP_synthetic_network_alt: Process: %i: simulating network took %.1f s' %
               (os.getpid(), time.time() - start_time))
         sys.stdout.flush()
 
@@ -447,7 +447,7 @@ def simulate_network(export=False, plot=False):
         with h5py.File(context.export_file_path, 'a') as f:
             exported_data_key = 'biBTSP_synthetic_network_history'
             if exported_data_key in f:
-                raise RuntimeError('simulate_biBTSP_synthetic_network: data has already been exported to '
+                raise RuntimeError('simulate_biBTSP_synthetic_network_alt: data has already been exported to '
                                    'export_file_path: %s' % context.export_file_path)
             group = f.create_group(exported_data_key)
             group.attrs['enumerated'] = False
@@ -482,7 +482,7 @@ def simulate_network(export=False, plot=False):
                                                           data=np.array(plateau_start_times))
 
         if context.disp:
-            print('simulate_biBTSP_synthetic_network: Process: %i: exported data to file: %s' %
+            print('simulate_biBTSP_synthetic_network_alt: Process: %i: exported data to file: %s' %
                   (os.getpid(), context.export_file_path))
             sys.stdout.flush()
 
@@ -744,7 +744,7 @@ def plot_model_summary(model_file_path):
                     loaded_seed_offset == int(context.seed_offset),
                     loaded_trial == int(context.trial),
                     loaded_num_cells == int(context.num_cells)]):
-            raise RuntimeError('simulate_biBTSP_synethic_network: plot_model_summary: configuration loaded from '
+            raise RuntimeError('simulate_biBTSP_synethic_network_alt: plot_model_summary: configuration loaded from '
                                'config_file_path: %s is inconsistent with data loaded from model_file_path: %s' %
                                (context.config_file_path, model_file_path))
         weights_pop_history = group['weights_pop_history'][:]
@@ -773,12 +773,12 @@ def plot_model_summary(model_file_path):
 
 @click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True, ))
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/simulate_biBTSP_synthetic_network_config.yaml')
+              default='config/simulate_biBTSP_synthetic_network_alt_config.yaml')
 @click.option("--trial", type=int, default=0)
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
 @click.option("--export-file-path", type=str, default=None)
-@click.option("--label", type=str, default='biBTSP_synthetic_network')
+@click.option("--label", type=str, default='biBTSP_synthetic_network_alt')
 @click.option("--verbose", type=int, default=2)
 @click.option("--plot", is_flag=True)
 @click.option("--interactive", is_flag=True)
@@ -790,13 +790,13 @@ def main(cli, config_file_path, trial, output_dir, export, export_file_path, lab
          plot_summary_figure, model_file_path):
     """
     To execute on a single process:
-    python -i simulate_biBTSP_synthetic_network.py --plot --framework=serial --interactive
+    python -i simulate_biBTSP_synthetic_network_alt.py --plot --framework=serial --interactive
 
     To execute using MPI parallelism with 1 controller process and N - 1 worker processes:
-    mpirun -n N python -i -m mpi4py.futures simulate_biBTSP_synthetic_network.py --plot --framework=mpi --interactive
+    mpirun -n N python -i -m mpi4py.futures simulate_biBTSP_synthetic_network_alt.py --plot --framework=mpi --interactive
 
     To plot results previously exported to a file on a single process:
-    python -i simulate_biBTSP_synthetic_network.py --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
+    python -i simulate_biBTSP_synthetic_network_alt.py --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
         --framework=serial --interactive
 
     :param cli: contains unrecognized args as list of str
