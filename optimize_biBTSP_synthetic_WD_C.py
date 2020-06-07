@@ -16,7 +16,7 @@ plasticity.
 4) Changes in weight at each synapse are integrated over periods of nonzero overlap between eligibility and instructive
 signals, and updated once per lap.
 
-Features/assumptions of weight-dependent model D:
+Features/assumptions of weight-dependent model C:
 1) Dendritic plateaus generate a global instructive signal that provides a necessary cofactor required to convert
 plasticity eligibility signals at each synapse into either increases or decreases in synaptic strength.
 2) Activity at each synapse generates a local plasticity eligibility signal that, in conjunction with the global
@@ -35,7 +35,8 @@ f_pot has the flexibility to be any segment of a sigmoid (so can be linear, expo
 7) f_dep represents the "sensitivity" of the reverse process to the presence of the local_signal. The transformation
 f_dep has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
 
-biBTSP_synthetic_alt: Single eligibility signal filter.
+biBTSP_synthetic_WD_C: Single eligibility signal filter.
+Rise and decay time constants for E and I filters.
 """
 __author__ = 'milsteina'
 from biBTSP_utils import *
@@ -46,7 +47,7 @@ import click
 context = Context()
 
 
-BTSP_model_name = 'synthetic'
+BTSP_model_name = 'synthetic_WD_C'
 
 
 def config_worker():
@@ -341,7 +342,8 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     :return: dict
     """
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
-        get_dual_exp_decay_signal_filters(context.local_signal_decay, context.global_signal_decay, context.down_dt)
+        get_dual_signal_filters(context.local_signal_rise, context.local_signal_decay,
+                                context.global_signal_rise, context.global_signal_decay, context.down_dt)
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
     global_signal_peak = np.max(global_signal)
     global_signal /= global_signal_peak
@@ -980,7 +982,7 @@ def get_features_interactive(interface, x, model_id=None, plot=False):
 
 @click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True, ))
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/optimize_biBTSP_synthetic_config.yaml')
+              default='config/optimize_biBTSP_synthetic_WD_C_config.yaml')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
 @click.option("--export-file-path", type=str, default=None)
@@ -996,17 +998,17 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
          plot_summary_figure, exported_data_key):
     """
     To execute on a single process on one cell from the experimental dataset:
-    python -i optimize_biBTSP_synthetic.py --plot --framework=serial --interactive
+    python -i optimize_biBTSP_synthetic_WD_C.py --plot --framework=serial --interactive
 
     To execute using MPI parallelism with 1 controller process and N - 1 worker processes:
-    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_synthetic.py --plot --framework=mpi --interactive
+    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_synthetic_WD_C.py --plot --framework=mpi --interactive
 
     To optimize the models by running many instances in parallel:
     mpirun -n N python -m mpi4py.futures -m nested.optimize --config-file-path=$PATH_TO_CONFIG_FILE --disp --export \
         --framework=mpi --pop-size=200 --path-length=3 --max-iter=50
 
     To plot results previously exported to a file on a single process:
-    python -i optimize_biBTSP_synthetic.py --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
+    python -i optimize_biBTSP_synthetic_WD_C.py --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
         --framework=serial --interactive
 
     :param cli: contains unrecognized args as list of str
