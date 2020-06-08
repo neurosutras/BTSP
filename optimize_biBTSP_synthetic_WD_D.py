@@ -240,7 +240,7 @@ def load_data(induction):
                                                         track_length=context.track_length,
                                                         target_peak_val=context.target_peak_val_1,
                                                         target_min_val=0., target_asymmetry=context.target_asymmetry_1,
-                                                        target_peak_shift=context.target_peak_shift_1,
+                                                        target_peak_shift=context.target_peak_shift,
                                                         target_ramp_width=context.target_ramp_width_1)
                 induction_context.target_ramp['before'], \
                 induction_context.LSA_weights['before'], _, _ = \
@@ -252,15 +252,23 @@ def load_data(induction):
                                           bounds=(context.min_delta_weight, context.target_peak_delta_weight),
                                           verbose=context.verbose)
 
-            target_ramp_2 = get_target_synthetic_ramp(induction_context.mean_induction_start_loc,
-                                                            ramp_x=context.binned_x,
-                                                            track_length=context.track_length,
-                                                            target_peak_val=context.target_peak_val_1,
-                                                            target_min_val=context.target_peak_val_1 +
-                                                                           context.target_delta_peak_val_2,
-                                                            target_asymmetry=context.target_asymmetry_2,
-                                                            target_peak_shift=context.target_peak_shift_2,
-                                                            target_ramp_width=context.target_ramp_width_2)
+            target_delta_ramp_dep = get_target_synthetic_ramp(induction_loc_1, ramp_x=context.binned_x,
+                                                              track_length=context.track_length,
+                                                              target_peak_val=-context.target_dep_delta_peak_val_2,
+                                                              target_min_val=0.,
+                                                              target_asymmetry=context.target_asymmetry_2,
+                                                              target_peak_shift=context.target_peak_shift,
+                                                              target_ramp_width=context.target_ramp_dep_width_2)
+            target_delta_ramp_pot = get_target_synthetic_ramp(induction_context.mean_induction_start_loc,
+                                                              ramp_x=context.binned_x,
+                                                              track_length=context.track_length,
+                                                              target_peak_val=context.target_pot_delta_peak_val_2,
+                                                              target_min_val=0.,
+                                                              target_asymmetry=context.target_asymmetry_2,
+                                                              target_peak_shift=context.target_peak_shift,
+                                                              target_ramp_width=context.target_ramp_pot_width_2)
+            target_delta_ramp = np.subtract(target_delta_ramp_pot, target_delta_ramp_dep)
+            target_ramp_2 = np.add(induction_context.target_ramp['before'], target_delta_ramp)
 
             induction_context.target_ramp['after'], \
             induction_context.LSA_weights['after'], _, _ = \
@@ -282,7 +290,7 @@ def load_data(induction):
                                                     track_length=context.track_length,
                                                     target_peak_val=context.target_peak_val_1, target_min_val=0.,
                                                     target_asymmetry=context.target_asymmetry_1,
-                                                    target_peak_shift=context.target_peak_shift_1,
+                                                    target_peak_shift=context.target_peak_shift,
                                                     target_ramp_width=context.target_ramp_width_1)
             induction_context.target_ramp['after'], \
             induction_context.LSA_weights['after'], _, _ = \

@@ -76,14 +76,15 @@ kwargs:
     '1': 120.
     '2': 45.
   target_ramp_width_1: 160.
-  target_ramp_width_2: 187.
+  target_ramp_pot_width_2: 160.
+  target_ramp_dep_width_2: 140.
   target_peak_delta_weight: 3.
-  target_peak_shift_1: -12.5
-  target_peak_shift_2: -12.5
+  target_peak_shift: -12.5
   target_peak_val_1: 8.
   target_asymmetry_1: 2.2
-  target_asymmetry_2: 1.4
-  target_delta_peak_val_2: -5.
+  target_asymmetry_2: 2.5
+  target_pot_delta_peak_val_2: 7.65
+  target_dep_delta_peak_val_2: -5.
   weights_path_distance_threshold: 1.25
 objective_names:
 - induction1_residual_score
@@ -113,12 +114,12 @@ target_range:
 target_val:
   ramp_amp_after_first_plateau: 4.
 x0:
-  f_pot_half_width: 9.828062E-01
-  f_pot_th: 5.262555E-01
-  f_dep_half_width: 8.100359E-02
-  f_dep_th: 1.279724E-02
-  global_signal_decay: 7.826026E+02
-  k_dep: 2.088454E-01
-  k_pot: 4.893109E-01
-  local_signal_decay: 1.075317E+03
-  peak_delta_weight: 4.392292E+00
+  f_dep_half_width: 2.008349E-02
+  f_dep_th: 1.707742E-03
+  f_pot_half_width: 6.131998E-01
+  f_pot_th: 2.407198E-03
+  global_signal_decay: 2.022378E+02
+  k_dep: 2.596156E-01
+  k_pot: 1.045263E+00
+  local_signal_decay: 1.686574E+03
+  peak_delta_weight: 2.825655E+00
