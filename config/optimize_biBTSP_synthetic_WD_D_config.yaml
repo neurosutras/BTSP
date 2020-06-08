@@ -82,7 +82,7 @@ kwargs:
   target_peak_shift_2: -12.5
   target_peak_val_1: 8.
   target_asymmetry_1: 2.2
-  target_asymmetry_2: 2.2
+  target_asymmetry_2: 1.4
   target_delta_peak_val_2: -5.
   weights_path_distance_threshold: 1.25
 objective_names:
