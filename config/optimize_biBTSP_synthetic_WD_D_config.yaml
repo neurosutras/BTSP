@@ -17,31 +17,17 @@ bounds:
   k_dep: !!python/tuple
   - 0.01
   - 10.
-  local_signal_rise: !!python/tuple
-  - 5.
-  - 200.
   local_signal_decay: !!python/tuple
   - 50.
-  - 1500.
-  global_signal_rise: !!python/tuple
-  - 5.
-  - 200.
+  - 1750.
   global_signal_decay: !!python/tuple
   - 50.
-  - 1500.
+  - 1750.
   peak_delta_weight: !!python/tuple
   - 1.5
   - 6.
 default_params:
 rel_bounds:
-- - local_signal_decay
-  - '>'
-  - 1.0
-  - local_signal_rise
-- - global_signal_decay
-  - '>'
-  - 1.0
-  - global_signal_rise
 - - local_signal_decay
   - '>'
   - 1.0
@@ -69,15 +55,15 @@ feature_names:
 - induction2_delta_val_at_model_min
 - ramp_amp_after_first_plateau
 update_context:
-- - optimize_biBTSP_synthetic_WD_C
+- - optimize_biBTSP_synthetic_WD_D
   - update_model_params
 get_features_stages:
-- source: optimize_biBTSP_synthetic_WD_C
+- source: optimize_biBTSP_synthetic_WD_D
   get_args_static: get_args_static_model_ramp
   compute_features: compute_features_model_ramp
   filter_features: filter_features_model_ramp
 get_objectives:
-  optimize_biBTSP_synthetic_WD_C: get_objectives
+  optimize_biBTSP_synthetic_WD_D: get_objectives
 kwargs:
   data_file_name: 20200527_biBTSP_data.hdf5
   input_field_width: 90.  # cm
@@ -89,14 +75,14 @@ kwargs:
   induction_loc:
     '1': 120.
     '2': 45.
-  target_ramp_width_1: 150.
-  target_ramp_width_2: 100.
+  target_ramp_width_1: 160.
+  target_ramp_width_2: 187.
   target_peak_delta_weight: 3.
   target_peak_shift_1: -12.5
   target_peak_shift_2: -12.5
   target_peak_val_1: 8.
-  target_asymmetry_1: 1.8
-  target_asymmetry_2: 1.8
+  target_asymmetry_1: 2.2
+  target_asymmetry_2: 2.2
   target_delta_peak_val_2: -5.
   weights_path_distance_threshold: 1.25
 objective_names:
@@ -104,7 +90,7 @@ objective_names:
 - induction2_residual_score
 # - ramp_amp_after_first_plateau
 - weights_path_distance
-optimization_title: biBTSP_synthetic_WD_C
+optimization_title: biBTSP_synthetic_WD_D
 param_gen: PopulationAnnealing
 param_names:
 - f_pot_th
@@ -113,9 +99,7 @@ param_names:
 - f_dep_half_width
 - k_pot
 - k_dep
-- local_signal_rise
 - local_signal_decay
-- global_signal_rise
 - global_signal_decay
 - peak_delta_weight
 target_range:
@@ -129,14 +113,12 @@ target_range:
 target_val:
   ramp_amp_after_first_plateau: 4.
 x0:
-  f_dep_half_width: 5.930098E-02
-  f_dep_th: 3.645601E-02
-  f_pot_half_width: 9.231442E-01
-  f_pot_th: 4.558377E-01
-  global_signal_decay: 7.050319E+02
-  global_signal_rise: 2.480175E+01
-  k_dep: 2.469170E-01
-  k_pot: 5.479908E-01
-  local_signal_decay: 1.236641E+03
-  local_signal_rise: 1.505551E+02
-  peak_delta_weight: 4.473506E+00
+  f_pot_half_width: 9.828062E-01
+  f_pot_th: 5.262555E-01
+  f_dep_half_width: 8.100359E-02
+  f_dep_th: 1.279724E-02
+  global_signal_decay: 7.826026E+02
+  k_dep: 2.088454E-01
+  k_pot: 4.893109E-01
+  local_signal_decay: 1.075317E+03
+  peak_delta_weight: 4.392292E+00

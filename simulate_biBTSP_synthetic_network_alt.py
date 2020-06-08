@@ -197,8 +197,7 @@ def init_context():
                                             target_min_val=0., target_asymmetry=1.8,
                                             target_peak_shift=context.target_peak_shift,
                                             target_ramp_width=context.target_ramp_width)
-
-    spike_threshold = 0.  # 2. mV
+    spike_threshold = 2.  # mV
     f_I_slope = context.input_field_peak_rate / (context.initial_ramp_peak_val * 1.5 - spike_threshold)
     f_I = np.vectorize(lambda x: 0. if x < spike_threshold else (x - spike_threshold) * f_I_slope)
     max_population_rate_sum = np.mean(f_I(target_initial_ramp)) * num_cells

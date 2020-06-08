@@ -200,8 +200,8 @@ def init_context():
                                             target_ramp_width=context.target_ramp_width)
     spike_threshold = 2.  # mV
     f_I_slope = context.input_field_peak_rate / (context.initial_ramp_peak_val * 1.5 - spike_threshold)
-    # f_I = np.vectorize(lambda x: 0. if x < spike_threshold else (x - spike_threshold) * f_I_slope)
-    f_I = lambda x: x
+    f_I = np.vectorize(lambda x: 0. if x < spike_threshold else (x - spike_threshold) * f_I_slope)
+    # f_I = lambda x: x
     max_population_rate_sum = np.mean(f_I(target_initial_ramp)) * num_cells
 
     initial_weights_population = [np.ones_like(peak_locs) for _ in range(num_cells)]
