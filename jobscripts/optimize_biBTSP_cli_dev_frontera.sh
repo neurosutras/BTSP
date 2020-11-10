@@ -5,8 +5,8 @@ export cores=$(($2 * 56))
 sbatch <<EOT
 #!/bin/bash -l
 #SBATCH -J $JOB_NAME
-#SBATCH -o /scratch1/06441/aaronmil/src/BTSP/logs/$JOB_NAME.%j.o
-#SBATCH -e /scratch1/06441/aaronmil/src/BTSP/logs/$JOB_NAME.%j.e
+#SBATCH -o /scratch1/06441/aaronmil/logs/BTSP/$JOB_NAME.%j.o
+#SBATCH -e /scratch1/06441/aaronmil/logs/BTSP/$JOB_NAME.%j.e
 #SBATCH -p development
 #SBATCH -N $2
 #SBATCH -n $cores
@@ -16,10 +16,11 @@ sbatch <<EOT
 
 set -x
 
-cd $SCRATCH/src/BTSP
+cd $WORK/BTSP
 
 ibrun -n $cores python3 -m nested.optimize \
-    --config-file-path=config/optimize_biBTSP_"$3"_cli_config.yaml --disp --output-dir=data \
+    --config-file-path=config/optimize_biBTSP_"$3"_cli_config.yaml --disp \
+    --output-dir=$SCRATCH/data/BTSP \
     --pop_size=200 --max_iter=50 --path_length=3 --disp --label="$4"cm_cell"$1" --cell_id=$1 \
     --input_field_width=$4
 EOT
