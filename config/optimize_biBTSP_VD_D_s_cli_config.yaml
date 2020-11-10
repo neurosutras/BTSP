@@ -18,11 +18,11 @@ bounds:
   - 0.001
   - 10.
   local_signal_decay: !!python/tuple
+  - 10.
   - 100.
-  - 1750.
   global_signal_decay: !!python/tuple
+  - 10.
   - 100.
-  - 1750.
   plateau_delta_depo: !!python/tuple
   - 0.
   - 20.
@@ -95,7 +95,7 @@ objective_names:
 - exp2_residual_score
 - exp3_residual_score
 - weights_path_distance
-optimization_title: biBTSP_VD_D
+optimization_title: biBTSP_VD_D_s
 param_gen: PopulationAnnealing
 param_names:
 - f_pot_half_width
@@ -120,8 +120,8 @@ x0:
   f_dep_th: 2.701431E-03
   f_pot_half_width: 1.305778E-03
   f_pot_th: 5.296852E-02
-  global_signal_decay: 1.283906E+03
+  global_signal_decay: 50.
   k_dep: 1.292171E-01
   k_pot: 7.630387E-01
-  local_signal_decay: 1.536536E+03
+  local_signal_decay: 60.
   plateau_delta_depo: 3.962006E+00

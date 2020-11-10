@@ -1,6 +1,6 @@
 #!/bin/bash -l
 
-cd $SCRATCH/src/BTSP
+cd $WORK/BTSP
 
 for i in 11 28 29 30 31 8 44 45 46 48 49;
 do
