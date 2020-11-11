@@ -120,8 +120,8 @@ x0:
   f_dep_th: 2.701431E-03
   f_pot_half_width: 1.305778E-03
   f_pot_th: 5.296852E-02
-  global_signal_decay: 50.
+  global_signal_decay: 40.
   k_dep: 1.292171E-01
   k_pot: 7.630387E-01
-  local_signal_decay: 60.
+  local_signal_decay: 50.
   plateau_delta_depo: 3.962006E+00
