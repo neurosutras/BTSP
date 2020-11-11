@@ -18,24 +18,24 @@ bounds:
   - 0.001
   - 10.
   local_signal_decay: !!python/tuple
-  - 50.
+  - 100.
   - 1750.
   global_signal_decay: !!python/tuple
-  - 50.
+  - 100.
   - 1750.
   peak_delta_weight: !!python/tuple
   - 1.5
   - 4.
 default_params:
 rel_bounds:
-#- - local_signal_decay
-#  - '>'
-#  - 1.0
-#  - global_signal_decay
-#- - k_pot
-#  - '>'
-#  - 1.0
-#  - k_dep
+- - local_signal_decay
+  - '>'
+  - 1.0
+  - global_signal_decay
+- - k_pot
+  - '>'
+  - 1.0
+  - k_dep
 feature_names:
 - spont_delta_val_at_target_peak
 - spont_delta_val_at_model_peak

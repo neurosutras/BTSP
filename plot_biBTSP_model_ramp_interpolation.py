@@ -149,8 +149,8 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
             current_time = time.time()
             interp_data = gp.predict(interp_points).reshape(-1, res)
             print('Gaussian Process Interpolation took %.1f s' % (time.time() - current_time))
-            cax = axes[1].pcolor(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax,
-                                 zorder=0)
+            cax = axes[1].pcolormesh(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax,
+                                     zorder=0, edgecolors='face')
             axes[1].set_ylabel('Initial ramp\namplitude (mV)')
             axes[1].set_xlabel('Time relative to plateau onset (s)')
             axes[1].set_ylim(0., ymax)

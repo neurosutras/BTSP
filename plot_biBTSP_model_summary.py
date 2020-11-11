@@ -130,7 +130,8 @@ def process_biBTSP_model_results(file_path, show=False, export=False, output_dir
                 delta_model_ramp.extend(np.subtract(model_ramp, initial_exp_ramp))
                 delta_exp_ramp.extend(np.subtract(target_ramp, initial_exp_ramp))
                 axes3[i][0].plot(binned_x, target_ramp, label='After', c='r')
-                axes3[i][0].set_title('Induction %i\nExperiment Vm:' % (i + 1), fontsize=mpl.rcParams['font.size'])
+                axes3[i][0].set_title('Induction %s\nExperiment Vm:' % (induction_key),
+                                      fontsize=mpl.rcParams['font.size'])
                 axes3[i][1].plot(binned_x, initial_model_ramp, label='Before', c='darkgrey')
                 axes3[i][1].plot(binned_x, model_ramp, label='After', c='k')
                 axes3[i][1].set_title('\nModel Vm', fontsize=mpl.rcParams['font.size'])
