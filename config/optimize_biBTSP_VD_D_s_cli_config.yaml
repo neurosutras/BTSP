@@ -19,10 +19,10 @@ bounds:
   - 10.
   local_signal_decay: !!python/tuple
   - 10.
-  - 100.
+  - 50.
   global_signal_decay: !!python/tuple
   - 10.
-  - 100.
+  - 50.
   plateau_delta_depo: !!python/tuple
   - 0.
   - 20.
