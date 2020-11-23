@@ -2,7 +2,7 @@
 To reproduce panels from Figure 1 and Figure S3:
 python -i plot_biBTSP_data_summary_figure.py --target-induction=2 --target-induction=3
 
-plot_ramp_prediction_from_interpolation(context.gp, ['data/20200527_biBTSP_data.hdf5'], ['Control'],
+plot_ramp_prediction_from_interpolation(context.gp, ['data/20201123_biBTSP_data.hdf5'], ['Control'],
     context.reference_delta_t, colors=['k'], target_induction_list=[[2, 3]],
     show_both_predictions_list=[False])
 
@@ -310,12 +310,12 @@ def boxplot_compare_ramp_summary_features(model_file_path_dict, ordered_labels, 
 
 @click.command()
 @click.option("--data-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='data/20200527_biBTSP_data.hdf5')
+              default='data/20201123_biBTSP_data.hdf5')
 @click.option("--vmax", type=float, default=12.97868)
 @click.option("--tmax", type=float, default=5.)
 @click.option("--truncate", type=float, default=2.5)
 @click.option("--debug", is_flag=True)
-@click.option("--target-induction", type=int, multiple=True, default=[2])
+@click.option("--target-induction", type=int, multiple=True, default=[2, 3])
 @click.option("--font-size", type=float, default=11.)
 def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_size):
     """

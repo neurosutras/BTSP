@@ -16,7 +16,7 @@ plasticity.
 4) Changes in weight at each synapse are integrated over periods of nonzero overlap between eligibility and instructive
 signals, and updated once per lap.
 
-Features/assumptions of weight-dependent model F:
+Features/assumptions of weight-dependent model G:
 1) Dendritic plateaus generate a global instructive signal that provides a necessary cofactor required to convert
 plasticity eligibility signals at each synapse into either increases or decreases in synaptic strength.
 2) Activity at each synapse generates a local plasticity eligibility signal that, in conjunction with the global
@@ -123,7 +123,7 @@ def init_context():
         print('optimize_biBTSP_%s: pid: %i; processing the following data_keys: %s' %
               (BTSP_model_name, os.getpid(), str(context.data_keys)))
     largest_signal_amplitude_data_keys = \
-        [(6, 1), (18, 1), (23, 1), (24, 1), (25, 1), (31, 2), (46, 2), (5, 2), (16, 1)]
+        [(6, 1), (18, 1), (23, 1), (24, 1), (25, 1), (31, 2), (46, 2), (5, 2), (16, 1), (53, 2)]
     down_dt = 10.  # ms, to speed up optimization
     context.update(locals())
     context.cell_id = None
@@ -1036,7 +1036,7 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
         this_axis.hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
 
     clean_axes(axes)
-    fig.suptitle('Weight-dependent model F (cell %i)' % cell_id,
+    fig.suptitle('Weight-dependent model G (cell %i)' % cell_id,
                  fontsize=mpl.rcParams['font.size'], x=0.02, ha='left')
     fig.subplots_adjust(left=0.1, hspace=1.075, wspace=0.7, right=0.955, top=0.925, bottom=0.05)
     fig.show()
@@ -1112,7 +1112,7 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
     cbar.set_label('Initial synaptic\nweight (normalized)', rotation=270., labelpad=20.)
 
     clean_axes(axes)
-    fig.suptitle('Weight-dependent model F (cell %i)' % cell_id,
+    fig.suptitle('Weight-dependent model G (cell %i)' % cell_id,
                  fontsize=mpl.rcParams['font.size'], x=0.02, ha='left')
     fig.subplots_adjust(left=0.1, hspace=1.075, wspace=0.7, right=0.955, top=0.925, bottom=0.05)
     fig.show()
@@ -1311,7 +1311,7 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
 
     clean_twin_right_axes([axes0_right])
     clean_axes(axes)
-    fig.suptitle('Weight-dependent model F (cell %i)' % cell_id,
+    fig.suptitle('Weight-dependent model G (cell %i)' % cell_id,
                  fontsize=mpl.rcParams['font.size'], x=0.02, ha='left')
     fig.subplots_adjust(left=0.25, hspace=0.8, right=0.8, top=0.8, bottom=0.1)
     fig.show()

@@ -19,7 +19,7 @@ context = Context()
 
 @click.command()
 @click.option("--model-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='data/20190812_biBTSP_SRL_B_90cm_all_cells_merged_exported_model_output.hdf5')
+              default='data/20201112_biBTSP_WD_D_90cm_exported_model_output.hdf5')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
 @click.option("--show-traces", is_flag=True)
@@ -335,14 +335,14 @@ def plot_compare_models_boxplot(model_file_path_list, label_list, exported_data_
         mse_data.append(this_mse_list)
         mse_dict[label] = this_mse_list
 
-    fig, axes = plt.subplots(figsize=(8, 3.5))
-    axes.boxplot(mse_data, showfliers=False, medianprops=dict(color='k'))
+    fig, axes = plt.subplots(figsize=(3.75, 2.9))
+    axes.boxplot(mse_data, showfliers=False, medianprops=dict(color='k'), widths=0.7)
     axes.set_xticklabels(label_list)
     axes.set_ylabel('Mean squared error')
     axes.set_ylim(axes.get_ylim()[0], ymax)
     clean_axes(axes)
     fig.suptitle('Model ramp residual error', y=0.95, x=0.05, ha='left', fontsize=mpl.rcParams['font.size'])
-    fig.subplots_adjust(top=0.75, hspace=0.2, wspace=0.6)
+    fig.subplots_adjust(top=0.85, hspace=0.2, wspace=0.6, bottom=0.15)
     fig.show()
 
     if control is not None:

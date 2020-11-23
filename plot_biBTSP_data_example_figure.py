@@ -15,7 +15,7 @@ context = Context()
 
 @click.command()
 @click.option("--data-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='data/20200527_biBTSP_data.hdf5')
+              default='data/20201123_biBTSP_data.hdf5')
 @click.option("--tmax", type=float, default=4.)
 @click.option("--truncate", type=float, default=2.5)
 @click.option("--debug", is_flag=True)

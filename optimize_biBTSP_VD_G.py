@@ -120,7 +120,7 @@ def init_context():
         print('optimize_biBTSP_%s: pid: %i; processing the following data_keys: %s' %
               (BTSP_model_name, os.getpid(), str(context.data_keys)))
     largest_signal_amplitude_data_keys = \
-        [(6, 1), (18, 1), (23, 1), (24, 1), (25, 1), (31, 2), (46, 2), (5, 2), (16, 1)]
+        [(6, 1), (18, 1), (23, 1), (24, 1), (25, 1), (31, 2), (46, 2), (5, 2), (16, 1), (53, 2)]
     down_dt = 10.  # ms, to speed up optimization
     context.update(locals())
     context.cell_id = None

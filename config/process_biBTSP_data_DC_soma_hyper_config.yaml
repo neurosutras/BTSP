@@ -25,21 +25,6 @@
       delta: 2
     spont: False
     DC_soma: True
-  3:
-    induction_vm_columns:
-      - 8
-      - 7
-      - 6
-      - 5
-      - 4
-    file_name: yl200203_before.txt
-    induction_t_column: 3
-    ramp_columns:
-      before: 1
-      after: 0
-      delta: 2
-    spont: False
-    DC_soma: False
 38:
   1:
     induction_vm_columns:

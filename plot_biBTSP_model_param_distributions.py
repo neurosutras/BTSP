@@ -43,7 +43,7 @@ ordered_param_names = ['local_signal_decay', 'global_signal_decay', 'k_pot', 'k_
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
               default='config/optimize_biBTSP_WD_D_cli_config.yaml')
 @click.option("--data-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='data/20200527_biBTSP_data.hdf5')
+              default='data/20201123_biBTSP_data.hdf5')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
 @click.option("--label", type=str, default=None)
