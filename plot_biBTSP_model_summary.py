@@ -24,7 +24,7 @@ context = Context()
 @click.option("--export", is_flag=True)
 @click.option("--show-traces", is_flag=True)
 @click.option("--label", type=str, default=None)
-@click.option("--exported-data-key", type=str, default=None)
+@click.option("--exported-data-key", type=str, default='0')
 def main(model_file_path, output_dir, export, show_traces, label, exported_data_key):
     """
 
@@ -69,8 +69,8 @@ def process_biBTSP_model_results(file_path, show=False, export=False, output_dir
     min_val = defaultdict(lambda: defaultdict(dict))
     ramp_mse_dict = defaultdict(list)
     ramp_sse_dict = defaultdict(list)
-    delta_model_ramp = []
-    delta_exp_ramp = []
+    max_delta_ramp_val = defaultdict(lambda: defaultdict(list))
+    min_delta_ramp_val = defaultdict(lambda: defaultdict(list))
     with h5py.File(file_path, 'r') as f:
         shared_context_key = 'shared_context'
         group = f[shared_context_key]
@@ -127,8 +127,13 @@ def process_biBTSP_model_results(file_path, show=False, export=False, output_dir
                     ymax = max(ymax, np.max(initial_exp_ramp) + 1.)
                 else:
                     initial_exp_ramp = np.zeros_like(target_ramp)
-                delta_model_ramp.extend(np.subtract(model_ramp, initial_exp_ramp))
-                delta_exp_ramp.extend(np.subtract(target_ramp, initial_exp_ramp))
+                delta_model_ramp = np.subtract(model_ramp, initial_exp_ramp)
+                delta_exp_ramp = np.subtract(target_ramp, initial_exp_ramp)
+                max_delta_ramp_val[induction_key]['target'].append(np.max(delta_exp_ramp))
+                max_delta_ramp_val[induction_key]['model'].append(np.max(delta_model_ramp))
+                min_delta_ramp_val[induction_key]['target'].append(np.min(delta_exp_ramp))
+                min_delta_ramp_val[induction_key]['model'].append(np.min(delta_model_ramp))
+
                 axes3[i][0].plot(binned_x, target_ramp, label='After', c='r')
                 axes3[i][0].set_title('Induction %s\nExperiment Vm:' % (induction_key),
                                       fontsize=mpl.rcParams['font.size'])
@@ -173,8 +178,8 @@ def process_biBTSP_model_results(file_path, show=False, export=False, output_dir
     else:
         plt.close('all')
 
-    return ramp_amp, ramp_width, local_peak_shift, min_val, ramp_mse_dict, ramp_sse_dict, delta_exp_ramp, \
-           delta_model_ramp
+    return ramp_amp, ramp_width, local_peak_shift, min_val, ramp_mse_dict, ramp_sse_dict, max_delta_ramp_val, \
+           min_delta_ramp_val
 
 
 def plot_biBTSP_model_fit_summary(ramp_amp, ramp_width, peak_shift, min_val, ramp_mse_dict, ramp_sse_dict,
@@ -269,7 +274,7 @@ def plot_compare_models_mse_by_induction(model_file_path_dict):
 
     for model, model_file_path in viewitems(model_file_path_dict):
         ramp_amp, ramp_width, peak_shift, min_val, all_mse[model], discard_ramp_mse_array, discard_ramp_sse_array, \
-        discard_delta_exp_ramp, discard_delta_model_ramp = process_biBTSP_model_results(model_file_path)
+        max_delta_ramp_val, min_delta_ramp_val = process_biBTSP_model_results(model_file_path)
     fig, axes = plt.subplots(1, 2)
 
     for model in all_mse:
@@ -323,9 +328,8 @@ def plot_compare_models_boxplot(model_file_path_list, label_list, exported_data_
     sse_data = []
     mse_dict = {}
     for model_file_path, label, exported_data_key in zip(model_file_path_list, label_list, exported_data_key_list):
-        ramp_amp, ramp_width, peak_shift, min_val, this_mse_dict, this_sse_dict, discard_delta_exp_ramp, \
-            discard_delta_model_ramp = \
-            process_biBTSP_model_results(model_file_path, exported_data_key=exported_data_key)
+        ramp_amp, ramp_width, peak_shift, min_val, this_mse_dict, this_sse_dict, max_delta_ramp_val, \
+        min_delta_ramp_val = process_biBTSP_model_results(model_file_path, exported_data_key=exported_data_key)
         this_sse_list = []
         this_mse_list = []
         for induction_key in ['2', '3']:  # this_sse_dict:
@@ -357,6 +361,94 @@ def plot_compare_models_boxplot(model_file_path_list, label_list, exported_data_
                 print('Wilcoxon signed rank: %s vs %s; p = %.5f' % (control, label, p))
 
     return mse_dict
+
+
+def plot_compare_model_delta_ramp_extrema(model_file_path_list, label_list, exported_data_key_list, control=None):
+    """
+
+    :param model_file_path_list: list of str (path)
+    :param label_list: list of str
+    :param exported_data_key_list: list of str
+    :param control: str (labeled data to act as control for statistical comparisons)
+    :return dict
+    """
+    max_delta_ramp_data = []
+    min_delta_ramp_data = []
+    max_delta_ramp_dict = {}
+    min_delta_ramp_dict = {}
+    for model_file_path, label, exported_data_key in zip(model_file_path_list, label_list, exported_data_key_list):
+        ramp_amp, ramp_width, peak_shift, min_val, this_mse_dict, this_sse_dict, max_delta_ramp_val, \
+        min_delta_ramp_val = process_biBTSP_model_results(model_file_path, exported_data_key=exported_data_key)
+        if 'Exp' not in max_delta_ramp_dict:
+            this_max_delta_ramp_list = []
+            this_min_delta_ramp_list = []
+            for induction_key in ['2', '3']:
+                this_max_delta_ramp_list.extend(max_delta_ramp_val[induction_key]['target'])
+                this_min_delta_ramp_list.extend(min_delta_ramp_val[induction_key]['target'])
+            max_delta_ramp_data.append(this_max_delta_ramp_list)
+            min_delta_ramp_data.append(this_min_delta_ramp_list)
+            max_delta_ramp_dict['Exp'] = this_max_delta_ramp_list
+            min_delta_ramp_dict['Exp'] = this_min_delta_ramp_list
+
+        this_max_delta_ramp_list = []
+        this_min_delta_ramp_list = []
+        for induction_key in ['2', '3']:
+            this_max_delta_ramp_list.extend(max_delta_ramp_val[induction_key]['model'])
+            this_min_delta_ramp_list.extend(min_delta_ramp_val[induction_key]['model'])
+        max_delta_ramp_data.append(this_max_delta_ramp_list)
+        min_delta_ramp_data.append(this_min_delta_ramp_list)
+        max_delta_ramp_dict[label] = this_max_delta_ramp_list
+        min_delta_ramp_dict[label] = this_min_delta_ramp_list
+
+    label_list.insert(0, 'Exp')
+    fig, axes = plt.subplots(2, figsize=(3.75, 6))
+    axes[0].boxplot(max_delta_ramp_data, showfliers=False, medianprops=dict(color='k'), widths=0.7)
+    axes[0].set_xticklabels(label_list)
+    axes[0].set_ylabel('Max change in ramp\namplitude (mV)')
+    axes[0].set_ylim((min(0., axes[0].get_ylim()[0]), axes[0].get_ylim()[1]))
+    axes[1].boxplot(min_delta_ramp_data, showfliers=False, medianprops=dict(color='k'), widths=0.7)
+    axes[1].set_xticklabels(label_list)
+    axes[1].set_ylabel('Min change in ramp\namplitude (mV)')
+    axes[1].set_ylim((axes[1].get_ylim()[0], max(0., axes[1].get_ylim()[1])))
+    clean_axes(axes)
+    # fig.suptitle('Model ramp residual error', y=0.95, x=0.05, ha='left', fontsize=mpl.rcParams['font.size'])
+    fig.subplots_adjust(hspace=0.35, wspace=0.6, bottom=0.15)
+    fig.show()
+
+    from scipy.stats import friedmanchisquare
+    from scipy.stats import wilcoxon
+
+    num_comparisons = len(label_list) - 1
+    if control is not None and len(label_list) > 2:
+        num_comparisons += len(label_list) - 2
+
+    print('Max delta ramp:')
+    stats, p = friedmanchisquare(*max_delta_ramp_data)
+    print('Friedman test: p = %.5f' % p)
+    if p < 0.05:
+        for label in label_list[1:]:
+            stat, p = wilcoxon(max_delta_ramp_dict['Exp'], max_delta_ramp_dict[label])
+            p *= num_comparisons
+            print('Wilcoxon signed rank: %s vs %s; p = %.5f' % ('Exp', label, p))
+        for label in [label for label in label_list[1:] if label != control]:
+            stat, p = wilcoxon(max_delta_ramp_dict[control], max_delta_ramp_dict[label])
+            p *= num_comparisons
+            print('Wilcoxon signed rank: %s vs %s; p = %.5f' % (control, label, p))
+
+    print('Min delta ramp:')
+    stats, p = friedmanchisquare(*min_delta_ramp_data)
+    print('Friedman test: p = %.5f' % p)
+    if p < 0.05:
+        for label in label_list[1:]:
+            stat, p = wilcoxon(min_delta_ramp_dict['Exp'], min_delta_ramp_dict[label])
+            p *= num_comparisons
+            print('Wilcoxon signed rank: %s vs %s; p = %.5f' % ('Exp', label, p))
+        for label in [label for label in label_list[1:] if label != control]:
+            stat, p = wilcoxon(min_delta_ramp_dict[control], min_delta_ramp_dict[label])
+            p *= num_comparisons
+            print('Wilcoxon signed rank: %s vs %s; p = %.5f' % (control, label, p))
+
+    return max_delta_ramp_dict, min_delta_ramp_dict
 
 
 if __name__ == '__main__':

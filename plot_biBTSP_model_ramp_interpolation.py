@@ -26,8 +26,8 @@ context = Context()
 @click.option("--truncate", type=float, default=2.5)
 @click.option("--debug", is_flag=True)
 @click.option("--label", type=str, default=None)
-@click.option("--target-induction", type=int, multiple=True, default=[2])
-@click.option("--exported-data-key", type=str, default=None)
+@click.option("--target-induction", type=int, multiple=True, default=[2, 3])
+@click.option("--exported-data-key", type=str, default='0')
 @click.option("--font-size", type=float, default=12.)
 def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, target_induction, exported_data_key,
          font_size):
@@ -100,6 +100,12 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
     ymax = np.max(target_flat_initial_ramp)
     ymin = min(0., np.min(target_flat_initial_ramp))
 
+    this_vmax = max(abs(np.max(flat_delta_model_ramp)), abs(np.min(flat_delta_model_ramp)))
+    if this_vmax > vmax:
+        print('New max detected for 3D data color legend: vmax: %.5f' % this_vmax)
+        sys.stdout.flush()
+        vmax = this_vmax
+
     lines_cmap = 'jet'
     interp_cmap = 'bwr'
 
@@ -120,18 +126,14 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
     cbar.set_label('Initial ramp\namplitude (mV)', rotation=270., labelpad=23.)
     axes[0].set_ylabel('Change in ramp\namplitude (mV)')
     axes[0].set_xlabel('Time relative to plateau onset (s)')
-    axes[0].set_yticks(np.arange(-10., 16., 5.))
+    axes[0].set_yticks(np.arange(-10., max(vmax + 1., 16.), 5.))
+    axes[0].set_ylim((-10., max(vmax + 1., 16.)))
     axes[0].set_xticks(np.arange(-4., 5., 2.))
 
     if np.any(np.array(target_induction) != 1):
         points = np.array([flat_min_t, flat_initial_ramp]).transpose()
         data = np.array(flat_delta_model_ramp)
 
-        this_vmax = max(abs(np.max(flat_delta_model_ramp)), abs(np.min(flat_delta_model_ramp)))
-        if this_vmax > vmax:
-            print('New max detected for 3D data color legend: vmax: %.5f' % this_vmax)
-            sys.stdout.flush()
-            vmax = this_vmax
         if not debug:
             res = len(reference_delta_t)
             t_range = np.divide(reference_delta_t, 1000.)
@@ -165,10 +167,10 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
     this_axis.scatter(flat_delta_exp_ramp, flat_delta_model_ramp, c='k', linewidth=0, alpha=0.25, s=10)
     this_axis.set_xlabel('Actual (mV)')
     this_axis.set_ylabel('Predicted (mV)')
-    this_axis.set_yticks(np.arange(-10., 16., 5.))
-    this_axis.set_ylim([-10., 16.])
-    this_axis.set_xticks(np.arange(-10., 16., 5.))
-    this_axis.set_xlim([-10., 16.])
+    this_axis.set_yticks(np.arange(-10., max(vmax + 1., 16.), 5.))
+    this_axis.set_ylim([-10., max(vmax + 1., 16.)])
+    this_axis.set_xticks(np.arange(-10., max(vmax + 1., 16.), 5.))
+    this_axis.set_xlim([-10., max(vmax + 1., 16.)])
     this_xlim = this_axis.get_xlim()
     this_axis.plot([this_xlim[0], this_xlim[1]], [this_xlim[0], this_xlim[1]], '--', c='darkgrey', alpha=0.75)
     this_axis.set_title('Change in\nramp amplitude', fontsize=mpl.rcParams['font.size'], y=1.1)

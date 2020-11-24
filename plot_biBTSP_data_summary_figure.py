@@ -472,8 +472,8 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
             current_time = time.time()
             interp_data = gp.predict(interp_points).reshape(-1, res)
             print('Gaussian Process Interpolation took %.1f s' % (time.time() - current_time))
-            cax = axes[3].pcolor(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax,
-                                 zorder=0)
+            cax = axes[3].pcolormesh(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax,
+                                     zorder=0, edgecolors='face')
             axes[3].set_ylabel('Initial ramp\namplitude (mV)')
             axes[3].set_xlabel('Time relative to plateau onset (s)')
             axes[3].set_ylim(0., ymax)
@@ -482,8 +482,8 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
             cbar = plt.colorbar(cax, ax=axes[3])
             cbar.set_label('Change in ramp\namplitude (mV)', rotation=270., labelpad=23.)
 
-            cax = axes2[1].pcolor(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax,
-                                 zorder=0)
+            cax = axes2[1].pcolormesh(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax,
+                                      zorder=0, edgecolors='face')
             axes2[1].set_ylabel('Initial ramp\namplitude (mV)')
             axes2[1].set_xlabel('Time relative to plateau onset (s)')
             axes2[1].set_ylim(0., ymax)

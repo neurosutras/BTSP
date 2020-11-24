@@ -632,7 +632,7 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
     axes1[2][2].set_title('Translocation towards reward location', fontsize=mpl.rcParams['font.size'], y=1.1)
 
     X, Y = np.meshgrid(context.default_interp_x, range(len(pop_rep_density_history) + 1))
-    hm = axes1[0][2].pcolormesh(X, Y, pop_rep_density_history, cmap=this_cmap, rasterized=True)  #, vmin=0., vmax=1.)
+    hm = axes1[0][2].pcolormesh(X, Y, pop_rep_density_history, cmap=this_cmap, rasterized=True, edgecolors='face')  #, vmin=0., vmax=1.)
     cb = plt.colorbar(hm, ax=axes1[0][2])
     cb.ax.set_ylabel('Normalized\npopulation activity', rotation=270)
     cb.ax.get_yaxis().labelpad = 25
@@ -674,7 +674,8 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
                 nonmodulated_cell_indexes.append(i)
         sorted_ramp_pop = modulated_ramp_pop + nonmodulated_ramp_pop
         X, Y = np.meshgrid(context.binned_x, range(len(sorted_ramp_pop)))
-        hm = axes2[0][2].pcolormesh(X, Y, sorted_ramp_pop, cmap=this_cmap, vmin=0., vmax=context.input_field_peak_rate)
+        hm = axes2[0][2].pcolormesh(X, Y, sorted_ramp_pop, cmap=this_cmap, vmin=0., vmax=context.input_field_peak_rate,
+                                    edgecolors='face')
         cb = plt.colorbar(hm, ax=axes2[0][2])
         cb.ax.set_ylabel('Firing rate (Hz)', rotation=270, fontsize=mpl.rcParams['font.size'])
         cb.ax.get_yaxis().labelpad = 15
@@ -693,7 +694,7 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
                 prev_sorted_delta_rate.append(this_delta_rate)
             X, Y = np.meshgrid(context.binned_x, range(len(prev_sorted_delta_rate)))
             hm = axes2[0][1].pcolormesh(X, Y, prev_sorted_delta_rate, vmin=-context.input_field_peak_rate,
-                                        vmax=context.input_field_peak_rate, cmap='seismic') # cmap='bwr',
+                                        vmax=context.input_field_peak_rate, cmap='seismic', edgecolors='face') # cmap='bwr',
             cb = plt.colorbar(hm, ax=axes2[0][1])
             cb.ax.set_ylabel('Change in firing rate (Hz)', rotation=270, fontsize=mpl.rcParams['font.size'])
             cb.ax.get_yaxis().labelpad = 15

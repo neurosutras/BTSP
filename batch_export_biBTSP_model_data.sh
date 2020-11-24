@@ -1,7 +1,7 @@
 #!/bin/bash
 cd $HOME/src/BTSP
 
-for cell_id in 11 28 29 30 31 8 44 45 46 48 49 15 18 4 5 7 9 47 1;
+for cell_id in 11 28 29 30 31 37 44 45 46 50 52 53 15 18 4 5 7 9 47 48 51 1;
 do
     export cell_id
     mpirun -n 7 python optimize_biBTSP_$1.py --cell_id=$cell_id --export \
