@@ -314,7 +314,7 @@ def plot_compare_models_mse_by_induction(model_file_path_dict):
     fig.show()
 
 
-def plot_compare_models_boxplot(model_file_path_list, label_list, exported_data_key_list, ymax=5., control=None):
+def plot_compare_models_boxplot(model_file_path_list, label_list, exported_data_key_list=None, ymax=5., control=None):
     """
 
     :param model_file_path_list: list of str (path)
@@ -324,6 +324,8 @@ def plot_compare_models_boxplot(model_file_path_list, label_list, exported_data_
     :param control: str (labeled data to act as control for statistical comparisons)
     :return dict
     """
+    if exported_data_key_list is None:
+        exported_data_key_list = ['0'] * len(label_list)
     mse_data = []
     sse_data = []
     mse_dict = {}
@@ -339,11 +341,11 @@ def plot_compare_models_boxplot(model_file_path_list, label_list, exported_data_
         mse_data.append(this_mse_list)
         mse_dict[label] = this_mse_list
 
-    fig, axes = plt.subplots(figsize=(3.75, 2.9))
+    fig, axes = plt.subplots(figsize=(7., 2.9))
     axes.boxplot(mse_data, showfliers=False, medianprops=dict(color='k'), widths=0.7)
     axes.set_xticklabels(label_list)
     axes.set_ylabel('Mean squared error')
-    axes.set_ylim(axes.get_ylim()[0], ymax)
+    axes.set_ylim((min(0, axes.get_ylim()[0]), max(axes.get_ylim()[1], ymax)))
     clean_axes(axes)
     fig.suptitle('Model ramp residual error', y=0.95, x=0.05, ha='left', fontsize=mpl.rcParams['font.size'])
     fig.subplots_adjust(top=0.85, hspace=0.2, wspace=0.6, bottom=0.15)
@@ -363,7 +365,7 @@ def plot_compare_models_boxplot(model_file_path_list, label_list, exported_data_
     return mse_dict
 
 
-def plot_compare_model_delta_ramp_extrema(model_file_path_list, label_list, exported_data_key_list, control=None):
+def plot_compare_model_delta_ramp_extrema(model_file_path_list, label_list, exported_data_key_list=None, control=None):
     """
 
     :param model_file_path_list: list of str (path)
@@ -372,6 +374,8 @@ def plot_compare_model_delta_ramp_extrema(model_file_path_list, label_list, expo
     :param control: str (labeled data to act as control for statistical comparisons)
     :return dict
     """
+    if exported_data_key_list is None:
+        exported_data_key_list = ['0'] * len(label_list)
     max_delta_ramp_data = []
     min_delta_ramp_data = []
     max_delta_ramp_dict = {}
@@ -400,14 +404,14 @@ def plot_compare_model_delta_ramp_extrema(model_file_path_list, label_list, expo
         max_delta_ramp_dict[label] = this_max_delta_ramp_list
         min_delta_ramp_dict[label] = this_min_delta_ramp_list
 
-    label_list.insert(0, 'Exp')
-    fig, axes = plt.subplots(2, figsize=(3.75, 6))
+    working_label_list = ['Exp'] + label_list
+    fig, axes = plt.subplots(2, figsize=(12, 7))
     axes[0].boxplot(max_delta_ramp_data, showfliers=False, medianprops=dict(color='k'), widths=0.7)
-    axes[0].set_xticklabels(label_list)
+    axes[0].set_xticklabels(working_label_list)
     axes[0].set_ylabel('Max change in ramp\namplitude (mV)')
     axes[0].set_ylim((min(0., axes[0].get_ylim()[0]), axes[0].get_ylim()[1]))
     axes[1].boxplot(min_delta_ramp_data, showfliers=False, medianprops=dict(color='k'), widths=0.7)
-    axes[1].set_xticklabels(label_list)
+    axes[1].set_xticklabels(working_label_list)
     axes[1].set_ylabel('Min change in ramp\namplitude (mV)')
     axes[1].set_ylim((axes[1].get_ylim()[0], max(0., axes[1].get_ylim()[1])))
     clean_axes(axes)
@@ -418,35 +422,37 @@ def plot_compare_model_delta_ramp_extrema(model_file_path_list, label_list, expo
     from scipy.stats import friedmanchisquare
     from scipy.stats import wilcoxon
 
-    num_comparisons = len(label_list) - 1
-    if control is not None and len(label_list) > 2:
-        num_comparisons += len(label_list) - 2
+    num_comparisons = len(label_list)
+    if control is not None and len(label_list) > 1:
+        num_comparisons += len(label_list) - 1
 
     print('Max delta ramp:')
     stats, p = friedmanchisquare(*max_delta_ramp_data)
     print('Friedman test: p = %.5f' % p)
     if p < 0.05:
-        for label in label_list[1:]:
+        for label in label_list:
             stat, p = wilcoxon(max_delta_ramp_dict['Exp'], max_delta_ramp_dict[label])
             p *= num_comparisons
             print('Wilcoxon signed rank: %s vs %s; p = %.5f' % ('Exp', label, p))
-        for label in [label for label in label_list[1:] if label != control]:
-            stat, p = wilcoxon(max_delta_ramp_dict[control], max_delta_ramp_dict[label])
-            p *= num_comparisons
-            print('Wilcoxon signed rank: %s vs %s; p = %.5f' % (control, label, p))
+        if control is not None:
+            for label in [label for label in label_list if label != control]:
+                stat, p = wilcoxon(max_delta_ramp_dict[control], max_delta_ramp_dict[label])
+                p *= num_comparisons
+                print('Wilcoxon signed rank: %s vs %s; p = %.5f' % (control, label, p))
 
     print('Min delta ramp:')
     stats, p = friedmanchisquare(*min_delta_ramp_data)
     print('Friedman test: p = %.5f' % p)
     if p < 0.05:
-        for label in label_list[1:]:
+        for label in label_list:
             stat, p = wilcoxon(min_delta_ramp_dict['Exp'], min_delta_ramp_dict[label])
             p *= num_comparisons
             print('Wilcoxon signed rank: %s vs %s; p = %.5f' % ('Exp', label, p))
-        for label in [label for label in label_list[1:] if label != control]:
-            stat, p = wilcoxon(min_delta_ramp_dict[control], min_delta_ramp_dict[label])
-            p *= num_comparisons
-            print('Wilcoxon signed rank: %s vs %s; p = %.5f' % (control, label, p))
+        if control is not None:
+            for label in [label for label in label_list if label != control]:
+                stat, p = wilcoxon(min_delta_ramp_dict[control], min_delta_ramp_dict[label])
+                p *= num_comparisons
+                print('Wilcoxon signed rank: %s vs %s; p = %.5f' % (control, label, p))
 
     return max_delta_ramp_dict, min_delta_ramp_dict
 

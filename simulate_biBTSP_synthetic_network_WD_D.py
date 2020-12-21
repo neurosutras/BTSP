@@ -634,7 +634,7 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
     axes1[2][2].set_title('Translocation towards reward location', fontsize=mpl.rcParams['font.size'], y=1.1)
 
     X, Y = np.meshgrid(context.default_interp_x, range(len(pop_rep_density_history) + 1))
-    hm = axes1[0][2].pcolormesh(X, Y, pop_rep_density_history, cmap=this_cmap, rasterized=True, edgecolors='face')  #, vmin=0., vmax=1.)
+    hm = axes1[0][2].pcolormesh(X, Y, pop_rep_density_history, cmap=this_cmap, edgecolors='face')  #, vmin=0., vmax=1.)
     cb = plt.colorbar(hm, ax=axes1[0][2])
     cb.ax.set_ylabel('Normalized\npopulation activity', rotation=270)
     cb.ax.get_yaxis().labelpad = 25

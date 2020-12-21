@@ -109,7 +109,8 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
     lines_cmap = 'jet'
     interp_cmap = 'bwr'
 
-    fig, axes = plt.subplots(1, 3, figsize=(11.5, 3.5))  #, constrained_layout=True)
+    fig, axes = plt.subplots(1, 3, figsize=(8., 2.42))  # figsize=(11.5, 3.5))  #, constrained_layout=True)
+
     # axes = [axesgrid[2][0], axesgrid[2][1], axesgrid[2][2]]
 
     axes[0].set_xlim(-tmax, tmax)
@@ -152,7 +153,7 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
             interp_data = gp.predict(interp_points).reshape(-1, res)
             print('Gaussian Process Interpolation took %.1f s' % (time.time() - current_time))
             cax = axes[1].pcolormesh(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax,
-                                     zorder=0, edgecolors='face')
+                                     zorder=0, edgecolors='face', rasterized=True)
             axes[1].set_ylabel('Initial ramp\namplitude (mV)')
             axes[1].set_xlabel('Time relative to plateau onset (s)')
             axes[1].set_ylim(0., ymax)
@@ -178,9 +179,8 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
     cbar.ax.set_visible(False)
 
     r_val, p_val = pearsonr(flat_delta_model_ramp, flat_delta_exp_ramp)
-    this_axis.annotate('R$^{2}$ = %.3f; p %s %.3f' %
-                       (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001),
-                       xy=(0.1, 0.9), xycoords='axes fraction', color='k')
+    this_axis.text(0.1, 0.9, 'R$^{2}$ = %.3f; p %s %.3f' %
+                   (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001), color='k')
 
     clean_axes(axes)
     fig.suptitle(label, y=0.95, x=0.05, ha='left', fontsize=mpl.rcParams['font.size'])  # y=0.95,

@@ -1226,6 +1226,198 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     mpl.rcParams['mathtext.default'] = 'regular'
     mpl.rcParams['axes.unicode_minus'] = True
     from matplotlib.lines import Line2D
+    from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+    from matplotlib import gridspec
+    import matplotlib.colors as col
+
+    complete_change_in_weight_matrix = np.empty((len(context.peak_locs), len(context.down_t)))
+    for lap, induction_lap in enumerate(range(len(context.induction_start_times))):
+        current_normalized_weights = np.add(delta_weights_snapshots[lap], 1.) / peak_weight
+        start_time = context.induction_start_times[induction_lap]
+        if lap == 0:
+            start_index = np.where(context.down_t >= start_time)[0][0]
+            for i in range(len(context.peak_locs)):
+                complete_change_in_weight_matrix[i, :start_index] = 0.
+        if induction_lap == len(context.induction_start_times) - 1:
+            stop_time = context.down_t[-1]
+        else:
+            stop_time = context.induction_start_times[induction_lap + 1]
+        indexes = np.where((context.down_t >= start_time) & (context.down_t < stop_time))[0]
+
+        for i, this_local_signal in enumerate(local_signals):
+            this_signal_overlap = np.multiply(this_local_signal[indexes], global_signal[indexes])
+            this_pot_rate = pot_rate(this_signal_overlap)
+            this_dep_rate = dep_rate(this_signal_overlap)
+            this_dwdt = context.k_pot * this_pot_rate * (1. - current_normalized_weights[i]) - \
+                        context.k_dep * this_dep_rate * current_normalized_weights[i]
+            complete_change_in_weight_matrix[i, indexes] = this_dwdt * peak_weight
+
+    cmap = 'gray_r'
+    # fig, axes = plt.subplots(3, figsize=(10., 5.))
+    fig = plt.figure(figsize=(6., 9.))
+    rows = 31
+    cols = 2
+    rasterized=True
+
+    rate_map_matrix = np.empty((len(context.down_rate_maps), len(context.down_t)))
+    for i, rate_map in enumerate(context.down_rate_maps):
+        rate_map_matrix[i, :] = rate_map
+    X, Y = np.meshgrid(context.down_t / 1000., range(len(context.down_rate_maps) + 1))
+
+    axis = plt.subplot2grid((rows, cols), (5, 0), rowspan=5, colspan=cols)
+    # axis = axes[1]
+    cdict = {'red': ((0.0, 1.0, 1.0),
+                     (1.0, 1.0, 1.0)),
+
+             'green': ((0.0, 1.0, 1.0),
+                       (1.0, 0.0, 0.0)),
+
+             'blue': ((0.0, 1.0, 1.0),
+                      (1.0, 0.0, 0.0))}
+    this_cmap = mpl.colors.LinearSegmentedColormap('my_colormap', cdict)
+
+    hm = axis.pcolormesh(X, Y, rate_map_matrix, cmap=this_cmap, vmin=0., rasterized=rasterized)  # , vmin=0., vmax=1.)
+    axins = inset_axes(axis,
+                       width="2.5%",  # width = 10% of parent_bbox width
+                       height="100%",  # height : 50%
+                       loc=2,
+                       bbox_to_anchor=(1.02, 0., 1, 1),
+                       bbox_transform=axis.transAxes,
+                       borderpad=0.,
+                       )
+    cb = plt.colorbar(hm, cax=axins)
+    cb.ax.set_ylabel('Presynaptic\nfiring rate\n(Hz)', rotation=0, va='center')
+    cb.ax.get_yaxis().labelpad = 40
+    axis.set_ylim((len(context.down_rate_maps) + 1, 0))
+    axis.set_ylabel('Sorted\nsynaptic\ninputs', rotation=0., va='center', labelpad=25)
+    source_xlim_axis = axis
+    plt.setp(axis.get_xticklabels(), visible=False)
+
+    pretty_position = context.complete_position % context.track_length
+    indexes = np.where(np.abs(np.diff(pretty_position)) > context.track_length / 4.)[0]
+    # for index in indexes:
+    #    print(pretty_position[index], pretty_position[index], pretty_position[index+1])
+    pretty_position[indexes] = np.nan
+    plateau_indexes = [np.where(context.complete_t >= start_time)[0][0] for start_time in context.induction_start_times]
+
+    axis = plt.subplot2grid((rows, cols), (0, 0), rowspan=5, colspan=cols, sharex=source_xlim_axis)
+    # axis = axes[0]
+    axis.plot(context.complete_t / 1000., pretty_position, c='grey', zorder=0)
+    axis.scatter(context.complete_t[plateau_indexes] / 1000., pretty_position[plateau_indexes], c='k', zorder=1,
+                 label='Plateau\npotentials')
+    axis.set_ylabel('Position\n(cm)', rotation=0., va='center', labelpad=25)
+    axis.set_ylim((context.track_length + 5., -5.))
+    axis.set_yticks(np.arange(0., context.track_length, 90.)[::-1])
+    plt.setp(axis.get_xticklabels(), visible=False)
+    axis.legend(loc='best', frameon=False, handletextpad=0.4)
+
+    local_signal_matrix = np.empty((len(context.down_rate_maps), len(context.down_t)))
+    for i, local_signal in enumerate(local_signals):
+        local_signal_matrix[i, :] = local_signal
+
+    axis = plt.subplot2grid((rows, cols), (10, 0), rowspan=5, colspan=cols, sharex=source_xlim_axis)
+    # axis = axes[2]
+    clist = [(0., 'White'), (1., 'Purple')]
+    this_cmap = mpl.colors.LinearSegmentedColormap.from_list('my_colormap', clist)
+    hm = axis.pcolormesh(X, Y, local_signal_matrix, cmap=this_cmap, vmin=0., rasterized=rasterized)  # , vmin=0., vmax=1.)
+    axins = inset_axes(axis,
+                       width="2.5%",  # width = 10% of parent_bbox width
+                       height="100%",  # height : 50%
+                       loc=2,
+                       bbox_to_anchor=(1.02, 0., 1, 1),
+                       bbox_transform=axis.transAxes,
+                       borderpad=0.,
+                       )
+    cb = plt.colorbar(hm, cax=axins)
+    cb.ax.set_ylabel('Eligibility\ntrace\n(a.u.)', rotation=0, va='center')
+    cb.ax.get_yaxis().labelpad = 40
+    axis.set_ylim((len(context.down_rate_maps) + 1, 0))
+    plt.setp(axis.get_xticklabels(), visible=False)
+    axis.set_ylabel('Sorted\nsynaptic\ninputs', rotation=0., va='center', labelpad=25)
+
+    axis = plt.subplot2grid((rows, cols), (15, 0), rowspan=2, colspan=cols, sharex=source_xlim_axis)
+    axis.plot(context.down_t / 1000., global_signal, c='k', linewidth=1., label='Instructive\nsignal\n(a.u.)')
+    axis.set_xlim((0., source_xlim_axis.get_xlim()[1]))
+    leg = axis.legend(loc='best', frameon=False, handlelength=0.)
+    plt.setp(leg.get_texts(), ha='center')
+    clean_axes(axis)
+    plt.setp(axis.get_xticklabels(), visible=False)
+
+    axis = plt.subplot2grid((rows, cols), (17, 0), rowspan=5, colspan=cols, sharex=source_xlim_axis)
+    scale = np.abs(np.min(complete_change_in_weight_matrix))
+    hm = axis.pcolormesh(X, Y, complete_change_in_weight_matrix, vmin=-2. * scale, vmax=2. * scale, cmap='bwr', rasterized=rasterized)
+    axins = inset_axes(axis,
+                       width="2.5%",  # width = 10% of parent_bbox width
+                       height="100%",  # height : 50%
+                       loc=2,
+                       bbox_to_anchor=(1.02, 0., 1, 1),
+                       bbox_transform=axis.transAxes,
+                       borderpad=0.,
+                       )
+    cb = plt.colorbar(hm, cax=axins)
+    cb.ax.set_ylabel('dW/dt\n(a.u./s)', rotation=0, va='center')
+    cb.ax.get_yaxis().labelpad = 25
+    axis.set_ylim((len(context.down_rate_maps) + 1, 0))
+    axis.set_ylabel('Sorted\nsynaptic\ninputs', rotation=0., va='center', labelpad=25)
+    axis.set_xlabel('Time (s)')
+    plt.setp(axis.get_xticklabels(), visible=True)
+    source_xlim_axis.set_xlim((0., 75.))
+
+    weights_matrix = np.empty((len(delta_weights_snapshots), len(context.peak_locs)))
+    for i, lap in enumerate(delta_weights_snapshots):
+        weights_matrix[i, :] = np.add(lap, 1.)
+
+    axis = plt.subplot2grid((rows, cols), (25, 0), rowspan=6, colspan=1)
+    X, Y = np.meshgrid(np.linspace(0., len(context.peak_locs), 200), np.arange(-0.5, weights_matrix.shape[0], 1.))
+    hm = axis.pcolormesh(X, Y, weights_matrix, vmin=0., rasterized=rasterized)
+    axins = inset_axes(axis,
+                       width="6%",  # width = 10% of parent_bbox width
+                       height="100%",  # height : 50%
+                       loc=2,
+                       bbox_to_anchor=(1.05, 0., 1, 1),
+                       bbox_transform=axis.transAxes,
+                       borderpad=0.,
+                       )
+    cb = plt.colorbar(hm, cax=axins)
+    # cb.ax.set_ylabel('Synaptic\nweight (a.u.)', rotation=0)
+    axis.set_title('Synaptic\nweight (a.u.)', fontsize=mpl.rcParams['font.size'], y=1.05)
+    # cb.ax.get_yaxis().labelpad = 30
+    axis.set_ylim((weights_matrix.shape[0] - 0.5, -0.5))
+    axis.set_yticks(list(range(weights_matrix.shape[0])))
+    axis.set_yticklabels(['Before'] + list(range(weights_matrix.shape[0] - 1)))
+    axis.set_ylabel('Induction\nlap #', rotation=0., va='center', labelpad=12)
+    axis.set_xlabel('Sorted synaptic inputs')
+
+    ramp_matrix = np.empty((len(ramp_snapshots), len(context.binned_x)))
+    for i, lap in enumerate(ramp_snapshots):
+        ramp_matrix[i, :] = lap
+
+    axis = plt.subplot2grid((rows, cols), (25, 1), rowspan=6, colspan=1)
+    X, Y = np.meshgrid(np.linspace(0., context.track_length, 100), np.arange(-0.5, weights_matrix.shape[0], 1.))
+    hm = axis.pcolormesh(X, Y, ramp_matrix, rasterized=rasterized)  # , vmin=0.)
+    axins = inset_axes(axis,
+                       width="6%",  # width = 10% of parent_bbox width
+                       height="100%",  # height : 50%
+                       loc=2,
+                       bbox_to_anchor=(1.05, 0., 1, 1),
+                       bbox_transform=axis.transAxes,
+                       borderpad=0.,
+                       )
+    cb = plt.colorbar(hm, cax=axins)
+    # cb.ax.set_ylabel('Ramp\namplitude\n(mV)', rotation=0)
+    axis.set_title('Ramp\namplitude (mV)', fontsize=mpl.rcParams['font.size'], y=1.05)
+    # cb.ax.get_yaxis().labelpad = 30
+    axis.set_ylim((weights_matrix.shape[0] - 0.5, -0.5))
+    axis.set_yticks(list(range(weights_matrix.shape[0])))
+    # axis.set_yticklabels(['Before'] + list(range(weights_matrix.shape[0] - 1)))
+    axis.set_yticklabels([])
+    axis.set_xticks(np.arange(0., context.track_length, 90.))
+    # axis.set_ylabel('Induction\nlap #', rotation=0., va='center', labelpad=12)
+    axis.set_xlabel('Position (cm)')
+
+    fig.subplots_adjust(hspace=5., right=0.7, left=0.2, wspace=0.4)
+    # fig.savefig('Figures/test.svg', format='svg', dpi=300)
+    fig.show()
 
     fig, axes = plt.subplots(3, figsize=(5, 7.5))
 
@@ -1290,15 +1482,6 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
                          fontsize=mpl.rcParams['font.size'])
     for line in leg.get_lines():
         line.set_linewidth(2.)
-
-    """
-    xmin = max(-5., np.min(this_t))
-    xmax = np.max(this_t)
-    axes[0].set_xlim(xmin, xmax)
-    axes[0].set_xticks(np.round((np.arange(xmin, xmax, 5.) / 5.)) * 5.)
-    axes[1].set_xticks(np.round((np.arange(xmin, xmax, 5.) / 5.)) * 5.)
-    axes[2].set_xticks(np.round((np.arange(xmin, xmax, 5.) / 5.)) * 5.)
-    """
 
     ymax0_left = context.input_field_peak_rate / 0.85
     ymax0_right = peak_ramp_amp / 0.85
@@ -1520,7 +1703,7 @@ def run_tests():
 @click.option("--interactive", is_flag=True)
 @click.option("--debug", is_flag=True)
 @click.option("--plot-summary-figure", is_flag=True)
-@click.option("--exported-data-key", type=str, default=None)
+@click.option("--exported-data-key", type=str, default='0')
 @click.pass_context
 def main(cli, config_file_path, output_dir, export, export_file_path, label, verbose, plot, interactive, debug,
          plot_summary_figure, exported_data_key):
