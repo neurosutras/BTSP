@@ -66,7 +66,7 @@ def plot_ramp_prediction_from_interpolation(regressor, data_file_path_list, labe
     for row, data_file_path in enumerate(data_file_path_list):
         peak_ramp_amp, total_induction_dur, group_indexes, exp_ramp, delta_exp_ramp, exp_ramp_raw, delta_exp_ramp_raw, \
         mean_induction_loc, interp_exp_ramp, interp_delta_exp_ramp, interp_delta_exp_ramp_raw, min_induction_t, \
-        clean_min_induction_t, clean_induction_t_indexes, initial_induction_delta_vm = \
+        clean_min_induction_t, clean_induction_t_indexes, initial_induction_delta_vm, baseline_vm = \
             get_biBTSP_data_analysis_results(data_file_path, reference_delta_t, debug=debug, truncate=truncate)
 
         label = labels[row]
@@ -109,8 +109,8 @@ def plot_ramp_prediction_from_interpolation(regressor, data_file_path_list, labe
                            alpha=0.5)
         this_axis.plot(np.divide(reference_delta_t, 1000.), np.nanmean(interp_delta_exp_ramp_list, axis=0), c=color)
         this_axis.set_title(label, fontsize=mpl.rcParams['font.size'], y=1.05)
-        this_axis.set_ylabel('Change in ramp\namplitude (mV)')
-        this_axis.set_xlabel('Time relative to\nplateau onset (s)')
+        this_axis.set_ylabel(r'$\Delta$Vm (mV)')
+        this_axis.set_xlabel('Time from plateau (s)')
         this_axis.set_yticks(np.arange(-10., 16., 5.))
         this_axis.set_ylim([-10., 16.])
         if tmin <= -4.:
@@ -118,7 +118,7 @@ def plot_ramp_prediction_from_interpolation(regressor, data_file_path_list, labe
         elif tmin <= -1.:
             this_axis.set_xticks(np.arange(-1., tmax + 0.1, 1.))
         this_xlim = this_axis.get_xlim()
-        this_axis.plot([this_xlim[0], this_xlim[1]], [0., 0.], '--', c='darkgrey', alpha=0.75)
+        this_axis.plot([this_xlim[0], this_xlim[1]], [0., 0.], '--', c='darkgrey', alpha=0.5)
 
         this_axis = axes[row][1]
         this_axis.set_xlim(tmin, tmax)
@@ -168,8 +168,8 @@ def plot_ramp_prediction_from_interpolation(regressor, data_file_path_list, labe
                              handletextpad=0.3,
                              handlelength=1.)
             this_axis.set_title('Prediction', fontsize=mpl.rcParams['font.size'], y=1.05)
-            this_axis.set_ylabel('Change in ramp\namplitude (mV)')
-            this_axis.set_xlabel('Time relative to\nplateau onset (s)')
+            this_axis.set_ylabel(r'$\Delta$Vm (mV)')
+            this_axis.set_xlabel('Time from plateau (s)')
             this_axis.set_yticks(np.arange(-10., 16., 5.))
             this_axis.set_ylim([-10., 16.])
             if tmin <= -4.:
@@ -194,8 +194,8 @@ def plot_ramp_prediction_from_interpolation(regressor, data_file_path_list, labe
             this_axis.set_xticks(np.arange(-10., 16., 5.))
             this_axis.set_xlim([-10., 16.])
             this_xlim = this_axis.get_xlim()
-            this_axis.plot([this_xlim[0], this_xlim[1]], [this_xlim[0], this_xlim[1]], '--', c='darkgrey', alpha=0.75)
-            this_axis.set_title('Change in\nramp amplitude', fontsize=mpl.rcParams['font.size'], y=1.05)
+            this_axis.plot([this_xlim[0], this_xlim[1]], [this_xlim[0], this_xlim[1]], '--', c='darkgrey', alpha=0.5)
+            this_axis.set_title(r'$\Delta$Vm (mV)', fontsize=mpl.rcParams['font.size'], y=1.05)
 
             r_val, p_val = pearsonr(flat_v_indep_prediction, flat_actual)
             this_axis.annotate('R$^{2}$ = %.3f; p %s %.3f' %
@@ -207,15 +207,15 @@ def plot_ramp_prediction_from_interpolation(regressor, data_file_path_list, labe
                                (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001),
                                xy=(0.3, 0.025), xycoords='axes fraction', color='r')
         else:
-            this_axis.plot(reference_delta_t / 1000., v_indep_prediction, c='k')
+            this_axis.plot(reference_delta_t / 1000., v_dep_prediction, c='purple')
             this_axis.fill_between(reference_delta_t / 1000.,
-                                   np.add(v_indep_prediction, v_indep_prediction_std),
-                                   np.subtract(v_indep_prediction, v_indep_prediction_std),
-                                   color='grey', alpha=0.25, linewidth=0)
+                                   np.add(v_dep_prediction, v_dep_prediction_std),
+                                   np.subtract(v_dep_prediction, v_dep_prediction_std),
+                                   color='purple', alpha=0.25, linewidth=0)
 
             this_axis.set_title('Prediction', fontsize=mpl.rcParams['font.size'], y=1.05)
-            this_axis.set_ylabel('Change in ramp\namplitude (mV)')
-            this_axis.set_xlabel('Time relative to\nplateau onset (s)')
+            this_axis.set_ylabel(r'$\Delta$Vm (mV)')
+            this_axis.set_xlabel('Time from plateau (s)')
             this_axis.set_yticks(np.arange(-10., 16., 5.))
             this_axis.set_ylim([-10., 16.])
             if tmin <= -4.:
@@ -226,7 +226,7 @@ def plot_ramp_prediction_from_interpolation(regressor, data_file_path_list, labe
             this_axis.plot([this_xlim[0], this_xlim[1]], [0., 0.], '--', c='darkgrey', alpha=0.5)
 
             this_axis = axes[row][2]
-            this_axis.scatter(flat_actual, flat_v_indep_prediction, c='k', linewidth=0, alpha=0.25, s=10)
+            this_axis.scatter(flat_actual, flat_v_dep_prediction, c='k', linewidth=0, alpha=0.25, s=10)
             this_axis.set_xlabel('Actual (mV)')
             this_axis.set_ylabel('Predicted (mV)')
             this_axis.set_yticks(np.arange(-10., 16., 5.))
@@ -234,13 +234,148 @@ def plot_ramp_prediction_from_interpolation(regressor, data_file_path_list, labe
             this_axis.set_xticks(np.arange(-10., 16., 5.))
             this_axis.set_xlim([-10., 16.])
             this_xlim = this_axis.get_xlim()
-            this_axis.plot([this_xlim[0], this_xlim[1]], [this_xlim[0], this_xlim[1]], '--', c='darkgrey', alpha=0.75)
-            this_axis.set_title('Change in\nramp amplitude', fontsize=mpl.rcParams['font.size'], y=1.05)
+            this_axis.plot([this_xlim[0], this_xlim[1]], [this_xlim[0], this_xlim[1]], '--', c='darkgrey', alpha=0.5)
+            this_axis.set_title(r'$\Delta$Vm (mV)', fontsize=mpl.rcParams['font.size'], y=1.05)
 
-            r_val, p_val = pearsonr(flat_v_indep_prediction, flat_actual)
+            r_val, p_val = pearsonr(flat_v_dep_prediction, flat_actual)
             this_axis.annotate('R$^{2}$ = %.3f; p %s %.3f' %
                                (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001),
                                xy=(0.1, 0.9), xycoords='axes fraction', color='k')
+        clean_axes(axes)
+        fig.subplots_adjust(left=0.1, wspace=0.55, hspace=0.7, right=0.95, bottom=0.15, top=0.9)
+        fig.show()
+        clean_axes(axes2)
+        fig2.tight_layout()
+        fig2.subplots_adjust(top=0.75, hspace=0.2, wspace=0.6)
+        fig2.show()
+
+
+def plot_ramp_prediction_from_interpolation_alt(regressor, data_file_path_list, labels, reference_delta_t, colors=None,
+                                                target_induction_list=None, t_lim_list=None, debug=False, truncate=2.5):
+    """
+
+    :param regressor: :class:'GaussianProcessRegressor'
+    :param data_file_path_list: list of str (path)
+    :param labels: list of str
+    :param reference_delta_t: array
+    :param colors: list of str
+    :param target_induction_list: list of list of int
+    :param t_lim_list: list of tuple of float
+    :param debug: bool
+    :param truncate: bool
+    """
+    if colors is None:
+        colors = ['k' for i in range(len(data_file_path_list))]
+    if target_induction_list is None:
+        target_induction_list = [[1] for i in range(len(data_file_path_list))]
+    if t_lim_list is None:
+        t_lim_list = [(reference_delta_t[0] / 1000., reference_delta_t[-1] / 1000.)
+                      for i in range(len(data_file_path_list))]
+
+    fig, axes = plt.subplots(2, 3, figsize=(9., 6.75))
+    fig2, axes2 = plt.subplots(1, 3, figsize=(11.5, 3.5))
+    for row, data_file_path in enumerate(data_file_path_list):
+        peak_ramp_amp, total_induction_dur, group_indexes, exp_ramp, delta_exp_ramp, exp_ramp_raw, delta_exp_ramp_raw, \
+        mean_induction_loc, interp_exp_ramp, interp_delta_exp_ramp, interp_delta_exp_ramp_raw, min_induction_t, \
+        clean_min_induction_t, clean_induction_t_indexes, initial_induction_delta_vm, baseline_vm = \
+            get_biBTSP_data_analysis_results(data_file_path, reference_delta_t, debug=debug, truncate=truncate)
+
+        label = labels[row]
+        color = colors[row]
+        target_induction = target_induction_list[row]
+        tmin = t_lim_list[row][0]
+        tmax = t_lim_list[row][1]
+
+        this_axis = axes[row][0]
+        this_axis.set_xlim(tmin, tmax)
+        interp_delta_exp_ramp_list = []
+        min_induction_t_list = []
+        delta_exp_ramp_list = []
+        initial_exp_ramp_list = []
+        initial_induction_delta_vm_list = []
+        for cell_key in delta_exp_ramp:
+            for induction in target_induction:
+                induction_key = str(induction)
+                if induction_key in delta_exp_ramp[cell_key]:
+                    interp_delta_exp_ramp_list.append(interp_delta_exp_ramp[cell_key][induction_key])
+                    this_clean_indexes = clean_induction_t_indexes[cell_key][induction_key]
+                    min_induction_t_list.append(clean_min_induction_t[cell_key][induction_key])
+                    delta_exp_ramp_list.append(delta_exp_ramp[cell_key][induction_key][this_clean_indexes])
+                    initial_exp_ramp_list.append(exp_ramp[cell_key][induction_key]['before'][this_clean_indexes])
+                    initial_induction_delta_vm_list.append(
+                        initial_induction_delta_vm[cell_key][induction_key][this_clean_indexes])
+            if 2 in target_induction and 1 not in target_induction and '2' in delta_exp_ramp[cell_key] and \
+                    '1' in delta_exp_ramp[cell_key]:
+                induction_key = '1'
+                interp_delta_exp_ramp_list.append(interp_delta_exp_ramp[cell_key][induction_key])
+                this_clean_indexes = clean_induction_t_indexes[cell_key][induction_key]
+                min_induction_t_list.append(clean_min_induction_t[cell_key][induction_key])
+                delta_exp_ramp_list.append(delta_exp_ramp[cell_key][induction_key][this_clean_indexes])
+                initial_exp_ramp_list.append(exp_ramp[cell_key][induction_key]['before'][this_clean_indexes])
+                initial_induction_delta_vm_list.append(
+                    initial_induction_delta_vm[cell_key][induction_key][this_clean_indexes])
+
+        delta_exp_ramp_mean = np.nanmean(interp_delta_exp_ramp_list, axis=0)
+        delta_exp_ramp_std = np.nanstd(interp_delta_exp_ramp_list, axis=0)
+        this_axis.plot(np.divide(reference_delta_t, 1000.), delta_exp_ramp_mean, c=color, label='Actual')
+        this_axis.fill_between(reference_delta_t / 1000.,
+                               np.add(delta_exp_ramp_mean, delta_exp_ramp_std),
+                               np.subtract(delta_exp_ramp_mean, delta_exp_ramp_std),
+                               color='grey', alpha=0.25, linewidth=0)
+        this_axis.set_title(label, fontsize=mpl.rcParams['font.size'], y=1.05)
+        this_axis.set_ylabel(r'$\Delta$Vm (mV)')
+        this_axis.set_xlabel('Time from plateau (s)')
+        this_axis.set_yticks(np.arange(-10., 16., 5.))
+        this_axis.set_ylim([-10., 16.])
+        if tmin <= -4.:
+            this_axis.set_xticks(np.arange(-4., tmax + 0.1, 2.))
+        elif tmin <= -1.:
+            this_axis.set_xticks(np.arange(-1., tmax + 0.1, 1.))
+        this_xlim = this_axis.get_xlim()
+        this_axis.plot([this_xlim[0], this_xlim[1]], [0., 0.], '--', c='darkgrey', alpha=0.5)
+
+        flat_actual = []
+        flat_v_dep_prediction = []
+        interp_v_dep_prediction_list = []
+        for i in range(len(initial_induction_delta_vm_list)):
+            this_initial_induction_delta_vm = initial_induction_delta_vm_list[i]
+            this_min_induction_t = min_induction_t_list[i]
+            flat_actual.extend(delta_exp_ramp_list[i])
+            v_dep_points = np.vstack((np.divide(this_min_induction_t, 1000.), this_initial_induction_delta_vm)).T
+            this_v_dep_prediction = regressor.predict(v_dep_points)
+            flat_v_dep_prediction.extend(this_v_dep_prediction)
+            bad_indexes = np.where((reference_delta_t < np.min(this_min_induction_t)) |
+                                   (reference_delta_t > np.max(this_min_induction_t)))[0]
+            this_interp_v_dep_prediction = \
+                np.interp(reference_delta_t, this_min_induction_t, this_v_dep_prediction)
+            this_interp_v_dep_prediction[bad_indexes] = np.nan
+            interp_v_dep_prediction_list.append(this_interp_v_dep_prediction)
+        v_dep_prediction = np.nanmean(interp_v_dep_prediction_list, axis=0)
+        v_dep_prediction_std = np.nanstd(interp_v_dep_prediction_list, axis=0)
+
+        this_axis.plot(reference_delta_t / 1000., v_dep_prediction, c='purple', label='Predicted')
+        this_axis.fill_between(reference_delta_t / 1000.,
+                               np.add(v_dep_prediction, v_dep_prediction_std),
+                               np.subtract(v_dep_prediction, v_dep_prediction_std),
+                               color='purple', alpha=0.25, linewidth=0)
+        this_axis.legend(loc='best', frameon=False, framealpha=0., handlelength=1)
+
+        this_axis = axes[row][2]
+        this_axis.scatter(flat_actual, flat_v_dep_prediction, c='k', linewidth=0, alpha=0.25, s=10)
+        this_axis.set_xlabel('Actual (mV)')
+        this_axis.set_ylabel('Predicted (mV)')
+        this_axis.set_yticks(np.arange(-10., 16., 5.))
+        this_axis.set_ylim([-10., 16.])
+        this_axis.set_xticks(np.arange(-10., 16., 5.))
+        this_axis.set_xlim([-10., 16.])
+        this_xlim = this_axis.get_xlim()
+        this_axis.plot([this_xlim[0], this_xlim[1]], [this_xlim[0], this_xlim[1]], '--', c='darkgrey', alpha=0.75)
+        this_axis.set_title(r'$\Delta$Vm (mV)', fontsize=mpl.rcParams['font.size'], y=1.05)
+
+        r_val, p_val = pearsonr(flat_v_dep_prediction, flat_actual)
+        this_axis.annotate('R$^{2}$ = %.3f; p %s %.3f' %
+                           (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001),
+                           xy=(0.1, 0.9), xycoords='axes fraction', color='k')
         clean_axes(axes)
         fig.subplots_adjust(left=0.1, wspace=0.55, hspace=0.7, right=0.95, bottom=0.15, top=0.9)
         fig.show()
@@ -334,7 +469,7 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
 
     peak_ramp_amp, total_induction_dur, group_indexes, exp_ramp, delta_exp_ramp, exp_ramp_raw, delta_exp_ramp_raw, \
     mean_induction_loc, interp_exp_ramp, interp_delta_exp_ramp, interp_delta_exp_ramp_raw, min_induction_t, \
-    clean_min_induction_t, clean_induction_t_indexes, initial_induction_delta_vm = \
+    clean_min_induction_t, clean_induction_t_indexes, initial_induction_delta_vm, baseline_vm = \
         get_biBTSP_data_analysis_results(data_file_path, reference_delta_t, debug=debug, truncate=truncate)
 
     context.update(locals())
@@ -392,9 +527,9 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
                                vmin=ymin, vmax=ymax, cmap=lines_cmap)
                 cax = this_axis.add_collection(lc)
     cbar = plt.colorbar(cax, ax=this_axis)
-    cbar.set_label('Initial ramp\namplitude (mV)', rotation=270., labelpad=23.)
-    this_axis.set_ylabel('Change in ramp\namplitude (mV)')
-    this_axis.set_xlabel('Time relative to plateau onset (s)')
+    cbar.set_label('Initial Vm ramp\namplitude (mV)', rotation=270., labelpad=23.)
+    this_axis.set_ylabel(r'$\Delta$Vm (mV)')
+    this_axis.set_xlabel('Time from plateau (s)')
     this_axis.set_yticks(np.arange(-10., 16., 5.))
     this_axis.set_xticks(np.arange(-4., 5., 2.))
 
@@ -405,7 +540,7 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
     this_axis.scatter(total_induction_dur[group_indexes['exp2'] + group_indexes['exp3']],
                       peak_ramp_amp[group_indexes['exp2'] + group_indexes['exp3']], c='k', s=40.,
                       alpha=0.5, linewidth=0)
-    this_axis.set_ylabel('Peak ramp\namplitude (mV)')
+    this_axis.set_ylabel('Peak Vm ramp\namplitude (mV)')
     this_axis.set_xlabel('Total accumulated\nplateau duration (ms)')
     ylim = [0., math.ceil(np.max(peak_ramp_amp) + 3.)]
     xlim = [0., (math.ceil(np.max(total_induction_dur) / 100.) + 1.) * 100.]
@@ -439,8 +574,8 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
                          (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001), xy=(0.6, 0.7),
                          xycoords='axes fraction')
         axes[1].set_xlim(xlim)
-        axes[1].set_xlabel('Initial ramp amplitude (mV)')
-        axes[1].set_ylabel('Change in ramp\namplitude (mV)')
+        axes[1].set_xlabel('Initial Vm ramp\namplitude (mV)')
+        axes[1].set_ylabel(r'$\Delta$Vm (mV)')
 
         target_flat_delta_ramp = np.array(target_flat_delta_ramp)
         target_flat_initial_ramp = np.array(target_flat_initial_ramp)
@@ -474,23 +609,23 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
             print('Gaussian Process Interpolation took %.1f s' % (time.time() - current_time))
             cax = axes[3].pcolormesh(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax,
                                      zorder=0, edgecolors='face')
-            axes[3].set_ylabel('Initial ramp\namplitude (mV)')
-            axes[3].set_xlabel('Time relative to plateau onset (s)')
+            axes[3].set_ylabel('Initial Vm ramp\namplitude (mV)')
+            axes[3].set_xlabel('Time from plateau (s)')
             axes[3].set_ylim(0., ymax)
             axes[3].set_xlim(-tmax, tmax)
             axes[3].set_xticks(np.arange(-4., 5., 2.))
             cbar = plt.colorbar(cax, ax=axes[3])
-            cbar.set_label('Change in ramp\namplitude (mV)', rotation=270., labelpad=23.)
+            cbar.set_label(r'$\Delta$Vm (mV)', rotation=270., labelpad=15.)
 
             cax = axes2[1].pcolormesh(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax,
-                                      zorder=0, edgecolors='face')
-            axes2[1].set_ylabel('Initial ramp\namplitude (mV)')
-            axes2[1].set_xlabel('Time relative to plateau onset (s)')
+                                      zorder=0, edgecolors='face', rasterized=True)
+            axes[3].set_ylabel('Initial Vm ramp\namplitude (mV)')
+            axes2[1].set_xlabel('Time from plateau (s)')
             axes2[1].set_ylim(0., ymax)
             axes2[1].set_xlim(-tmax, tmax)
             axes2[1].set_xticks(np.arange(-4., 5., 2.))
             cbar = plt.colorbar(cax, ax=axes2[1])
-            cbar.set_label('Change in ramp\namplitude (mV)', rotation=270., labelpad=23.)
+            cbar.set_label(r'$\Delta$Vm (mV)', rotation=270., labelpad=15.)
 
     clean_axes(axes)
     # fig.set_constrained_layout_pads(wspace=0.08, hspace=0.12)

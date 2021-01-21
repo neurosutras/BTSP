@@ -1,0 +1,63 @@
+151006_3i_1 - Same as cell1 in old file 151006_3&4. Looks good. (Now downsampled to 1 kHz)
+
+160204_2i - Same as cell2 in old file 151006_3&4. Looks good. (Now downsampled to 1 kHz)
+
+151006_3i_3 - Don't use. cell3 from the original file 151006_3&4. No induction waves.
+
+160323_2i - Same as cell4 in old file 151006_3&4. Looks good. (Now downsampled to 1 kHz)
+
+160310_4i - Same as cell5 in old file 151006_3&4. Looks good. (Now downsampled to 1 kHz). Still 1st position wave is two laps, but now current injection wave has two laps as well, so need to sensibly split it up and make sure the induction location is the same for the two laps.
+
+150422.txt: perfect - cell6 : has another lap that wasn't used in the original BTSP paper
+
+151203.txt: perfect - cell7
+
+151208.txt: perfect - cell8
+
+160309.txt: perfect - cell9
+
+160721.txt: perfect - cell10 : has another lap that wasn't used in the original BTSP paper
+
+160826_2i - Same cell as old file 160826 (cell11), but now there are two ramp traces. What is the difference? Still there is the same problem as before, the last current injection trial has a oscillating current, and seems to have induced the smaller second peak.
+	- cell11 - one of the ramps is from cherry-picked trials minimizing the second hump.
+
+140522_3i - New cell. - cell12
+
+140529_6i - New cell. - cell13
+
+140609_4i - New cell. - cell14
+
+151007_2i - cell15 - same as cell3 from original file 151006_3&4 - replace cell3
+
+151209_3i - Don't use. Same as cell8 but missing an induction lap.
+
+160308_2i - New cell. - cell17
+
+160318_2i - New cell. - cell18
+
+
+Spontaneous cells:
+
+
+032017 - Optimization of discrete spike version of plasticity rule.
+Random seeds:
+During optimization:
+synapses_seed = 0
+one seed for theta_offset, spike_trains, successes: 
+	long: 10000 + cell_id 
+	long_spont: 20000 + cell_id
+	short: 30000 + cell_id
+	short_spont: 40000 + cell_id
+For full simulation:
+synapses_seed:
+	long: cell_id
+	long_spont: 100 + cell_id
+	short: 200 + cell_id
+	short_spont: 300 + cell_id
+one seed for theta_offset, spike_trains:
+	long: 50000 + cell_id + 100 * trial_seed
+	long_spont: 60000 + cell_id + 100 * trial_seed
+	short: 70000 + cell_id + 100 * trial_seed
+	short_spont: 80000 + cell_id + 100 * trial_seed
+seeds for release_probability:
+	per synapse value + trial_seed * 10000

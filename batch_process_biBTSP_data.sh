@@ -1,5 +1,5 @@
 #!/bin/bash
-cd $HOME/PycharmProjects/BTSP
+cd $HOME/src/BTSP
 
 for ((cell_id=1;cell_id<=31;cell_id++))
 do

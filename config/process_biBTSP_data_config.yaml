@@ -733,29 +733,6 @@
       after: 13
     sampling_rate: 20000.0
     spont: False
-8:
-  2:
-    current_columns:
-    - 6
-    - 7
-    - 8
-    - 9
-    - 10
-    - 11
-    file_name: 150805_b.txt
-    position_columns:
-      induction:
-      - 0
-      - 1
-      - 2
-      - 3
-      - 4
-      - 5
-    ramp_columns:
-      before: 12
-      after: 13
-    sampling_rate: 1000.0
-    spont: False
 37:
   2:
     current_columns:

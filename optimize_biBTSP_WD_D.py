@@ -1231,17 +1231,17 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     import matplotlib.colors as col
 
     complete_change_in_weight_matrix = np.empty((len(context.peak_locs), len(context.down_t)))
-    for lap, induction_lap in enumerate(range(len(context.induction_start_times))):
+    for lap, this_induction_lap in enumerate(range(len(context.induction_start_times))):
         current_normalized_weights = np.add(delta_weights_snapshots[lap], 1.) / peak_weight
-        start_time = context.induction_start_times[induction_lap]
+        start_time = context.induction_start_times[this_induction_lap]
         if lap == 0:
             start_index = np.where(context.down_t >= start_time)[0][0]
             for i in range(len(context.peak_locs)):
                 complete_change_in_weight_matrix[i, :start_index] = 0.
-        if induction_lap == len(context.induction_start_times) - 1:
+        if this_induction_lap == len(context.induction_start_times) - 1:
             stop_time = context.down_t[-1]
         else:
-            stop_time = context.induction_start_times[induction_lap + 1]
+            stop_time = context.induction_start_times[this_induction_lap + 1]
         indexes = np.where((context.down_t >= start_time) & (context.down_t < stop_time))[0]
 
         for i, this_local_signal in enumerate(local_signals):
@@ -1259,10 +1259,13 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     cols = 2
     rasterized=True
 
+    source_xlim = (-2.5, 10.)
     rate_map_matrix = np.empty((len(context.down_rate_maps), len(context.down_t)))
     for i, rate_map in enumerate(context.down_rate_maps):
         rate_map_matrix[i, :] = rate_map
-    X, Y = np.meshgrid(context.down_t / 1000., range(len(context.down_rate_maps) + 1))
+
+    X, Y = np.meshgrid((context.down_t - context.induction_start_times[induction_lap]) / 1000.,
+                       range(len(context.down_rate_maps) + 1))
 
     axis = plt.subplot2grid((rows, cols), (5, 0), rowspan=5, colspan=cols)
     # axis = axes[1]
@@ -1302,9 +1305,11 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
 
     axis = plt.subplot2grid((rows, cols), (0, 0), rowspan=5, colspan=cols, sharex=source_xlim_axis)
     # axis = axes[0]
-    axis.plot(context.complete_t / 1000., pretty_position, c='grey', zorder=0)
-    axis.scatter(context.complete_t[plateau_indexes] / 1000., pretty_position[plateau_indexes], c='k', zorder=1,
-                 label='Plateau\npotentials')
+    axis.plot((context.complete_t - context.induction_start_times[induction_lap]) / 1000., pretty_position, c='grey',
+              zorder=0)
+    axis.scatter((context.complete_t[plateau_indexes] - context.induction_start_times[induction_lap]) / 1000.,
+                 pretty_position[plateau_indexes], c='k', zorder=1,
+                 label='Plateau')
     axis.set_ylabel('Position\n(cm)', rotation=0., va='center', labelpad=25)
     axis.set_ylim((context.track_length + 5., -5.))
     axis.set_yticks(np.arange(0., context.track_length, 90.)[::-1])
@@ -1336,7 +1341,8 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     axis.set_ylabel('Sorted\nsynaptic\ninputs', rotation=0., va='center', labelpad=25)
 
     axis = plt.subplot2grid((rows, cols), (15, 0), rowspan=2, colspan=cols, sharex=source_xlim_axis)
-    axis.plot(context.down_t / 1000., global_signal, c='k', linewidth=1., label='Instructive\nsignal\n(a.u.)')
+    axis.plot((context.down_t - context.induction_start_times[induction_lap]) / 1000., global_signal, c='k',
+              linewidth=1., label='Instructive\nsignal\n(a.u.)')
     axis.set_xlim((0., source_xlim_axis.get_xlim()[1]))
     leg = axis.legend(loc='best', frameon=False, handlelength=0.)
     plt.setp(leg.get_texts(), ha='center')
@@ -1345,7 +1351,8 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
 
     axis = plt.subplot2grid((rows, cols), (17, 0), rowspan=5, colspan=cols, sharex=source_xlim_axis)
     scale = np.abs(np.min(complete_change_in_weight_matrix))
-    hm = axis.pcolormesh(X, Y, complete_change_in_weight_matrix, vmin=-2. * scale, vmax=2. * scale, cmap='bwr', rasterized=rasterized)
+    hm = axis.pcolormesh(X, Y, complete_change_in_weight_matrix, vmin=-2. * scale, vmax=2. * scale, cmap='bwr',
+                         rasterized=rasterized)
     axins = inset_axes(axis,
                        width="2.5%",  # width = 10% of parent_bbox width
                        height="100%",  # height : 50%
@@ -1361,13 +1368,18 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     axis.set_ylabel('Sorted\nsynaptic\ninputs', rotation=0., va='center', labelpad=25)
     axis.set_xlabel('Time (s)')
     plt.setp(axis.get_xticklabels(), visible=True)
-    source_xlim_axis.set_xlim((0., 75.))
+    source_xlim_axis.set_xlim(source_xlim)
 
+    fig.subplots_adjust(hspace=5., right=0.7, left=0.2, wspace=0.4)
+    # fig.savefig('Figures/test.svg', format='svg', dpi=300)
+    fig.show()
+
+    fig = plt.figure(figsize=(5.5, 2.5))
     weights_matrix = np.empty((len(delta_weights_snapshots), len(context.peak_locs)))
     for i, lap in enumerate(delta_weights_snapshots):
         weights_matrix[i, :] = np.add(lap, 1.)
 
-    axis = plt.subplot2grid((rows, cols), (25, 0), rowspan=6, colspan=1)
+    axis = plt.subplot2grid((1, 2), (0, 0), rowspan=1, colspan=1)
     X, Y = np.meshgrid(np.linspace(0., len(context.peak_locs), 200), np.arange(-0.5, weights_matrix.shape[0], 1.))
     hm = axis.pcolormesh(X, Y, weights_matrix, vmin=0., rasterized=rasterized)
     axins = inset_axes(axis,
@@ -1384,7 +1396,7 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     # cb.ax.get_yaxis().labelpad = 30
     axis.set_ylim((weights_matrix.shape[0] - 0.5, -0.5))
     axis.set_yticks(list(range(weights_matrix.shape[0])))
-    axis.set_yticklabels(['Before'] + list(range(weights_matrix.shape[0] - 1)))
+    axis.set_yticklabels(['Before'] + list(range(1, weights_matrix.shape[0])))
     axis.set_ylabel('Induction\nlap #', rotation=0., va='center', labelpad=12)
     axis.set_xlabel('Sorted synaptic inputs')
 
@@ -1392,7 +1404,7 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     for i, lap in enumerate(ramp_snapshots):
         ramp_matrix[i, :] = lap
 
-    axis = plt.subplot2grid((rows, cols), (25, 1), rowspan=6, colspan=1)
+    axis = plt.subplot2grid((1, 2), (0, 1), rowspan=1, colspan=1)
     X, Y = np.meshgrid(np.linspace(0., context.track_length, 100), np.arange(-0.5, weights_matrix.shape[0], 1.))
     hm = axis.pcolormesh(X, Y, ramp_matrix, rasterized=rasterized)  # , vmin=0.)
     axins = inset_axes(axis,
@@ -1415,7 +1427,7 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     # axis.set_ylabel('Induction\nlap #', rotation=0., va='center', labelpad=12)
     axis.set_xlabel('Position (cm)')
 
-    fig.subplots_adjust(hspace=5., right=0.7, left=0.2, wspace=0.4)
+    fig.subplots_adjust(hspace=5., right=0.89, left=0.225, wspace=0.575, top=0.8, bottom=0.2)
     # fig.savefig('Figures/test.svg', format='svg', dpi=300)
     fig.show()
 

@@ -863,11 +863,11 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None):
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
 
-    ordered_conditions = {1: ['control', 'depo', 'hyper'], 2: ['control']}
+    ordered_conditions = {1: ['control', 'depo', 'hyper'], 2: ['control', 'hyper']}
     condition_labels = {'control': 'Control', 'depo': 'Depolarized', 'hyper': 'Hyperpolarized'}
     condition_colors = {'control': 'k', 'depo': 'r', 'hyper': 'c'}
 
-    fig, axes = plt.subplots(3, 3, figsize=(10., 11.))
+    fig, axes = plt.subplots(3, 3, figsize=(10., 10.))
 
     min_t_val = np.min(this_min_induction_t)
     max_t_val = np.max(this_min_induction_t)
@@ -905,9 +905,9 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None):
     this_axis.set_xlim(xlim)
     this_axis.set_xticks(xticks)
     this_axis.set_title(r'$P$', fontsize=mpl.rcParams['font.size'] + 2)
-    this_axis.set_xlabel('Time relative to\nplateau onset (s)')
+    this_axis.set_xlabel('Time from plateau (s)')
 
-    this_axis = axes[0][1]
+    this_axis = axes[2][0]
     this_spine_depo_f = np.vectorize(scaled_single_sigmoid(context.spine_th,
                                                            context.spine_th + context.spine_half_width))
     this_axis.plot(signal_xrange, this_spine_depo_f(signal_xrange), c='k', label='Control')
@@ -918,10 +918,10 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None):
                                                            context.spine_th_hyper + context.spine_half_width))
     this_axis.plot(signal_xrange, this_spine_depo_f(signal_xrange), c='c', label='Hyperpolarized')
     this_axis.set_xlabel('Presynaptic firing\nrate (normalized)')
-    this_axis.set_ylabel('Spine depolarization\n(normalized)')
+    this_axis.set_ylabel('Spine Vm (normalized)')
     this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
     this_axis.set_xlim((signal_xrange[0], signal_xrange[-1]))
-    this_axis.set_title(r'$\phi(R_i,V_i)$', fontsize=mpl.rcParams['font.size'] + 2)
+    # this_axis.set_title(r'$\phi(R_i,V_i)$', fontsize=mpl.rcParams['font.size'] + 2)
 
     this_axis = axes[0][2]
     this_axis.plot(local_signal_filter_t / 1000., local_signal_filter / np.max(local_signal_filter), color='k')
@@ -954,7 +954,6 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None):
     for condition in ordered_conditions[induction]:
         label = condition_labels[condition]
         color = condition_colors[condition]
-        """
         this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
                        np.subtract(model_ramp[induction][condition], initial_ramp[induction][condition])[
                            this_clean_induction_t_indexes], label=label, color=color)
@@ -965,12 +964,15 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None):
         this_norm_delta_weights = np.subtract(this_interp_final_weights, this_interp_initial_weights) / peak_weight
         this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
                        this_norm_delta_weights[this_clean_induction_t_indexes], label=label, color=color)
+        """
     this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
                    np.zeros_like(this_clean_induction_t_indexes), '--', c='grey', alpha=0.5)
     this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-    this_axis.set_xlabel('Time relative to\nplateau onset (s)')
-    this_axis.set_ylabel('Change in weight\n(normalized)')
-    this_axis.set_ylim([-0.2, 0.4])
+    this_axis.set_xlabel('Time from plateau (s)')
+    this_axis.set_ylabel(r'$\Delta$Vm (mV)')
+    this_axis.set_ylim([-5., 10.])
+    # this_axis.set_ylabel('Change in weight\n(normalized)')
+    # this_axis.set_ylim([-0.2, 0.4])
     this_axis.set_xlim(xlim)
     this_axis.set_xticks(xticks)
     this_axis.set_title('Silent -> Place 1', fontsize=mpl.rcParams['font.size'] + 2)
@@ -1001,7 +1003,7 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None):
                              np.zeros_like(this_clean_induction_t_indexes), '--', c='grey', alpha=0.5)
         axes2[row][col].set_xlim(xlim)
         axes2[row][col].set_xticks(xticks)
-        axes2[row][col].set_xlabel('Time relative to\nplateau onset (s)')
+        axes2[row][col].set_xlabel('Time from plateau (s)')
     axes2[row][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
 
     this_axis = axes[2][2]
@@ -1009,29 +1011,39 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None):
     this_min_induction_t = context.min_induction_t
     this_clean_induction_t_indexes = context.clean_induction_t_indexes
     induction = 2
-    condition = 'control'
-    label = condition_labels[condition]
-    color = condition_colors[condition]
+    for condition in ordered_conditions[induction]:
+        if condition not in initial_weights[induction]:
+            continue
+        label = condition_labels[condition]
+        color = condition_colors[condition]
+        this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
+                       np.subtract(model_ramp[induction][condition], initial_ramp[induction][condition])[
+                           this_clean_induction_t_indexes], label=label, color=color)
+        """
+        this_interp_initial_weights = np.interp(context.binned_x, context.peak_locs,
+                                                initial_weights[induction][condition])
+        this_interp_final_weights = np.interp(context.binned_x, context.peak_locs, final_weights[induction][condition])
+        this_norm_delta_weights = np.subtract(this_interp_final_weights, this_interp_initial_weights) / peak_weight
+        this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
+                       this_norm_delta_weights[this_clean_induction_t_indexes], label=label, color=color)
+        """
 
-    this_interp_initial_weights = np.interp(context.binned_x, context.peak_locs,
-                                            initial_weights[induction][condition])
-    this_interp_final_weights = np.interp(context.binned_x, context.peak_locs, final_weights[induction][condition])
-    this_norm_delta_weights = np.subtract(this_interp_final_weights, this_interp_initial_weights) / peak_weight
     this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes] / 1000.,
-                   this_norm_delta_weights[this_clean_induction_t_indexes], color=color)
-    this_axis.plot(this_min_induction_t[this_clean_induction_t_indexes], np.zeros_like(this_clean_induction_t_indexes),
+                   np.zeros_like(this_clean_induction_t_indexes),
                    '--', c='grey', alpha=0.5)
-    # this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
-    this_axis.set_xlabel('Time relative to\nplateau onset (s)')
-    this_axis.set_ylabel('Change in weight\n(normalized)')
-    this_axis.set_ylim([-0.2, 0.4])
+    this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
+    this_axis.set_xlabel('Time from plateau (s)')
+    this_axis.set_ylabel(r'$\Delta$Vm (mV)')
+    this_axis.set_ylim([-5., 10.])
+    # this_axis.set_ylabel('Change in weight\n(normalized)')
+    # this_axis.set_ylim([-0.2, 0.4])
     this_axis.set_xlim(xlim)
     this_axis.set_xticks(xticks)
     this_axis.set_title('Place 1 -> Place 2', fontsize=mpl.rcParams['font.size'] + 2)
 
     clean_axes(axes)
     fig.tight_layout()
-    fig.subplots_adjust(hspace=0.5, wspace=0.4)
+    fig.subplots_adjust(hspace=0.7, wspace=0.6)
     fig.show()
 
     prev_ramp = None
@@ -1059,7 +1071,7 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None):
                              np.zeros_like(this_clean_induction_t_indexes), '--', c='grey', alpha=0.5)
         axes2[row][col].set_xlim(xlim)
         axes2[row][col].set_xticks(xticks)
-        axes2[row][col].set_xlabel('Time relative to\nplateau onset (s)')
+        axes2[row][col].set_xlabel('Time from plateau (s)')
     # axes2[row][0].legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
     clean_axes(axes2)
     fig2.tight_layout()
@@ -1244,7 +1256,7 @@ def get_features_interactive(interface, x, model_id=None, plot=False):
 @click.option("--interactive", is_flag=True)
 @click.option("--debug", is_flag=True)
 @click.option("--plot-summary-figure", is_flag=True)
-@click.option("--exported-data-key", type=str, default=None)
+@click.option("--exported-data-key", type=str, default='0')
 @click.pass_context
 def main(cli, config_file_path, output_dir, export, export_file_path, label, verbose, plot, interactive, debug,
          plot_summary_figure, exported_data_key):

@@ -20,7 +20,7 @@ context = Context()
 @click.option("--data-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
               default='data/20201123_biBTSP_data.hdf5')
 @click.option("--model-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='data/20200429_biBTSP_WD_E_90cm_exported_model_output.hdf5')
+              default='data/20201124_biBTSP_WD_D_90cm_exported_model_output.hdf5')
 @click.option("--vmax", type=float, default=12.97868)
 @click.option("--tmax", type=float, default=5.)
 @click.option("--truncate", type=float, default=2.5)
@@ -55,7 +55,7 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
 
     peak_ramp_amp, total_induction_dur, group_indexes, exp_ramp, delta_exp_ramp, exp_ramp_raw, delta_exp_ramp_raw, \
     mean_induction_loc, interp_exp_ramp, interp_delta_exp_ramp, interp_delta_exp_ramp_raw, min_induction_t, \
-    clean_min_induction_t, clean_induction_t_indexes, initial_induction_delta_vm = \
+    clean_min_induction_t, clean_induction_t_indexes, initial_induction_delta_vm, baseline_vm = \
         get_biBTSP_data_analysis_results(data_file_path, reference_delta_t, debug=debug, truncate=truncate)
 
     delta_model_ramp, interp_delta_model_ramp = \
@@ -109,10 +109,7 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
     lines_cmap = 'jet'
     interp_cmap = 'bwr'
 
-    fig, axes = plt.subplots(1, 3, figsize=(8., 2.42))  # figsize=(11.5, 3.5))  #, constrained_layout=True)
-
-    # axes = [axesgrid[2][0], axesgrid[2][1], axesgrid[2][2]]
-
+    fig, axes = plt.subplots(1, 3, figsize=(8.5, 2.5))  # figsize=(11.5, 3.5))  #, constrained_layout=True)
     axes[0].set_xlim(-tmax, tmax)
     for cell_key in interp_delta_model_ramp:
         for induction in target_induction:
@@ -124,9 +121,9 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
                                vmin=ymin, vmax=ymax, cmap=lines_cmap)
                 cax = axes[0].add_collection(lc)
     cbar = plt.colorbar(cax, ax=axes[0])
-    cbar.set_label('Initial ramp\namplitude (mV)', rotation=270., labelpad=23.)
-    axes[0].set_ylabel('Change in ramp\namplitude (mV)')
-    axes[0].set_xlabel('Time relative to plateau onset (s)')
+    cbar.set_label('Initial Vm (mV)', rotation=270., labelpad=15.)
+    axes[0].set_ylabel(r'$\Delta$Vm (mV)')
+    axes[0].set_xlabel('Time from plateau (s)')
     axes[0].set_yticks(np.arange(-10., max(vmax + 1., 16.), 5.))
     axes[0].set_ylim((-10., max(vmax + 1., 16.)))
     axes[0].set_xticks(np.arange(-4., 5., 2.))
@@ -154,13 +151,13 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
             print('Gaussian Process Interpolation took %.1f s' % (time.time() - current_time))
             cax = axes[1].pcolormesh(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax,
                                      zorder=0, edgecolors='face', rasterized=True)
-            axes[1].set_ylabel('Initial ramp\namplitude (mV)')
-            axes[1].set_xlabel('Time relative to plateau onset (s)')
+            axes[1].set_ylabel('Initial Vm ramp\namplitude (mV)')
+            axes[1].set_xlabel('Time from plateau (s)')
             axes[1].set_ylim(0., ymax)
             axes[1].set_xlim(-tmax, tmax)
             axes[1].set_xticks(np.arange(-4., 5., 2.))
             cbar = plt.colorbar(cax, ax=axes[1])
-            cbar.set_label('Change in ramp\namplitude (mV)', rotation=270., labelpad=23.)
+            cbar.set_label(r'$\Delta$Vm (mV)', rotation=270., labelpad=15.)
 
     context.update(locals())
 
@@ -174,19 +171,19 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
     this_axis.set_xlim([-10., max(vmax + 1., 16.)])
     this_xlim = this_axis.get_xlim()
     this_axis.plot([this_xlim[0], this_xlim[1]], [this_xlim[0], this_xlim[1]], '--', c='darkgrey', alpha=0.75)
-    this_axis.set_title('Change in\nramp amplitude', fontsize=mpl.rcParams['font.size'], y=1.1)
+    this_axis.set_title(r'$\Delta$Vm', fontsize=mpl.rcParams['font.size'], y=1.05)
     cbar = plt.colorbar(cax, ax=this_axis)
     cbar.ax.set_visible(False)
 
     r_val, p_val = pearsonr(flat_delta_model_ramp, flat_delta_exp_ramp)
-    this_axis.text(0.1, 0.9, 'R$^{2}$ = %.3f; p %s %.3f' %
+    this_axis.text(0.1, 0.9, 'R$^{2}$ = %.3f\np %s %.3f' %
                    (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001), color='k')
 
     clean_axes(axes)
     fig.suptitle(label, y=0.95, x=0.05, ha='left', fontsize=mpl.rcParams['font.size'])  # y=0.95,
     # fig.set_constrained_layout_pads(wspace=0.08, hspace=0.12)
     fig.tight_layout()
-    fig.subplots_adjust(top=0.75, hspace=0.2, wspace=0.6)
+    fig.subplots_adjust(top=0.8, hspace=0.2, wspace=0.6, bottom=0.2)
     fig.show()
 
 

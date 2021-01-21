@@ -1,0 +1,36 @@
+0:  # best 20200527
+  f_dep_half_width: 1.225082E-02
+  f_dep_th: 5.874827E-03
+  global_signal_decay: 7.416242E+02
+  k_dep: 2.285727E-01
+  k_pot: 2.406468E+00
+  local_signal_decay: 1.012450E+03
+  peak_delta_weight: 4.622392E+00
+  spine_half_width: 4.077459E-01
+  spine_th: 5.531024E-01
+  spine_th_depo: 3.140178E-01
+  spine_th_hyper: 8.621754E-01
+1:  # best 20200527; rounded
+  f_dep_half_width: 0.012  # beta: 160.
+  f_dep_th: 0.0059
+  global_signal_decay: 750.
+  k_dep: 0.23
+  k_pot: 2.4
+  local_signal_decay: 1000.
+  peak_delta_weight: 4.6
+  spine_half_width: 0.41  # beta: 4.9
+  spine_th: 0.55
+  spine_th_depo: 0.31
+  spine_th_hyper: 0.86
+test:
+  f_dep_half_width: 0.012  # beta: 160.
+  f_dep_th: 0.0059
+  global_signal_decay: 750.
+  k_dep: 0.23
+  k_pot: 2.4
+  local_signal_decay: 750.
+  peak_delta_weight: 4.6
+  spine_half_width: 0.41  # beta: 4.9
+  spine_th: 0.55
+  spine_th_depo: 0.31
+  spine_th_hyper: 0.86

@@ -316,6 +316,7 @@ def process_data(plot):
             ramp_baseline = context.prev_ramp_baseline
             if ramp_baseline < np.min(exp_ramp['before'] - 20.) or ramp_baseline > np.min(exp_ramp['before'] + 20.):
                 exp_ramp['before'], ramp_baseline = subtract_baseline(exp_ramp['before'])
+                context.prev_ramp_baseline = ramp_baseline
             else:
                 exp_ramp['before'] -= ramp_baseline
         exp_ramp_raw['before'] -= ramp_baseline
@@ -339,7 +340,7 @@ def process_data(plot):
         context.max_ramp = max([context.max_ramp, np.max(exp_ramp['after']), np.max(exp_ramp_raw['after'])])
         delta_exp_ramp = np.copy(exp_ramp['after'])
         delta_exp_ramp_raw = np.copy(exp_ramp_raw['after'])
-
+    print('Vm baseline: %.2f' % ramp_baseline)
     context.update(locals())
 
     if plot > 0:
@@ -465,6 +466,7 @@ def export_data(export_file_path=None):
         if induction_key not in f['data'][cell_key]:
             f['data'][cell_key].create_group(induction_key)
         f['data'][cell_key].attrs['spont'] = context.spont
+        f['data'][cell_key].attrs['vm_baseline'] = context.prev_ramp_baseline
         this_group = f['data'][cell_key][induction_key]
         if context.DC_soma is not None:
             this_group.attrs['DC_soma'] = context.DC_soma
@@ -525,6 +527,18 @@ def export_data(export_file_path=None):
         this_group['complete'].create_dataset('t', compression='gzip', data=context.complete_t)
         this_group['complete'].create_dataset('induction_gate', compression='gzip', data=context.induction_gate)
     print('Exported data for cell: %i, induction: %i to %s' % (context.cell_id, context.induction, export_file_path))
+
+
+def append_vm_baseline(export_file_path):
+    """
+
+    :param export_file_path: str (path)
+    """
+    with h5py.File(export_file_path, 'a') as f:
+        cell_key = str(context.cell_id)
+        f['data'][cell_key].attrs['vm_baseline'] = context.prev_ramp_baseline
+    print('Appended Vm baseline data (%.2f mV) for cell: %i, induction: %i to %s' %
+          (context.prev_ramp_baseline, context.cell_id, context.induction, export_file_path))
 
 
 if __name__ == '__main__':

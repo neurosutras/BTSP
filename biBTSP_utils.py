@@ -2002,9 +2002,11 @@ def get_biBTSP_data_analysis_results(data_file_path, reference_delta_t, debug=Fa
     interp_delta_exp_ramp = defaultdict(dict)
     interp_delta_exp_ramp_raw = defaultdict(dict)
     interp_exp_ramp = defaultdict(lambda: defaultdict(dict))
+    baseline_vm = dict()
 
     with h5py.File(data_file_path, 'r') as f:
         for cell_key in f['data']:
+            baseline_vm[cell_key] = f['data'][cell_key].attrs['vm_baseline']
             for induction_key in f['data'][cell_key]:
                 induction_locs = f['data'][cell_key][induction_key].attrs['induction_locs']
                 induction_durs = f['data'][cell_key][induction_key].attrs['induction_durs']
@@ -2103,7 +2105,7 @@ def get_biBTSP_data_analysis_results(data_file_path, reference_delta_t, debug=Fa
 
     return peak_ramp_amp, total_induction_dur, group_indexes, exp_ramp, delta_exp_ramp, exp_ramp_raw,\
            delta_exp_ramp_raw, mean_induction_loc, interp_exp_ramp, interp_delta_exp_ramp, interp_delta_exp_ramp_raw, \
-           min_induction_t, clean_min_induction_t, clean_induction_t_indexes, initial_induction_delta_vm
+           min_induction_t, clean_min_induction_t, clean_induction_t_indexes, initial_induction_delta_vm, baseline_vm
 
 
 def get_biBTSP_model_analysis_results(model_file_path, reference_delta_t, exp_ramp, clean_min_induction_t,

@@ -42,7 +42,8 @@ def main(data_file_path, tmax, truncate, debug, cell):
 
     peak_ramp_amp, total_induction_dur, group_indexes, exp_ramp, delta_exp_ramp, exp_ramp_raw, delta_exp_ramp_raw, \
     mean_induction_loc, interp_exp_ramp, interp_delta_exp_ramp, interp_delta_exp_ramp_raw, min_induction_t, \
-    clean_min_induction_t, clean_induction_t_indexes, initial_induction_delta_vm = \
+    clean_min_induction_t, clean_induction_t_indexes, initial_induction_delta_vm,\
+        baseline_vm = \
         get_biBTSP_data_analysis_results(data_file_path, reference_delta_t, debug=debug, truncate=truncate)
 
     context.update(locals())

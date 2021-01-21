@@ -1,0 +1,27 @@
+Second field induction data: 1st field induction laps in separate file
+
+1: 151006_4ii.txt - original cell 1 - 151006_3i_1.txt
+
+2: 151007_2ii.txt - original cell 15 - 151007_2i.txt  # had a hyperpolarizing current injection to test input resistance in the lap before 2nd induction
+
+3: 151203_4ii.txt - original cell 7 - 151203.txt
+
+4: 160309_2ii.txt - original cell 9 - 160309.txt  # has an extra position lap with no current injection at the end
+
+5: 160310_4ii.txt - original cell 5 - 160310_4i.txt
+
+6: 160323_2ii.txt - original cell 4 - 160323_2i.txt
+
+7: 150604ni.txt
+
+8: 150625ni.txt
+
+9: 150805ni.txt # position and current waves are not matched.
+
+10: 150827ni.txt 
+
+11: 151009_1ni.txt
+
+12. 160318_2ii*.txt  # original cell 18. Jeff labeled as problem. What is the problem?
+
+13. 160826_2ii*.txt  # original cell 11. There was an oscillatory current injection during induction 1 that induced a small second bump. Not ideal, but we used it for the first paper, and there's so little data, we should probably use it here, too.
