@@ -735,6 +735,44 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
             induction_stop_times[int(induction_key)] = group.attrs['induction_stop_times']
 
     load_data(1)
+
+    mpl.rcParams['font.size'] = 8.
+    fig, axes = plt.subplots(3, 1, figsize=(2.2, 2.3))
+    this_axis = axes[0]
+    for rate_map in context.input_rate_maps[::20]:
+        this_axis.plot(context.binned_x, rate_map, c='r', linewidth=0.5)
+    this_axis.set_title('Presynaptic firing rates', fontsize=mpl.rcParams['font.size'], x=0.1, loc='left')
+    ymax = np.max(context.input_rate_maps)
+    this_axis.set_ylim(-0.1 * ymax, 1.1 * ymax)
+    bar_loc = 1.05 * ymax
+    this_axis.hlines(bar_loc, xmin=induction_start_loc[1], xmax=induction_stop_loc[1], colors='k')
+    this_axis.hlines(bar_loc, xmin=induction_start_loc[2], xmax=induction_stop_loc[2], colors='c')
+    this_axis.set_xlim(0., context.track_length)
+
+    this_axis = axes[1]
+    ymax = max(np.max(final_weights[1]), np.max(final_weights[2]))
+    this_axis.plot(context.peak_locs, initial_weights[1], c='grey', label='Before', linewidth=0.5)
+    this_axis.plot(context.peak_locs, final_weights[1], c='k', label='After Induction 1', linewidth=0.5)
+    this_axis.plot(context.peak_locs, final_weights[2], c='c', label='After Induction 2', linewidth=0.5)
+    this_axis.set_ylim(1. - 0.1 * (ymax - 1.), 1. + 1.1 * (ymax - 1.))
+    this_axis.set_xlim(0., context.track_length)
+    this_axis.legend(loc='best', frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
+    this_axis.set_title('Synaptic weights', fontsize=mpl.rcParams['font.size'], x=0.1, loc='left')
+
+    this_axis = axes[2]
+    ymax = max(np.max(model_ramp[1]), np.max(model_ramp[2]))
+    this_axis.plot(context.binned_x, initial_ramp[1], c='grey', linewidth=0.5)
+    this_axis.plot(context.binned_x, model_ramp[1], c='k', linewidth=0.5)
+    this_axis.plot(context.binned_x, model_ramp[2], c='c', linewidth=0.5)
+    this_axis.set_ylim(-0.1 * ymax, 1.1 * ymax)
+    this_axis.set_xlim(0., context.track_length)
+    this_axis.set_title('Vm ramp', fontsize=mpl.rcParams['font.size'], x=0.1, loc='left')
+
+    clean_axes(axes)
+    fig.tight_layout()
+    fig.show()
+
+    mpl.rcParams['font.size'] = 12.
     this_min_induction_t = context.min_induction_t
     this_clean_induction_t_indexes = context.clean_induction_t_indexes
     this_induction_start_time = induction_start_times[1][0]
@@ -1006,7 +1044,7 @@ def get_features_interactive(interface, x, model_id=None, plot=False):
 @click.option("--interactive", is_flag=True)
 @click.option("--debug", is_flag=True)
 @click.option("--plot-summary-figure", is_flag=True)
-@click.option("--exported-data-key", type=str, default=None)
+@click.option("--exported-data-key", type=str, default='0')
 @click.pass_context
 def main(cli, config_file_path, output_dir, export, export_file_path, label, verbose, plot, interactive, debug,
          plot_summary_figure, exported_data_key):
@@ -1022,7 +1060,7 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
         --framework=mpi --pop-size=200 --path-length=3 --max-iter=50
 
     To plot results previously exported to a file on a single process:
-    python -i optimize_biBTSP_synthetic_WD_D.py --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
+    python -i optimize_biBTSP_synthetic_WD_D.py --plot-summary-figure --export-file-path=$PATH_TO_MODEL_FILE \
         --framework=serial --interactive
 
     :param cli: contains unrecognized args as list of str

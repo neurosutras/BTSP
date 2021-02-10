@@ -1,12 +1,8 @@
 """
-To reproduce panels from Figure 1 and Figure S3:
-python -i plot_biBTSP_data_summary_figure.py --target-induction=2 --target-induction=3
+To reproduce Figure 3F:
+python -i plot_biBTSP_data_summary_figure.py
 
-plot_ramp_prediction_from_interpolation(context.gp, ['data/20201123_biBTSP_data.hdf5'], ['Control'],
-    context.reference_delta_t, colors=['k'], target_induction_list=[[2, 3]],
-    show_both_predictions_list=[False])
-
-To reproduce panels from Figure 3:
+To use interpolation to predict the outcomes of the voltage perturbation experiments in Figures 4 and 5:
 python -i plot_biBTSP_data_summary_figure.py --target-induction=1 --target-induction=2 --target-induction=3
 
 plot_ramp_prediction_from_interpolation(context.gp,
@@ -451,7 +447,7 @@ def boxplot_compare_ramp_summary_features(model_file_path_dict, ordered_labels, 
 @click.option("--truncate", type=float, default=2.5)
 @click.option("--debug", is_flag=True)
 @click.option("--target-induction", type=int, multiple=True, default=[2, 3])
-@click.option("--font-size", type=float, default=11.)
+@click.option("--font-size", type=float, default=12.)
 def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_size):
     """
 
@@ -474,10 +470,9 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
 
     context.update(locals())
 
-    # fig, axesgrid = plt.subplots(3, 3, figsize=(10.5, 8.25), constrained_layout=True)
-    fig, axesgrid = plt.subplots(3, 3, figsize=(12, 8.25))
+    fig1, axes1 = plt.subplots(1, 3, figsize=(8.5, 3.))
     fig2, axes2 = plt.subplots(1, 3, figsize=(11.5, 3.5))
-    axes = [axesgrid[0][0], axesgrid[2][1], axesgrid[1][2], axesgrid[2][2]]
+    fig3, axes3 = plt.subplots(1, 3, figsize=(8.5, 2.5))
 
     flat_min_t = []
     flat_delta_ramp = []
@@ -515,7 +510,7 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
     lines_cmap = 'jet'
     interp_cmap = 'bwr'
 
-    this_axis = axes2[0]
+    this_axis = axes3[2]
     this_axis.set_xlim(-tmax, tmax)
     for cell_key in interp_delta_exp_ramp:
         for induction in target_induction:
@@ -533,7 +528,7 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
     this_axis.set_yticks(np.arange(-10., 16., 5.))
     this_axis.set_xticks(np.arange(-4., 5., 2.))
 
-    this_axis = axes2[2]
+    this_axis = axes1[1]
     this_axis.scatter(total_induction_dur[group_indexes['exp1'] + group_indexes['spont']],
                       peak_ramp_amp[group_indexes['exp1'] + group_indexes['spont']], c='darkgrey', s=40., alpha=0.5,
                       linewidth=0)
@@ -551,6 +546,7 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
     this_axis.plot(fit_xlim, fit(fit_xlim), c='grey', alpha=0.5, zorder=0, linestyle='--')
     this_axis.set_ylim(ylim)
     this_axis.set_xlim(xlim)
+    this_axis.set_xticks(np.arange(0., xlim[1], 1000.))
     handles = [mlines.Line2D([0], [0], linestyle='none', mfc=color, mew=0, alpha=0.5, marker='o', ms=math.sqrt(40.))
                for color in ['darkgrey', 'k']]
     labels = ['Silent -> Place 1', 'Place 1 -> Place 2']
@@ -560,22 +556,23 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
     this_axis.annotate('R$^{2}$ = %.3f; p %s %.3f' %
                        (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001), xy=(0.03, 0.025),
                        xycoords='axes fraction')
-    cbar = plt.colorbar(cax, ax=this_axis)
-    cbar.ax.set_visible(False)
+    # cbar = plt.colorbar(cax, ax=this_axis)
+    # cbar.ax.set_visible(False)
 
     if np.any(np.array(target_induction) != 1):
-        axes[1].scatter(target_flat_initial_ramp, target_flat_delta_ramp, c='grey', s=5., alpha=0.5, linewidth=0.)
+        this_axis = axes1[0]
+        this_axis.scatter(target_flat_initial_ramp, target_flat_delta_ramp, c='grey', s=5., alpha=0.5, linewidth=0.)
         fit_params = np.polyfit(target_flat_initial_ramp, target_flat_delta_ramp, 1)
         fit_f = np.vectorize(lambda x: fit_params[0] * x + fit_params[1])
         xlim = [0., math.ceil(np.max(target_flat_initial_ramp))]
-        axes[1].plot(xlim, fit_f(xlim), c='k', alpha=0.75, zorder=1, linestyle='--')
+        this_axis.plot(xlim, fit_f(xlim), c='k', alpha=0.75, zorder=1, linestyle='--')
         r_val, p_val = pearsonr(target_flat_initial_ramp, target_flat_delta_ramp)
-        axes[1].annotate('R$^{2}$ = %.3f;\np %s %.3f' %
+        this_axis.annotate('R$^{2}$ = %.3f;\np %s %.3f' %
                          (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001), xy=(0.6, 0.7),
                          xycoords='axes fraction')
-        axes[1].set_xlim(xlim)
-        axes[1].set_xlabel('Initial Vm ramp\namplitude (mV)')
-        axes[1].set_ylabel(r'$\Delta$Vm (mV)')
+        this_axis.set_xlim(xlim)
+        this_axis.set_xlabel('Initial Vm ramp\namplitude (mV)')
+        this_axis.set_ylabel(r'$\Delta$Vm (mV)')
 
         target_flat_delta_ramp = np.array(target_flat_delta_ramp)
         target_flat_initial_ramp = np.array(target_flat_initial_ramp)
@@ -607,36 +604,33 @@ def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_siz
             current_time = time.time()
             interp_data = gp.predict(interp_points).reshape(-1, res)
             print('Gaussian Process Interpolation took %.1f s' % (time.time() - current_time))
-            cax = axes[3].pcolormesh(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax,
-                                     zorder=0, edgecolors='face')
-            axes[3].set_ylabel('Initial Vm ramp\namplitude (mV)')
-            axes[3].set_xlabel('Time from plateau (s)')
-            axes[3].set_ylim(0., ymax)
-            axes[3].set_xlim(-tmax, tmax)
-            axes[3].set_xticks(np.arange(-4., 5., 2.))
-            cbar = plt.colorbar(cax, ax=axes[3])
-            cbar.set_label(r'$\Delta$Vm (mV)', rotation=270., labelpad=15.)
+            for this_axis in [axes2[0], axes3[0]]:
+                cax = this_axis.pcolormesh(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax,
+                                           vmax=vmax, zorder=0, edgecolors='face', rasterized=True)
+                this_axis.set_ylabel('Initial Vm ramp\namplitude (mV)')
+                this_axis.set_xlabel('Time from plateau (s)')
+                this_axis.set_ylim(0., ymax)
+                this_axis.set_xlim(-tmax, tmax)
+                this_axis.set_xticks(np.arange(-4., 5., 2.))
+                cbar = plt.colorbar(cax, ax=this_axis)
+                cbar.set_label(r'$\Delta$Vm (mV)', rotation=270., labelpad=15.)
 
-            cax = axes2[1].pcolormesh(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax,
-                                      zorder=0, edgecolors='face', rasterized=True)
-            axes[3].set_ylabel('Initial Vm ramp\namplitude (mV)')
-            axes2[1].set_xlabel('Time from plateau (s)')
-            axes2[1].set_ylim(0., ymax)
-            axes2[1].set_xlim(-tmax, tmax)
-            axes2[1].set_xticks(np.arange(-4., 5., 2.))
-            cbar = plt.colorbar(cax, ax=axes2[1])
-            cbar.set_label(r'$\Delta$Vm (mV)', rotation=270., labelpad=15.)
-
-    clean_axes(axes)
+    clean_axes(axes1)
     # fig.set_constrained_layout_pads(wspace=0.08, hspace=0.12)
-    fig.subplots_adjust(hspace=0.6, wspace=0.66, left=0.085, right=0.945, top=0.9, bottom=0.11)
-    fig.show()
+    fig1.subplots_adjust(hspace=0.6, wspace=0.66, left=0.085, right=0.945, top=0.825, bottom=0.225)
+    fig1.show()
 
     clean_axes(axes2)
-    fig2.suptitle('Experimental data', y=0.95, x=0.05, ha='left', fontsize=mpl.rcParams['font.size'])  # y=0.95,
+    # fig2.suptitle('Experimental data', y=0.95, x=0.05, ha='left', fontsize=mpl.rcParams['font.size'])  # y=0.95,
     fig2.tight_layout()
     fig2.subplots_adjust(top=0.75, hspace=0.2, wspace=0.6)
     fig2.show()
+
+    clean_axes(axes3)
+    fig3.suptitle('Experimental data', y=0.95, x=0.05, ha='left', fontsize=mpl.rcParams['font.size'])  # y=0.95,
+    fig3.tight_layout()
+    fig3.subplots_adjust(top=0.8, hspace=0.2, wspace=0.6, bottom=0.2)
+    fig3.show()
 
     context.update(locals())
 

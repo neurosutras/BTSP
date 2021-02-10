@@ -1,0 +1,16 @@
+Max delta ramp:
+Friedman test: p = 0.22086
+Min delta ramp:
+Friedman test: p = 0.00000
+Wilcoxon signed rank: Exp vs WD; p = 0.08727
+Wilcoxon signed rank: Exp vs WD
+(short); p = 0.00032
+Wilcoxon signed rank: Exp vs WD
+(linear pot/dep); p = 0.00000
+Wilcoxon signed rank: Exp vs WD
+(linear pot); p = 0.05160
+Wilcoxon signed rank: Exp vs WD
+(60 cm inputs); p = 0.01418
+Wilcoxon signed rank: Exp vs WD
+(alt); p = 0.08727
+Wilcoxon signed rank: Exp vs VD; p = 1.33570

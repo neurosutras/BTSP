@@ -1375,6 +1375,31 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     fig.show()
 
     fig = plt.figure(figsize=(5.5, 2.5))
+    axis = plt.subplot2grid((1, 2), (0, 0), rowspan=1, colspan=1)
+    axis.plot(context.peak_locs, np.add(delta_weights_snapshots[0], 1.), c='grey', label='Before')
+    axis.plot(context.peak_locs, np.add(delta_weights_snapshots[-1], 1.), c='k', label='After')
+    axis.set_title('Synaptic\nweight (a.u.)', fontsize=mpl.rcParams['font.size'], y=1.05)
+    # axis.set_ylim((weights_matrix.shape[0] - 0.5, -0.5))
+    # axis.set_yticks(list(range(weights_matrix.shape[0])))
+    # axis.set_yticklabels(['Before'] + list(range(1, weights_matrix.shape[0])))
+    # axis.set_ylabel('Induction\nlap #', rotation=0., va='center', labelpad=12)
+    axis.set_xlabel('Sorted synaptic inputs')
+    axis.legend(loc='best', frameon=False, handletextpad=0.4, handlelength=1, framealpha=0.5)
+    clean_axes(axis)
+
+    axis = plt.subplot2grid((1, 2), (0, 1), rowspan=1, colspan=1)
+    axis.plot(context.binned_x, ramp_snapshots[0], c='grey', label='Before')
+    axis.plot(context.binned_x, ramp_snapshots[-1], c='k', label='After')
+    axis.set_title('Ramp\namplitude (mV)', fontsize=mpl.rcParams['font.size'], y=1.05)
+    axis.legend(loc='best', frameon=False, handletextpad=0.4, handlelength=1, framealpha=0.5)
+    axis.set_xlabel('Position (cm)')
+    clean_axes(axis)
+
+    fig.subplots_adjust(hspace=5., right=0.89, left=0.225, wspace=0.575, top=0.8, bottom=0.2)
+    # fig.savefig('Figures/test.svg', format='svg', dpi=300)
+    fig.show()
+
+    fig = plt.figure(figsize=(5.5, 2.5))
     weights_matrix = np.empty((len(delta_weights_snapshots), len(context.peak_locs)))
     for i, lap in enumerate(delta_weights_snapshots):
         weights_matrix[i, :] = np.add(lap, 1.)
@@ -1730,8 +1755,7 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
 
     To plot results previously exported to a file on a single process:
     python -i optimize_biBTSP_WD_D.py --param_file_path=$PATH_TO_PARAM_YAML --model_key=$VALID_KEY_IN_PARAM_YAML \
-        --cell_id=1 --framework=serial --export-file-path-$PATH_TO_EXPORTED_DATA_HDF5 --plot-summary-figure \
-        --model-label=$VALID_KEY_IN_EXPORT_FILE
+        --cell_id=1 --framework=serial --export-file-path-$PATH_TO_EXPORTED_DATA_HDF5 --plot-summary-figure
 
     To optimize the models by running many instances in parallel:
     mpirun -n N python -i -m mpi4py.futures -m nested.optimize --config-file-path=$PATH_TO_CONFIG_YAML --disp

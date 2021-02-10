@@ -10,7 +10,7 @@ import click
 
 
 mpl.rcParams['svg.fonttype'] = 'none'
-mpl.rcParams['font.size'] = 11.
+mpl.rcParams['font.size'] = 12.
 mpl.rcParams['font.sans-serif'] = 'Arial'
 mpl.rcParams['text.usetex'] = False
 mpl.rcParams['axes.titlepad'] = 2.
@@ -39,7 +39,7 @@ ordered_param_names = ['local_signal_decay', 'global_signal_decay', 'k_pot', 'k_
 
 @click.command()
 @click.option("--param-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/20200528_biBTSP_WD_D_90cm_best_params.yaml')
+              default='config/20201124_biBTSP_WD_D_90cm_best_params.yaml')
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
               default='config/optimize_biBTSP_WD_D_cli_config.yaml')
 @click.option("--data-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),

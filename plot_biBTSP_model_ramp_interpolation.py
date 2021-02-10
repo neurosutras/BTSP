@@ -109,8 +109,9 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
     lines_cmap = 'jet'
     interp_cmap = 'bwr'
 
-    fig, axes = plt.subplots(1, 3, figsize=(8.5, 2.5))  # figsize=(11.5, 3.5))  #, constrained_layout=True)
-    axes[0].set_xlim(-tmax, tmax)
+    fig, axes = plt.subplots(1, 3, figsize=(8.5, 2.5))
+    this_axis = axes[2]
+    this_axis.set_xlim(-tmax, tmax)
     for cell_key in interp_delta_model_ramp:
         for induction in target_induction:
             induction_key = str(induction)
@@ -119,14 +120,14 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
                                interp_delta_model_ramp[cell_key][induction_key],
                                interp_exp_ramp[cell_key][induction_key]['before'],
                                vmin=ymin, vmax=ymax, cmap=lines_cmap)
-                cax = axes[0].add_collection(lc)
-    cbar = plt.colorbar(cax, ax=axes[0])
+                cax = this_axis.add_collection(lc)
+    cbar = plt.colorbar(cax, ax=this_axis)
     cbar.set_label('Initial Vm (mV)', rotation=270., labelpad=15.)
-    axes[0].set_ylabel(r'$\Delta$Vm (mV)')
-    axes[0].set_xlabel('Time from plateau (s)')
-    axes[0].set_yticks(np.arange(-10., max(vmax + 1., 16.), 5.))
-    axes[0].set_ylim((-10., max(vmax + 1., 16.)))
-    axes[0].set_xticks(np.arange(-4., 5., 2.))
+    this_axis.set_ylabel(r'$\Delta$Vm (mV)')
+    this_axis.set_xlabel('Time from plateau (s)')
+    this_axis.set_yticks(np.arange(-10., max(vmax + 1., 16.), 5.))
+    this_axis.set_ylim((-10., max(vmax + 1., 16.)))
+    this_axis.set_xticks(np.arange(-4., 5., 2.))
 
     if np.any(np.array(target_induction) != 1):
         points = np.array([flat_min_t, flat_initial_ramp]).transpose()
@@ -149,19 +150,20 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
             current_time = time.time()
             interp_data = gp.predict(interp_points).reshape(-1, res)
             print('Gaussian Process Interpolation took %.1f s' % (time.time() - current_time))
-            cax = axes[1].pcolormesh(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax,
+            this_axis = axes[0]
+            cax = this_axis.pcolormesh(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax, vmax=vmax,
                                      zorder=0, edgecolors='face', rasterized=True)
-            axes[1].set_ylabel('Initial Vm ramp\namplitude (mV)')
-            axes[1].set_xlabel('Time from plateau (s)')
-            axes[1].set_ylim(0., ymax)
-            axes[1].set_xlim(-tmax, tmax)
-            axes[1].set_xticks(np.arange(-4., 5., 2.))
-            cbar = plt.colorbar(cax, ax=axes[1])
+            this_axis.set_ylabel('Initial Vm ramp\namplitude (mV)')
+            this_axis.set_xlabel('Time from plateau (s)')
+            this_axis.set_ylim(0., ymax)
+            this_axis.set_xlim(-tmax, tmax)
+            this_axis.set_xticks(np.arange(-4., 5., 2.))
+            cbar = plt.colorbar(cax, ax=this_axis)
             cbar.set_label(r'$\Delta$Vm (mV)', rotation=270., labelpad=15.)
 
     context.update(locals())
 
-    this_axis = axes[2]
+    this_axis = axes[1]
     this_axis.scatter(flat_delta_exp_ramp, flat_delta_model_ramp, c='k', linewidth=0, alpha=0.25, s=10)
     this_axis.set_xlabel('Actual (mV)')
     this_axis.set_ylabel('Predicted (mV)')
@@ -180,8 +182,7 @@ def main(data_file_path, model_file_path, vmax, tmax, truncate, debug, label, ta
                    (r_val ** 2., '>' if p_val > 0.05 else '<', p_val if p_val > 0.001 else 0.001), color='k')
 
     clean_axes(axes)
-    fig.suptitle(label, y=0.95, x=0.05, ha='left', fontsize=mpl.rcParams['font.size'])  # y=0.95,
-    # fig.set_constrained_layout_pads(wspace=0.08, hspace=0.12)
+    fig.suptitle(label, y=0.95, x=0.05, ha='left', fontsize=mpl.rcParams['font.size'])
     fig.tight_layout()
     fig.subplots_adjust(top=0.8, hspace=0.2, wspace=0.6, bottom=0.2)
     fig.show()
