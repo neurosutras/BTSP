@@ -1092,7 +1092,7 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
 
     To optimize the models by running many instances in parallel:
     mpirun -n N python -m mpi4py.futures -m nested.optimize --config-file-path=$PATH_TO_CONFIG_FILE --disp --export \
-        --framework=mpi --pop-size=200 --path-length=3 --max-iter=50
+        --framework=mpi --pop_size=200 --path_length=3 --max_iter=50
 
     To plot results previously exported to a file on a single process:
     python -i optimize_biBTSP_synthetic_VD.py --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \

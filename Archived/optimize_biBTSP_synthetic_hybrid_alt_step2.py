@@ -34,10 +34,14 @@ I (inactive) <------------------------------> A (active)
 f_pot has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
 7) f_dep represents the "sensitivity" of the reverse process to the presence of the local_signal. The transformation
 f_dep has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
-8) local_signals are modulated by local voltage such that depolarization increases potentiation and hyperpolarization
-decreases it (e.g. NMDA-R nonlinear voltage-dependence).
 
-biBTSP_synthetic_hybrid: Single eligibility signal filter. Sigmoidal f_pot and f_dep.
+biBTSP_synthetic_hybrid_alt_step2:
+Spine Vm is a nonlinear NMDA(R)-like transformation of the sum of unitary synaptic depolarization and local
+dendritic depolarization.
+A Ca2+ signal is estimated as a the product of rate_pre and Vm_spine.
+Eligibility filter acts on the Ca2+ signal.
+Gain functions f_pot and f_dep are sigmoidal.
+
 """
 __author__ = 'milsteina'
 from biBTSP_utils import *
@@ -48,7 +52,7 @@ import click
 context = Context()
 
 
-BTSP_model_name = 'synthetic_hybrid_alt'
+BTSP_model_name = 'synthetic_hybrid_alt_step2'
 
 
 def config_worker():
@@ -68,7 +72,7 @@ def init_context():
                       (BTSP_model_name, context.data_file_path))
 
     if 'weights_path_distance_threshold' not in context():
-        context.weights_path_distance_threshold = 1.5 # 2.
+        context.weights_path_distance_threshold = 2.
     else:
         context.weights_path_distance_threshold = float(context.weights_path_distance_threshold)
 
@@ -189,6 +193,13 @@ def load_data(induction, condition='control'):
         for i in range(len(induction_context.t['pre'])):
             induction_context.complete_t -= len(induction_context.t['pre'][i]) * context.dt
             induction_context.complete_position -= context.track_length
+
+        induction_context.min_induction_t = \
+            get_min_induction_t(induction_context.complete_t, induction_context.complete_position,
+                                context.binned_x, context.track_length, induction_context.mean_induction_start_loc,
+                                context.num_induction_laps)
+        induction_context.clean_induction_t_indexes = \
+            get_clean_induction_t_indexes(induction_context.min_induction_t)
 
         induction_context.complete_run_vel = np.full_like(induction_context.complete_t, context.default_run_vel)
         induction_context.complete_run_vel_gate = np.ones_like(induction_context.complete_run_vel)
@@ -378,7 +389,7 @@ def load_data(induction, condition='control'):
             induction_context.ramp_offset['hyper'][offset_indexes] = context.target_ramp_offset_1_hyper
             induction_context.LSA_weights['after']['hyper'] = \
                 np.array(induction_context.LSA_weights['after']['control'])
-            induction_context.LSA_weights['after']['hyper'][delta_weights_offset_indexes] *= 0.5
+            induction_context.LSA_weights['after']['hyper'][delta_weights_offset_indexes] *= 0.4
             induction_context.target_ramp['after']['hyper'], _ = \
                 get_model_ramp(induction_context.LSA_weights['after']['hyper'], context.binned_x, context.peak_locs,
                                context.input_rate_maps, context.ramp_scaling_factor)
@@ -466,16 +477,11 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                                                            context.down_dt))
 
     signal_xrange = np.linspace(0., 1., 10000)
-    vrange = np.linspace(context.min_delta_ramp, context.peak_delta_ramp, 10000)
-    pot_rate = np.vectorize(scaled_single_sigmoid(
-        context.f_pot_th, context.f_pot_th + context.f_pot_half_width, signal_xrange))
+    vrange = np.linspace(0., 1., 10000)
+    pot_rate = lambda x: x
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
-    phi_pot = np.vectorize(scaled_single_sigmoid(
-        context.vd_pot_th, context.vd_pot_th + context.vd_pot_half_width, vrange, [context.vd_pot_min, 1.]))
-    # phi_dep = np.vectorize(lambda x: 1.)
-    phi_dep = np.vectorize(scaled_single_sigmoid(
-        context.vd_dep_th, context.vd_dep_th + context.vd_dep_half_width, vrange, [context.vd_dep_min, 1.]))
+    phi_spine_vm = np.vectorize(lambda x: context.phi_min + (1. - context.phi_min) * x)
 
     if plot and context.induction == 1 and context.condition == 'control':
         fig, axes = plt.subplots(1, 2)
@@ -484,10 +490,9 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         axes[0].plot(signal_xrange, dep_rate(signal_xrange) * dep_scale, c='r', label='Depression rate')
         axes[0].set_xlabel('Normalized eligibility signal amplitude (a.u.)')
         axes[0].set_ylabel('Normalized rate')
-        axes[1].plot(vrange, phi_pot(vrange), c='c', label='Potentiation')
-        axes[1].plot(vrange, phi_dep(vrange), c='r', label='Depression')
-        axes[1].set_xlabel('Relative ramp amplitude')
-        axes[1].set_ylabel('Voltage-dependent modulation factor')
+        axes[1].plot(vrange, phi_spine_vm(vrange), c='k')
+        axes[1].set_xlabel('Expected spine depolarization (normalized)')
+        axes[1].set_ylabel('Actual spine depolarization (normalized)')
         axes[0].legend(loc='best', frameon=False, framealpha=0.5)
         axes[1].legend(loc='best', frameon=False, framealpha=0.5)
         clean_axes(axes)
@@ -539,14 +544,13 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         fig, axes = plt.subplots(2, sharex=True)
         fig.suptitle('Induction: %i (%s)' % (context.induction, context.condition), y=1.)
         axes[0].plot(context.down_t / 1000., global_signal, label='Instructive signal')
-        # axes[0].set_ylabel('Plasticity gating signal')
         axes[1].set_xlabel('Time (s)')
-        axes[1].set_ylabel('Relative ramp amplitude (mV)')
+        axes[1].set_ylabel('Relative ramp\n\amplitude (mV)')
 
         fig2, axes2 = plt.subplots(1, 2, sharex=True)
         fig2.suptitle('Induction: %i (%s)' % (context.induction, context.condition))
         axes2[0].plot(context.binned_x, initial_ramp, c='k', label='Before')
-        axes2[0].plot(context.binned_x, target_ramp, c='r', label='After (Target)')
+        axes2[0].plot(context.binned_x, target_ramp, c='r', label='Target')
         axes2[0].set_ylabel('Ramp amplitude (mV)')
         axes2[0].set_xlabel('Location (cm)')
         axes2[1].set_ylabel('Change in synaptic weight')
@@ -557,21 +561,13 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     this_ramp_offset = context.ramp_offset[context.condition]
 
     for induction_lap in range(len(context.induction_start_times)):
-        current_complete_ramp = \
-            np.maximum(context.min_delta_ramp, np.minimum(context.peak_delta_ramp,
-                       get_complete_ramp(np.add(current_ramp, this_ramp_offset), context.binned_x,
-                                         context.position, context.complete_run_vel_gate, context.induction_gate,
-                                         context.peak_delta_ramp)))
-        current_complete_down_ramp = np.interp(context.down_t, context.complete_t, current_complete_ramp)
-        vd_mod_pot = np.minimum(1., np.maximum(0., phi_pot(current_complete_down_ramp)))
-        vd_mod_dep = np.minimum(1., np.maximum(0., phi_dep(current_complete_down_ramp)))
-
-        local_signals_pot = np.divide(
-            get_local_signal_population(local_signal_filter, np.multiply(context.down_rate_maps, vd_mod_pot),
-                                        context.down_dt), local_signal_peak)
-        local_signals_dep = np.divide(
-            get_local_signal_population(local_signal_filter, np.multiply(context.down_rate_maps, vd_mod_dep),
-                                        context.down_dt), local_signal_peak)
+        current_complete_dend_depo = \
+            np.maximum(context.min_delta_ramp, np.minimum(
+                context.peak_delta_ramp, get_complete_dend_depo(
+                    this_ramp_offset, context.binned_x, context.position, context.complete_run_vel_gate,
+                    context.induction_gate, context.peak_delta_ramp)))
+        current_complete_dend_depo *= context.dend_depo_range / (context.peak_delta_ramp - context.min_delta_ramp)
+        current_complete_down_dend_depo = np.interp(context.down_t, context.complete_t, current_complete_dend_depo)
 
         if induction_lap == 0:
             start_time = context.down_t[0]
@@ -581,24 +577,29 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             stop_time = context.down_t[-1]
         else:
             stop_time = context.induction_start_times[induction_lap + 1]
-        indexes = np.where((context.down_t >= start_time) & (context.down_t <= stop_time))
+        indexes = np.where((context.down_t > start_time) & (context.down_t <= stop_time))
 
         next_normalized_weights = []
-        for i, (this_local_signal_pot, this_local_signal_dep) in enumerate(zip(local_signals_pot, local_signals_dep)):
-            this_pot_rate = np.trapz(np.multiply(pot_rate(this_local_signal_pot[indexes]), global_signal[indexes]),
+        for i, (this_rate_map, this_current_normalized_weight) in \
+                enumerate(zip(context.down_rate_maps, current_normalized_weights)):
+            this_expected_spine_depo_amp = \
+                np.minimum(1., np.maximum(context.phi_min, phi_spine_vm(
+                    np.add(this_current_normalized_weight, current_complete_down_dend_depo))))
+            this_local_signal_pot = np.divide(get_local_signal(
+                this_rate_map * this_expected_spine_depo_amp, local_signal_filter, context.down_dt), local_signal_peak)
+            this_local_signal_dep = np.divide(get_local_signal(
+                this_rate_map * this_expected_spine_depo_amp, local_signal_filter, context.down_dt), local_signal_peak)
+            this_pot_rate = np.trapz(pot_rate(np.multiply(this_local_signal_pot[indexes], global_signal[indexes])),
                                      dx=context.down_dt / 1000.)
-            this_dep_rate = np.trapz(np.multiply(dep_rate(this_local_signal_dep[indexes]), global_signal[indexes]),
+            this_dep_rate = np.trapz(dep_rate(np.multiply(this_local_signal_dep[indexes], global_signal[indexes])),
                                      dx=context.down_dt / 1000.)
-            this_normalized_delta_weight = context.k_pot * this_pot_rate * (1. - current_normalized_weights[i]) - \
-                                           context.k_dep * this_dep_rate * current_normalized_weights[i]
-            this_next_normalized_weight = max(0., min(1., current_normalized_weights[i] + this_normalized_delta_weight))
+            this_normalized_delta_weight = context.k_pot * this_pot_rate * (1. - this_current_normalized_weight) - \
+                                           context.k_dep * this_dep_rate * this_current_normalized_weight
+            this_next_normalized_weight = \
+                max(0., min(1., this_current_normalized_weight + this_normalized_delta_weight))
             next_normalized_weights.append(this_next_normalized_weight)
         if plot:
-            axes[0].plot(context.down_t[indexes] / 1000., vd_mod_pot[indexes], c='c',
-                         label='Voltage-dependence (potentiation)')
-            axes[0].plot(context.down_t[indexes] / 1000., vd_mod_dep[indexes], c='r',
-                         label='Voltage-dependence (depression)')
-            axes[1].plot(context.down_t[indexes] / 1000., current_complete_down_ramp[indexes],
+            axes[1].plot(context.down_t[indexes] / 1000., current_complete_down_dend_depo[indexes],
                          label='Induction lap: %i' % (induction_lap + 1))
             axes2[1].plot(context.peak_locs,
                           np.multiply(np.subtract(next_normalized_weights, current_normalized_weights), peak_weight),
@@ -611,7 +612,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                            input_rate_maps=context.input_rate_maps, ramp_scaling_factor=context.ramp_scaling_factor)
 
         if plot:
-            axes2[0].plot(context.binned_x, current_ramp, c='c', label='After (Model)')
+            axes2[0].plot(context.binned_x, current_ramp)
 
         if context.induction == 1 and context.condition == 'control' and induction_lap == 0:
             result['ramp_amp_after_first_plateau'] = np.max(current_ramp)
@@ -798,13 +799,9 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                 group['delta_weights_snapshots'].create_dataset(str(i), data=this_delta_weights)
 
     # catch models with excessive fluctuations in weights across laps:
-    if weights_path_distance_exceeds_threshold(delta_weights_snapshots, context.weights_path_distance_threshold,
-                                               cumulative=False):
-        if context.verbose > 0:
-            print('optimize_biBTSP_%s: calculate_model_ramp: pid: %i; aborting - excessive fluctuations in weights '
-                  'across laps; induction: %i' %
-                  (BTSP_model_name, os.getpid(), context.induction))
-        return dict()
+    result['weights_path_distance'] = \
+        weights_path_distance_exceeds_threshold(delta_weights_snapshots, context.weights_path_distance_threshold,
+                                                cumulative=True, return_value=True)
 
     return {context.induction: {context.condition: result}}
 
@@ -867,11 +864,8 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
         context.f_pot_th, context.f_pot_th + context.f_pot_half_width, signal_xrange))
     dep_rate = np.vectorize(scaled_single_sigmoid(
         context.f_dep_th, context.f_dep_th + context.f_dep_half_width, signal_xrange))
-    phi_pot = np.vectorize(scaled_single_sigmoid(
-        context.vd_pot_th, context.vd_pot_th + context.vd_pot_half_width, vrange, [context.vd_pot_min, 1.]))
-    # phi_dep = np.vectorize(lambda x: 1.)
-    phi_dep = np.vectorize(scaled_single_sigmoid(
-        context.vd_dep_th, context.vd_dep_th + context.vd_dep_half_width, vrange, [context.vd_dep_min, 1.]))
+    phi_pot = np.vectorize(lambda x: 1.)
+    phi_dep = np.vectorize(lambda x: 1.)
 
     fig, axes = plt.subplots(1, 3, figsize=(10, 3.5))
     dep_scale = context.k_dep / context.k_pot
@@ -1257,7 +1251,8 @@ def get_args_static_model_ramp():
     :param x: array
     :return: list of list
     """
-    return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
+    # return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control', 'hyper']]
+    return [[1, 1, 1, 2, 2], ['control', 'depo', 'hyper', 'control']]
     # return [[1, 2], ['control', 'control']]
 
 
@@ -1301,7 +1296,7 @@ def filter_features_model_ramp(primitives, current_features, model_id=None, expo
     grouped_feature_names = ['delta_val_at_target_peak', 'delta_val_at_model_peak', 'delta_width', 'delta_peak_shift',
                              'delta_asymmetry', 'delta_min_loc', 'delta_val_at_target_min', 'delta_val_at_model_min',
                              'residual_score']
-    feature_names = ['ramp_amp_after_first_plateau']
+    feature_names = ['ramp_amp_after_first_plateau', 'weights_path_distance']
     for this_result_dict in primitives:
         if not this_result_dict:
             if context.verbose > 0:
@@ -1360,14 +1355,17 @@ def get_objectives(features, model_id=None, export=False):
             if objective_name in features:
                 objectives[objective_name] = features[objective_name]
 
-    feature_names = ['ramp_amp_after_first_plateau']
-    for feature_name in feature_names:
-        if feature_name in context.objective_names and feature_name in features:
-            if features[feature_name] < context.target_val[feature_name]:
-                objectives[feature_name] = ((features[feature_name] - context.target_val[feature_name]) /
-                                            context.target_range[feature_name]) ** 2.
-            else:
-                objectives[feature_name] = 0.
+    feature_name = 'ramp_amp_after_first_plateau'
+    if feature_name in context.objective_names and feature_name in features:
+        if features[feature_name] < context.target_val[feature_name]:
+            objectives[feature_name] = ((features[feature_name] - context.target_val[feature_name]) /
+                                        context.target_range[feature_name]) ** 2.
+        else:
+            objectives[feature_name] = 0.
+
+    feature_name = 'weights_path_distance'
+    if feature_name in context.objective_names and feature_name in features:
+        objectives[feature_name] = (features[feature_name] / context.target_range[feature_name]) ** 2.
 
     for objective_name in context.objective_names:
         if objective_name not in objectives:
@@ -1401,7 +1399,7 @@ def get_features_interactive(interface, x, model_id=None, plot=False):
 
 @click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True, ))
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/optimize_biBTSP_synthetic_hybrid_alt_config.yaml')
+              default='config/optimize_biBTSP_synthetic_hybrid_alt_step2_config.yaml')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
 @click.option("--export-file-path", type=str, default=None)
@@ -1417,17 +1415,17 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
          plot_summary_figure, exported_data_key):
     """
     To execute on a single process on one cell from the experimental dataset:
-    python -i optimize_biBTSP_synthetic_hybrid.py --plot --framework=serial --interactive
+    python -i optimize_biBTSP_synthetic_hybrid_alt_step2.py --plot --framework=serial --interactive
 
     To execute using MPI parallelism with 1 controller process and N - 1 worker processes:
-    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_synthetic_hybrid.py --plot --framework=mpi --interactive
+    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_synthetic_hybrid_alt_step2.py --plot --framework=mpi --interactive
 
     To optimize the models by running many instances in parallel:
     mpirun -n N python -m mpi4py.futures -m nested.optimize --config-file-path=$PATH_TO_CONFIG_FILE --disp --export \
-        --framework=mpi --pop-size=200 --path-length=3 --max-iter=50
+        --framework=mpi --pop_size=200 --path_length=3 --max_iter=50
 
     To plot results previously exported to a file on a single process:
-    python -i optimize_biBTSP_synthetic_hybrid.py --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
+    python -i optimize_biBTSP_synthetic_hybrid_alt_step2.py --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
         --framework=serial --interactive
 
     :param cli: contains unrecognized args as list of str

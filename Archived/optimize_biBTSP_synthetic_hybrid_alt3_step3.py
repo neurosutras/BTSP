@@ -35,7 +35,7 @@ f_pot has the flexibility to be any segment of a sigmoid (so can be linear, expo
 7) f_dep represents the "sensitivity" of the reverse process to the presence of the local_signal. The transformation
 f_dep has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
 
-biBTSP_synthetic_hybrid_alt2_step2:
+biBTSP_synthetic_hybrid_alt3_step3:
 Spine Vm is a nonlinear NMDA(R)-like transformation of the sum of unitary synaptic depolarization and local
 dendritic depolarization.
 A Ca2+ signal is estimated as a the product of rate_pre and Vm_spine.
@@ -52,7 +52,7 @@ import click
 context = Context()
 
 
-BTSP_model_name = 'synthetic_hybrid_alt2_step2'
+BTSP_model_name = 'synthetic_hybrid_alt3_step3'
 
 
 def config_worker():
@@ -604,7 +604,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         current_complete_dend_depo_mod = \
             get_dend_depo_mod(
                 get_complete_dend_depo(this_ramp_offset, context.binned_x, context.position, context.induction_gate,
-                                       context.max_dend_depo))
+                                       max_dend_depo=None))  # context.max_dend_depo))
         current_complete_down_dend_depo_mod = \
             np.interp(context.down_t, context.complete_t, current_complete_dend_depo_mod)
 
@@ -1467,7 +1467,7 @@ def get_features_interactive(interface, x, model_id=None, plot=False):
 
 @click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True, ))
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/optimize_biBTSP_synthetic_hybrid_alt2_step2_config.yaml')
+              default='config/optimize_biBTSP_synthetic_hybrid_alt3_step3_config.yaml')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
 @click.option("--export-file-path", type=str, default=None)
@@ -1483,17 +1483,17 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
          plot_summary_figure, exported_data_key):
     """
     To execute on a single process on one cell from the experimental dataset:
-    python -i optimize_biBTSP_synthetic_hybrid_alt2_step2.py --plot --framework=serial --interactive
+    python -i optimize_biBTSP_synthetic_hybrid_alt3_step3.py --plot --framework=serial --interactive
 
     To execute using MPI parallelism with 1 controller process and N - 1 worker processes:
-    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_synthetic_hybrid_alt2_step2.py --plot --framework=mpi --interactive
+    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_synthetic_hybrid_alt3_step3.py --plot --framework=mpi --interactive
 
     To optimize the models by running many instances in parallel:
     mpirun -n N python -m mpi4py.futures -m nested.optimize --config-file-path=$PATH_TO_CONFIG_FILE --disp --export \
-        --framework=mpi --pop-size=200 --path-length=3 --max-iter=50
+        --framework=mpi --pop_size=200 --path_length=3 --max_iter=50
 
     To plot results previously exported to a file on a single process:
-    python -i optimize_biBTSP_synthetic_hybrid_alt2_step2.py --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
+    python -i optimize_biBTSP_synthetic_hybrid_alt3_step3.py --plot-summary-figure --model-file-path=$PATH_TO_MODEL_FILE \
         --framework=serial --interactive
 
     :param cli: contains unrecognized args as list of str

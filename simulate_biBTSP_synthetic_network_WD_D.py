@@ -36,7 +36,6 @@ f_pot has the flexibility to be any segment of a sigmoid (so can be linear, expo
 f_dep has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
 
 biBTSP_WD_D:
-Rise and decay time constants for E and I filters.
 """
 __author__ = 'milsteina'
 from biBTSP_utils import *

@@ -92,15 +92,15 @@ feature_names:
 - induction2_hyper_delta_val_at_model_min
 - ramp_amp_after_first_plateau
 update_context:
-- - optimize_biBTSP_synthetic_hybrid_norm
+- - optimize_biBTSP_synthetic_WD_NMDAR
   - update_model_params
 get_features_stages:
-- source: optimize_biBTSP_synthetic_hybrid_norm
+- source: optimize_biBTSP_synthetic_WD_NMDAR
   get_args_static: get_args_static_model_ramp_include_hyper2
   compute_features: compute_features_model_ramp
   filter_features: filter_features_model_ramp
 get_objectives:
-  optimize_biBTSP_synthetic_hybrid_norm: get_objectives
+  optimize_biBTSP_synthetic_WD_NMDAR: get_objectives
 kwargs:
   data_file_name: 20201123_biBTSP_data.hdf5
   input_field_width: 90.  # cm
@@ -131,7 +131,7 @@ objective_names:
 - induction2_hyper_residual_score
 # - ramp_amp_after_first_plateau
 - weights_path_distance
-optimization_title: biBTSP_synthetic_hybrid_norm
+optimization_title: biBTSP_synthetic_WD_NMDAR
 param_gen: PopulationAnnealing
 param_names:
 - spine_th_depo
