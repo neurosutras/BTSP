@@ -59,7 +59,7 @@ def config_context(run_vel=None, plot=False):
             run_vel = float(context.default_run_vel)  # cm/s
 
     if 'expand_track' not in context():
-        expand_track = 5
+        expand_track = 4
     else:
         expand_track = int(context.expand_track)
     if 'truncate' not in context():
@@ -85,7 +85,7 @@ def config_context(run_vel=None, plot=False):
         context.default_track_length = float(context.default_track_length)
     track_length = context.default_track_length * expand_track
 
-    binned_dx = track_length / 100.  # cm
+    binned_dx = track_length / (100. * expand_track)  # cm
     binned_x = np.arange(0., track_length + binned_dx / 2., binned_dx)[:100 * expand_track] + binned_dx / 2.
     generic_dx = binned_dx / 100.  # cm
     generic_x = np.arange(0., track_length, generic_dx)
@@ -130,7 +130,7 @@ def load_data(induction):
         induction_key = str(induction)
         induction_context = Context()
 
-        this_induction_loc = context.induction_loc[induction_key] + context.track_length / 2.
+        this_induction_loc = context.induction_loc[induction_key] # + context.track_length / 2.
         induction_context.mean_induction_start_loc = this_induction_loc
         induction_context.complete_induction_locs = [this_induction_loc for i in range(context.num_induction_laps)]
         induction_context.complete_induction_durs = [context.induction_dur for i in range(context.num_induction_laps)]
@@ -183,7 +183,7 @@ def load_data(induction):
         induction_context.clean_induction_t_indexes = \
             get_clean_induction_t_indexes(induction_context.min_induction_t, context.truncate * 1000.)
 
-        induction_context.complete_run_vel = np.full_like(induction_context.complete_t, context.default_run_vel)
+        induction_context.complete_run_vel = np.full_like(induction_context.complete_t, context.run_vel)
         induction_context.complete_run_vel_gate = np.ones_like(induction_context.complete_run_vel)
         induction_context.complete_run_vel_gate[np.where(induction_context.complete_run_vel <= 5.)[0]] = 0.
 
@@ -214,7 +214,7 @@ def load_data(induction):
         induction_context.target_ramp = {}
         induction_context.LSA_weights = {}
         if induction == 2:
-            induction_loc_1 = context.induction_loc['1'] + context.track_length / 2.
+            induction_loc_1 = context.induction_loc['1'] #  + context.track_length / 2.
             if 1 in context.data_cache:
                 induction_context.target_ramp['before'] = context.data_cache[1].target_ramp['after']
                 induction_context.LSA_weights['before'] = context.data_cache[1].LSA_weights['after']
@@ -336,13 +336,8 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
         get_dual_exp_decay_signal_filters(context.local_signal_decay, context.global_signal_decay, context.down_dt)
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
-    global_signal_peak = np.max(global_signal)
-    # global_signal /= global_signal_peak
     local_signals = get_local_signal_population(local_signal_filter, 
                                                 context.down_rate_maps / context.input_field_peak_rate)
-    local_signal_peak = np.max(local_signals)
-    # local_signals /= local_signal_peak
-    # print('local_signal_peak: %.2E, global_signal_peak: %.2E' % (local_signal_peak, global_signal_peak))
 
     signal_xrange = np.linspace(0., 1., 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(
@@ -619,8 +614,6 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             group.create_dataset('global_filter', compression='gzip', data=global_filter)
             group.attrs['run_vel'] = context.run_vel
             group.attrs['track_length'] = context.track_length
-            group.attrs['local_signal_peak'] = local_signal_peak
-            group.attrs['global_signal_peak'] = global_signal_peak
             group.attrs['mean_induction_start_loc'] = context.mean_induction_start_loc
             group.attrs['mean_induction_stop_loc'] = context.mean_induction_stop_loc
             group.attrs['induction_start_times'] = context.induction_start_times
@@ -695,11 +688,6 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
         source = get_h5py_group(f, [exported_data_key, 'exported_data', 'synthetic'])
         group = source['1'][description]
         x = group['param_array'][:]
-        if 'local_signal_peak' not in group.attrs or 'global_signal_peak' not in group.attrs:
-            raise KeyError('plot_model_summary_figure: missing required attributes from file: %s' %
-                           export_file_path)
-        local_signal_peak = group.attrs['local_signal_peak']
-        global_signal_peak = group.attrs['global_signal_peak']
         local_signal_filter_t = group['local_signal_filter_t'][:]
         local_signal_filter = group['local_signal_filter'][:]
         global_filter_t = group['global_filter_t'][:]
@@ -760,11 +748,9 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     this_induction_start_time = induction_start_times[1][0]
     induction = 1
 
-    global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
-    local_signals = \
-        np.divide(get_local_signal_population(local_signal_filter,
-                                              context.down_rate_maps / context.input_field_peak_rate),
-                  local_signal_peak)
+    global_signal = get_global_signal(context.down_induction_gate, global_filter)
+    local_signals = get_local_signal_population(local_signal_filter,
+                                                context.down_rate_maps / context.input_field_peak_rate)
 
     signal_xrange = np.linspace(0., 1., 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(
@@ -944,10 +930,10 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
                            (output_dir_str, datetime.datetime.today().strftime('%Y%m%d_%H%M%S'), label)
     context.update(locals())
     kwargs = get_unknown_click_arg_dict(cli.args)
-    context.update(kwargs)
     config_dict = read_from_yaml(config_file_path)
     context.update(config_dict)
     context.update(context.x0)
+    context.update(kwargs)
     context.disp = verbose > 0
 
     if plot_summary_figure:

@@ -53,7 +53,6 @@ def config_worker():
     """
 
     """
-    context.data_file_path = context.output_dir + '/' + context.data_file_name
     init_context()
 
 
@@ -61,10 +60,6 @@ def init_context():
     """
 
     """
-    if context.data_file_path is None or not os.path.isfile(context.data_file_path):
-        raise IOError('optimize_biBTSP_%s: init_context: invalid data_file_path: %s' %
-                      (BTSP_model_name, context.data_file_path))
-
     if 'weights_path_distance_threshold' not in context():
         context.weights_path_distance_threshold = 2.
     else:
@@ -74,53 +69,61 @@ def init_context():
     if 'plot' not in context():
         context.plot = False
 
+    if 'default_run_vel' not in context():
+        run_vel = 25.  # cm/s
+    else:
+        run_vel = float(context.default_run_vel)  # cm/s
+
+    if 'expand_track' not in context():
+        expand_track = 2
+    else:
+        expand_track = int(context.expand_track)
     if 'truncate' not in context():
-        context.truncate = 2.5
+        truncate = 2.5
+    else:
+        truncate = float(context.truncate)
+    if 'dt' not in context():
+        dt = 1.0
+    else:
+        dt = float(context.dt)
+    if 'input_field_peak_rate' not in context():
+        input_field_peak_rate = 40.0
+    else:
+        input_field_peak_rate = float(context.input_field_peak_rate)
+    if 'default_num_inputs' not in context():
+        context.default_num_inputs = 200
+    else:
+        context.default_num_inputs = int(context.default_num_inputs)
+    num_inputs = context.default_num_inputs * expand_track
+    if 'default_track_length' not in context():
+        context.default_track_length = 187.
+    else:
+        context.default_track_length = float(context.default_track_length)
+    track_length = context.default_track_length * expand_track
 
-    with h5py.File(context.data_file_path, 'r') as f:
-        dt = f['defaults'].attrs['dt']  # ms
-        input_field_peak_rate = f['defaults'].attrs['input_field_peak_rate']  # Hz
-        num_inputs = f['defaults'].attrs['num_inputs']
-        track_length = f['defaults'].attrs['track_length']  # cm
-        binned_dx = f['defaults'].attrs['binned_dx']  # cm
-        generic_dx = f['defaults'].attrs['generic_dx']  # cm
-        binned_x = f['defaults']['binned_x'][:]
-        generic_x = f['defaults']['generic_x'][:]
-        extended_x = f['defaults']['extended_x'][:]
-        if 'default_run_vel' not in context() or context.default_run_vel is None:
-            default_run_vel = f['defaults'].attrs['default_run_vel']  # cm/s
-            generic_position_dt = f['defaults'].attrs['generic_position_dt']  # ms
-            default_interp_dx = f['defaults'].attrs['default_interp_dx']  # cm
-            generic_t = f['defaults']['generic_t'][:]
-            default_interp_t = f['defaults']['default_interp_t'][:]
-            default_interp_x = f['defaults']['default_interp_x'][:]
-        else:
-            default_run_vel = float(context.default_run_vel)
-            generic_position_dt = generic_dx / default_run_vel * 1000.  # ms
-            generic_t = np.arange(0., len(generic_x) * generic_position_dt, generic_position_dt)[:len(generic_x)]
-            default_interp_t = np.arange(0., generic_t[-1], dt)
-            default_interp_x = np.interp(default_interp_t, generic_t, generic_x)
-            default_interp_dx = dt * default_run_vel / 1000.  # cm
+    binned_dx = track_length / (100. * expand_track)  # cm
+    binned_x = np.arange(0., track_length + binned_dx / 2., binned_dx)[:100 * expand_track] + binned_dx / 2.
+    generic_dx = binned_dx / 100.  # cm
+    generic_x = np.arange(0., track_length, generic_dx)
 
-        if 'input_field_width' not in context() or context.input_field_width is None:
-            raise RuntimeError('optimize_biBTSP_%s: init context: missing required parameter: input_field_width' %
-                               BTSP_model_name)
-        context.input_field_width = float(context.input_field_width)
-        input_field_width_key = str(int(context.input_field_width))
-        if 'calibrated_input' not in f or input_field_width_key not in f['calibrated_input']:
-            raise RuntimeError('optimize_biBTSP_%s: init context: data for input_field_width: %.1f not found in the '
-                               'provided data_file_path: %s' %
-                               (BTSP_model_name, float(context.input_field_width), context.data_file_path))
-        input_field_width = f['calibrated_input'][input_field_width_key].attrs['input_field_width']  # cm
-        input_rate_maps, peak_locs = \
-            generate_spatial_rate_maps(binned_x, num_inputs, input_field_peak_rate, input_field_width, track_length)
-        ramp_scaling_factor = f['calibrated_input'][input_field_width_key].attrs['ramp_scaling_factor']
+    generic_position_dt = generic_dx / run_vel * 1000.  # ms
+    generic_t = np.arange(0., len(generic_x) * generic_position_dt, generic_position_dt)[:len(generic_x)]
+
+    default_interp_t = np.arange(0., generic_t[-1], dt)
+    default_interp_x = np.interp(default_interp_t, generic_t, generic_x)
+    default_interp_dx = dt * run_vel / 1000.  # cm
+
+    input_field_width = 90.  # cm
+
+    input_rate_maps, peak_locs = \
+        generate_spatial_rate_maps(binned_x, num_inputs, input_field_peak_rate, input_field_width, track_length)
+    ramp_scaling_factor = 0.0037733369416093412  # calibrated for 90 cm input_field_width
 
     down_dt = 10.  # ms, to speed up optimization
     if 'num_induction_laps' not in context():
-        num_induction_laps = 1
+        num_induction_laps = 3
     else:
-        num_induction_laps = context.num_induction_laps
+        num_induction_laps = int(context.num_induction_laps)
     induction_dur = 300.  # ms
     context.update(locals())
 
@@ -196,7 +199,7 @@ def load_data(induction):
         induction_context.clean_induction_t_indexes = \
             get_clean_induction_t_indexes(induction_context.min_induction_t, context.truncate * 1000.)
 
-        induction_context.complete_run_vel = np.full_like(induction_context.complete_t, context.default_run_vel)
+        induction_context.complete_run_vel = np.full_like(induction_context.complete_t, context.run_vel)
         induction_context.complete_run_vel_gate = np.ones_like(induction_context.complete_run_vel)
         induction_context.complete_run_vel_gate[np.where(induction_context.complete_run_vel <= 5.)[0]] = 0.
 
@@ -329,6 +332,7 @@ def load_data(induction):
     for rate_map in context.complete_rate_maps:
         this_down_rate_map = np.interp(context.down_t, context.complete_t, rate_map)
         context.down_rate_maps.append(this_down_rate_map)
+    context.down_rate_maps = np.array(context.down_rate_maps)
     context.down_induction_gate = np.interp(context.down_t, context.complete_t, context.induction_gate)
     context.induction = induction
 
@@ -634,7 +638,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             group.create_dataset('local_signal_filter', compression='gzip', data=local_signal_filter)
             group.create_dataset('global_filter_t', compression='gzip', data=global_filter_t)
             group.create_dataset('global_filter', compression='gzip', data=global_filter)
-            group.attrs['default_run_vel'] = context.default_run_vel
+            group.attrs['run_vel'] = context.run_vel
             group.attrs['mean_induction_start_loc'] = context.mean_induction_start_loc
             group.attrs['mean_induction_stop_loc'] = context.mean_induction_stop_loc
             group.attrs['induction_start_times'] = context.induction_start_times
