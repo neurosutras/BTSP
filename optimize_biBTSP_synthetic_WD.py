@@ -35,7 +35,7 @@ f_pot has the flexibility to be any segment of a sigmoid (so can be linear, expo
 7) f_dep represents the "sensitivity" of the reverse process to the presence of the local_signal. The transformation
 f_dep has the flexibility to be any segment of a sigmoid (so can be linear, exponential rise, or saturating).
 
-biBTSP_synthetic_WD_D:
+biBTSP_synthetic_WD:
 """
 __author__ = 'milsteina'
 from biBTSP_utils import *
@@ -46,7 +46,7 @@ import click
 context = Context()
 
 
-BTSP_model_name = 'synthetic_WD_D'
+BTSP_model_name = 'synthetic_WD'
 
 
 def config_worker():
@@ -359,12 +359,8 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
     local_signal_filter_t, local_signal_filter, global_filter_t, global_filter = \
         get_dual_exp_decay_signal_filters(context.local_signal_decay, context.global_signal_decay, context.down_dt)
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
-    global_signal_peak = np.max(global_signal)
-    global_signal /= global_signal_peak
     local_signals = get_local_signal_population(local_signal_filter, 
                                                 context.down_rate_maps / context.input_field_peak_rate)
-    local_signal_peak = np.max(local_signals)
-    local_signals /= local_signal_peak
 
     signal_xrange = np.linspace(0., 1., 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(
@@ -639,8 +635,6 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             group.create_dataset('global_filter_t', compression='gzip', data=global_filter_t)
             group.create_dataset('global_filter', compression='gzip', data=global_filter)
             group.attrs['default_run_vel'] = context.default_run_vel
-            group.attrs['local_signal_peak'] = local_signal_peak
-            group.attrs['global_signal_peak'] = global_signal_peak
             group.attrs['mean_induction_start_loc'] = context.mean_induction_start_loc
             group.attrs['mean_induction_stop_loc'] = context.mean_induction_stop_loc
             group.attrs['induction_start_times'] = context.induction_start_times
@@ -715,11 +709,6 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
         source = get_h5py_group(f, [exported_data_key, 'exported_data', 'synthetic'])
         group = source['1'][description]
         x = group['param_array'][:]
-        if 'local_signal_peak' not in group.attrs or 'global_signal_peak' not in group.attrs:
-            raise KeyError('plot_model_summary_figure: missing required attributes from file: %s' %
-                           export_file_path)
-        local_signal_peak = group.attrs['local_signal_peak']
-        global_signal_peak = group.attrs['global_signal_peak']
         local_signal_filter_t = group['local_signal_filter_t'][:]
         local_signal_filter = group['local_signal_filter'][:]
         global_filter_t = group['global_filter_t'][:]
@@ -780,11 +769,9 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     induction = 1
     update_source_contexts(x)
 
-    global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
-    local_signals = \
-        np.divide(get_local_signal_population(local_signal_filter,
-                                              context.down_rate_maps / context.input_field_peak_rate),
-                  local_signal_peak)
+    global_signal = get_global_signal(context.down_induction_gate, global_filter)
+    local_signals = get_local_signal_population(local_signal_filter,
+                                                context.down_rate_maps / context.input_field_peak_rate)
 
     signal_xrange = np.linspace(0., 1., 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(
@@ -1035,7 +1022,7 @@ def get_features_interactive(interface, x, model_id=None, plot=False):
 
 @click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True, ))
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/optimize_biBTSP_synthetic_WD_D_config.yaml')
+              default='config/optimize_biBTSP_synthetic_WD_config.yaml')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
 @click.option("--export-file-path", type=str, default=None)
@@ -1051,17 +1038,17 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
          plot_summary_figure, exported_data_key):
     """
     To execute on a single process:
-    python -i optimize_biBTSP_synthetic_WD_D.py --plot --framework=serial --interactive
+    python -i optimize_biBTSP_synthetic_WD.py --plot --framework=serial --interactive
 
     To execute using MPI parallelism with 1 controller process and N - 1 worker processes:
-    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_synthetic_WD_D.py --plot --framework=mpi --interactive
+    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_synthetic_WD.py --plot --framework=mpi --interactive
 
     To optimize the models by running many instances in parallel:
     mpirun -n N python -m mpi4py.futures -m nested.optimize --config-file-path=$PATH_TO_CONFIG_FILE --disp --export \
         --framework=mpi --pop_size=200 --path_length=3 --max_iter=50
 
     To plot results previously exported to a file on a single process:
-    python -i optimize_biBTSP_synthetic_WD_D.py --plot-summary-figure --export-file-path=$PATH_TO_MODEL_FILE \
+    python -i optimize_biBTSP_synthetic_WD.py --plot-summary-figure --export-file-path=$PATH_TO_MODEL_FILE \
         --framework=serial --interactive
 
     :param cli: contains unrecognized args as list of str

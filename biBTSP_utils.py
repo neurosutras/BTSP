@@ -1,7 +1,13 @@
 """
 
 """
-from nested.utils import *
+try:
+    # raise Exception
+    from nested.utils import *
+except:
+    print('Problem locating \'nested\' module, needed for model optimization.')
+    from local_nested_utils import *
+    pass
 from scipy.optimize import minimize
 
 

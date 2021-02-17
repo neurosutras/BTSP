@@ -1,5 +1,5 @@
 """
-These methods aim to optimize a parametric model of bidirectional, state-dependent behavioral timescale synaptic
+These methods aim to simulate a parametric model of bidirectional, state-dependent behavioral timescale synaptic
 plasticity to account for the width and amplitude of place fields in an experimental data set from the Magee lab that
 includes:
 1) Silent cells converted to place cells by spontaneous plateaus
@@ -39,9 +39,8 @@ biBTSP_synthetic_WD_D:
 """
 __author__ = 'milsteina'
 from biBTSP_utils import *
-from nested.parallel import *
-from nested.optimize_utils import *
 import click
+
 
 context = Context()
 
@@ -49,78 +48,66 @@ context = Context()
 BTSP_model_name = 'synthetic_WD_D'
 
 
-def config_worker():
+def config_context(run_vel=None, plot=False):
     """
 
     """
-    context.data_file_path = context.output_dir + '/' + context.data_file_name
-    init_context()
-
-
-def init_context():
-    """
-
-    """
-    if context.data_file_path is None or not os.path.isfile(context.data_file_path):
-        raise IOError('optimize_biBTSP_%s: init_context: invalid data_file_path: %s' %
-                      (BTSP_model_name, context.data_file_path))
-
-    if 'weights_path_distance_threshold' not in context():
-        context.weights_path_distance_threshold = 2.
-    else:
-        context.weights_path_distance_threshold = float(context.weights_path_distance_threshold)
-
-    context.verbose = int(context.verbose)
-    if 'plot' not in context():
-        context.plot = False
-
-    if 'truncate' not in context():
-        context.truncate = 2.5
-
-    with h5py.File(context.data_file_path, 'r') as f:
-        dt = f['defaults'].attrs['dt']  # ms
-        input_field_peak_rate = f['defaults'].attrs['input_field_peak_rate']  # Hz
-        num_inputs = f['defaults'].attrs['num_inputs']
-        track_length = f['defaults'].attrs['track_length']  # cm
-        binned_dx = f['defaults'].attrs['binned_dx']  # cm
-        generic_dx = f['defaults'].attrs['generic_dx']  # cm
-        binned_x = f['defaults']['binned_x'][:]
-        generic_x = f['defaults']['generic_x'][:]
-        extended_x = f['defaults']['extended_x'][:]
-        if 'default_run_vel' not in context() or context.default_run_vel is None:
-            default_run_vel = f['defaults'].attrs['default_run_vel']  # cm/s
-            generic_position_dt = f['defaults'].attrs['generic_position_dt']  # ms
-            default_interp_dx = f['defaults'].attrs['default_interp_dx']  # cm
-            generic_t = f['defaults']['generic_t'][:]
-            default_interp_t = f['defaults']['default_interp_t'][:]
-            default_interp_x = f['defaults']['default_interp_x'][:]
+    if run_vel is None:
+        if 'default_run_vel' not in context():
+            run_vel = 25.  # cm/s
         else:
-            default_run_vel = float(context.default_run_vel)
-            generic_position_dt = generic_dx / default_run_vel * 1000.  # ms
-            generic_t = np.arange(0., len(generic_x) * generic_position_dt, generic_position_dt)[:len(generic_x)]
-            default_interp_t = np.arange(0., generic_t[-1], dt)
-            default_interp_x = np.interp(default_interp_t, generic_t, generic_x)
-            default_interp_dx = dt * default_run_vel / 1000.  # cm
+            run_vel = float(context.default_run_vel)  # cm/s
 
-        if 'input_field_width' not in context() or context.input_field_width is None:
-            raise RuntimeError('optimize_biBTSP_%s: init context: missing required parameter: input_field_width' %
-                               BTSP_model_name)
-        context.input_field_width = float(context.input_field_width)
-        input_field_width_key = str(int(context.input_field_width))
-        if 'calibrated_input' not in f or input_field_width_key not in f['calibrated_input']:
-            raise RuntimeError('optimize_biBTSP_%s: init context: data for input_field_width: %.1f not found in the '
-                               'provided data_file_path: %s' %
-                               (BTSP_model_name, float(context.input_field_width), context.data_file_path))
-        input_field_width = f['calibrated_input'][input_field_width_key].attrs['input_field_width']  # cm
-        input_rate_maps, peak_locs = \
-            generate_spatial_rate_maps(binned_x, num_inputs, input_field_peak_rate, input_field_width, track_length)
-        ramp_scaling_factor = f['calibrated_input'][input_field_width_key].attrs['ramp_scaling_factor']
+    if 'expand_track' not in context():
+        expand_track = 5
+    else:
+        expand_track = int(context.expand_track)
+    if 'truncate' not in context():
+        truncate = 2.5
+    else:
+        truncate = float(context.truncate)
+    if 'dt' not in context():
+        dt = 1.0
+    else:
+        dt = float(context.dt)
+    if 'input_field_peak_rate' not in context():
+        input_field_peak_rate = 40.0
+    else:
+        input_field_peak_rate = float(context.input_field_peak_rate)
+    if 'default_num_inputs' not in context():
+        context.default_num_inputs = 200
+    else:
+        context.default_num_inputs = int(context.default_num_inputs)
+    num_inputs = context.default_num_inputs * expand_track
+    if 'default_track_length' not in context():
+        context.default_track_length = 187.
+    else:
+        context.default_track_length = float(context.default_track_length)
+    track_length = context.default_track_length * expand_track
+
+    binned_dx = track_length / 100.  # cm
+    binned_x = np.arange(0., track_length + binned_dx / 2., binned_dx)[:100 * expand_track] + binned_dx / 2.
+    generic_dx = binned_dx / 100.  # cm
+    generic_x = np.arange(0., track_length, generic_dx)
+
+    generic_position_dt = generic_dx / run_vel * 1000.  # ms
+    generic_t = np.arange(0., len(generic_x) * generic_position_dt, generic_position_dt)[:len(generic_x)]
+
+    default_interp_t = np.arange(0., generic_t[-1], dt)
+    default_interp_x = np.interp(default_interp_t, generic_t, generic_x)
+    default_interp_dx = dt * run_vel / 1000.  # cm
+
+    input_field_width = 90.  # cm
+
+    input_rate_maps, peak_locs = \
+        generate_spatial_rate_maps(binned_x, num_inputs, input_field_peak_rate, input_field_width, track_length)
+    ramp_scaling_factor = 0.0037733369416093412  # calibrated for 90 cm input_field_width
 
     down_dt = 10.  # ms, to speed up optimization
     if 'num_induction_laps' not in context():
-        num_induction_laps = 1
+        num_induction_laps = 3
     else:
-        num_induction_laps = context.num_induction_laps
+        num_induction_laps = int(context.num_induction_laps)
     induction_dur = 300.  # ms
     context.update(locals())
 
@@ -143,7 +130,7 @@ def load_data(induction):
         induction_key = str(induction)
         induction_context = Context()
 
-        this_induction_loc = context.induction_loc[induction_key]
+        this_induction_loc = context.induction_loc[induction_key] + context.track_length / 2.
         induction_context.mean_induction_start_loc = this_induction_loc
         induction_context.complete_induction_locs = [this_induction_loc for i in range(context.num_induction_laps)]
         induction_context.complete_induction_durs = [context.induction_dur for i in range(context.num_induction_laps)]
@@ -227,7 +214,7 @@ def load_data(induction):
         induction_context.target_ramp = {}
         induction_context.LSA_weights = {}
         if induction == 2:
-            induction_loc_1 = context.induction_loc['1']
+            induction_loc_1 = context.induction_loc['1'] + context.track_length / 2.
             if 1 in context.data_cache:
                 induction_context.target_ramp['before'] = context.data_cache[1].target_ramp['after']
                 induction_context.LSA_weights['before'] = context.data_cache[1].LSA_weights['after']
@@ -329,23 +316,13 @@ def load_data(induction):
     for rate_map in context.complete_rate_maps:
         this_down_rate_map = np.interp(context.down_t, context.complete_t, rate_map)
         context.down_rate_maps.append(this_down_rate_map)
+    context.down_rate_maps = np.array(context.down_rate_maps)
     context.down_induction_gate = np.interp(context.down_t, context.complete_t, context.induction_gate)
     context.induction = induction
 
     if context.verbose > 1:
         print('optimize_biBTSP_%s: process: %i loaded data for induction: %i' %
               (BTSP_model_name, os.getpid(), induction))
-
-
-def update_model_params(x, local_context):
-    """
-
-    :param x: array
-    :param local_context: :class:'Context'
-    """
-    if local_context is None:
-        local_context = context
-    local_context.update(param_array_to_dict(x, local_context.param_names))
 
 
 def calculate_model_ramp(model_id=None, export=False, plot=False):
@@ -360,11 +337,12 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
         get_dual_exp_decay_signal_filters(context.local_signal_decay, context.global_signal_decay, context.down_dt)
     global_signal = get_global_signal(context.down_induction_gate, global_filter)
     global_signal_peak = np.max(global_signal)
-    global_signal /= global_signal_peak
+    # global_signal /= global_signal_peak
     local_signals = get_local_signal_population(local_signal_filter, 
                                                 context.down_rate_maps / context.input_field_peak_rate)
     local_signal_peak = np.max(local_signals)
-    local_signals /= local_signal_peak
+    # local_signals /= local_signal_peak
+    # print('local_signal_peak: %.2E, global_signal_peak: %.2E' % (local_signal_peak, global_signal_peak))
 
     signal_xrange = np.linspace(0., 1., 10000)
     pot_rate = np.vectorize(scaled_single_sigmoid(
@@ -610,7 +588,8 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
                              track_length=context.track_length)
 
     if export:
-        with h5py.File(context.temp_output_path, 'a') as f:
+        x_array = np.array([context.x0[param_name] for param_name in context.param_names])
+        with h5py.File(context.export_file_path, 'a') as f:
             shared_context_key = 'shared_context'
             if shared_context_key not in f:
                 f.create_group(shared_context_key)
@@ -633,12 +612,13 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             group.create_dataset('initial_weights', compression='gzip', data=initial_weights)
             group.create_dataset('global_signal', compression='gzip', data=global_signal)
             group.create_dataset('down_t', compression='gzip', data=context.down_t)
-            group.create_dataset('param_array', compression='gzip', data=context.x_array)
+            group.create_dataset('param_array', compression='gzip', data=x_array)
             group.create_dataset('local_signal_filter_t', compression='gzip', data=local_signal_filter_t)
             group.create_dataset('local_signal_filter', compression='gzip', data=local_signal_filter)
             group.create_dataset('global_filter_t', compression='gzip', data=global_filter_t)
             group.create_dataset('global_filter', compression='gzip', data=global_filter)
-            group.attrs['default_run_vel'] = context.default_run_vel
+            group.attrs['run_vel'] = context.run_vel
+            group.attrs['track_length'] = context.track_length
             group.attrs['local_signal_peak'] = local_signal_peak
             group.attrs['global_signal_peak'] = global_signal_peak
             group.attrs['mean_induction_start_loc'] = context.mean_induction_start_loc
@@ -734,7 +714,8 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
             induction_stop_loc[int(induction_key)] = group.attrs['mean_induction_stop_loc']
             induction_start_times[int(induction_key)] = group.attrs['induction_start_times']
             induction_stop_times[int(induction_key)] = group.attrs['induction_stop_times']
-
+    x0 = {param_name: param_val for param_name, param_val in zip(param_names, x)}
+    context.update(x0)
     load_data(1)
 
     mpl.rcParams['font.size'] = 8.
@@ -778,7 +759,6 @@ def plot_model_summary_figure(export_file_path=None, exported_data_key=None, ind
     this_clean_induction_t_indexes = context.clean_induction_t_indexes
     this_induction_start_time = induction_start_times[1][0]
     induction = 1
-    update_source_contexts(x)
 
     global_signal = np.divide(get_global_signal(context.down_induction_gate, global_filter), global_signal_peak)
     local_signals = \
@@ -895,174 +875,49 @@ def get_args_static_model_ramp():
     return [[1, 2]]
 
 
-def compute_features_model_ramp(x, induction=None, model_id=None, export=False, plot=False):
+def simulate_biBTSP_WD(induction, run_vel, model_id=None, export=False, plot=False):
     """
 
-    :param x: array
-    :param induction: str
+    :param induction: int
+    :param run_vel: float
     :param model_id: int
     :param export: bool
     :param plot: bool
     :return: dict
     """
     load_data(induction)
-    update_source_contexts(x, context)
     start_time = time.time()
     if context.disp:
-        print('Process: %i: computing model_ramp features for induction: %s with x: %s' % \
-              (os.getpid(), induction, ', '.join('%.3E' % i for i in x)))
+        print('Computing model_ramp features for induction: %i with run_vel: %.1f cm/s' % (induction, run_vel))
         sys.stdout.flush()
     result = calculate_model_ramp(export=export, plot=plot, model_id=model_id)
     if context.disp:
-        print('Process: %i: computing model_ramp features for induction: %s took %.1f s' % \
-              (os.getpid(), induction, time.time() - start_time))
+        print('Computing model_ramp features for induction: %i with run_vel: %.1f took %.1f s' % \
+              (induction, run_vel, time.time() - start_time))
         sys.stdout.flush()
     return result
 
 
-def filter_features_model_ramp(primitives, current_features, model_id=None, export=False):
-    """
-
-    :param primitives: list of dict (each dict contains results from a single simulation)
-    :param current_features: dict
-    :param model_id: int
-    :param export: bool
-    :return: dict
-    """
-    features = {}
-    groups = ['induction1', 'induction2']
-    grouped_feature_names = ['delta_val_at_target_peak', 'delta_val_at_model_peak', 'delta_width', 'delta_peak_shift',
-                             'delta_asymmetry', 'delta_min_loc', 'delta_val_at_target_min', 'delta_val_at_model_min',
-                             'residual_score']
-    feature_names = ['ramp_amp_after_first_plateau', 'weights_path_distance']
-    for this_result_dict in primitives:
-        if not this_result_dict:
-            if context.verbose > 0:
-                print('optimize_biBTSP_%s: filter_features_model_ramp: pid: %i; model failed' %
-                      (BTSP_model_name, os.getpid()))
-                sys.stdout.flush()
-            return dict()
-        for induction in this_result_dict:
-            induction = int(induction)
-            group = 'induction' + str(induction)
-            for feature_name in grouped_feature_names:
-                key = group + '_' + feature_name
-                if key not in features:
-                    features[key] = []
-                features[key].append(this_result_dict[induction][feature_name])
-            for feature_name in feature_names:
-                if feature_name in this_result_dict[induction]:
-                    if feature_name not in features:
-                        features[feature_name] = []
-                    features[feature_name].append(this_result_dict[induction][feature_name])
-
-    for feature_name in grouped_feature_names:
-        for group in groups:
-            key = group + '_' + feature_name
-            if key in features and len(features[key]) > 0:
-                features[key] = np.mean(features[key])
-            else:
-                features[key] = 0.
-
-    for feature_name in feature_names:
-        if feature_name in features and len(features[feature_name]) > 0:
-            features[feature_name] = np.mean(features[feature_name])
-        else:
-            features[feature_name] = 0.
-
-    return features
-
-
-def get_objectives(features, model_id=None, export=False):
-    """
-
-    :param features: dict
-    :param model_id: int
-    :param export: bool
-    :return: tuple of dict
-    """
-    objectives = {}
-
-    grouped_feature_names = ['residual_score']
-    groups = ['induction1', 'induction2']
-    for feature_name in grouped_feature_names:
-        for group in groups:
-            objective_name = group + '_' + feature_name
-            if objective_name in features:
-                objectives[objective_name] = features[objective_name]
-
-    feature_name = 'ramp_amp_after_first_plateau'
-    if feature_name in context.objective_names and feature_name in features:
-        if features[feature_name] < context.target_val[feature_name]:
-            objectives[feature_name] = ((features[feature_name] - context.target_val[feature_name]) /
-                                        context.target_range[feature_name]) ** 2.
-        else:
-            objectives[feature_name] = 0.
-
-    feature_name = 'weights_path_distance'
-    if feature_name in context.objective_names and feature_name in features:
-        objectives[feature_name] = (features[feature_name] / context.target_range[feature_name]) ** 2.
-
-    for objective_name in context.objective_names:
-        if objective_name not in objectives:
-            return dict(), dict()
-        else:
-            objectives[objective_name] = np.mean(objectives[objective_name])
-
-    return features, objectives
-
-
-def get_features_interactive(interface, x, model_id=None, plot=False):
-    """
-
-    :param interface: :class: 'IpypInterface', 'MPIFuturesInterface', 'ParallelContextInterface', or 'SerialInterface'
-    :param x:
-    :param model_id: int
-    :param plot:
-    :return: dict
-    """
-    features = {}
-    args = interface.execute(get_args_static_model_ramp)
-    group_size = len(args[0])
-    sequences = [[x] * group_size] + args + [[model_id] * group_size] + [[context.export] * group_size] + \
-                [[plot] * group_size]
-    primitives = interface.map(compute_features_model_ramp, *sequences)
-    new_features = interface.execute(filter_features_model_ramp, primitives, features, model_id, context.export)
-    features.update(new_features)
-
-    return features
-
-
 @click.command(context_settings=dict(ignore_unknown_options=True, allow_extra_args=True, ))
 @click.option("--config-file-path", type=click.Path(exists=True, file_okay=True, dir_okay=False),
-              default='config/optimize_biBTSP_synthetic_WD_D_config.yaml')
+              default='config/simulate_biBTSP_synthetic_WD_config.yaml')
 @click.option("--output-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--export", is_flag=True)
 @click.option("--export-file-path", type=str, default=None)
 @click.option("--label", type=str, default=None)
 @click.option("--verbose", type=int, default=2)
 @click.option("--plot", is_flag=True)
-@click.option("--interactive", is_flag=True)
-@click.option("--debug", is_flag=True)
 @click.option("--plot-summary-figure", is_flag=True)
-@click.option("--exported-data-key", type=str, default='0')
+@click.option("--run-vel", type=float, default=None)
 @click.pass_context
-def main(cli, config_file_path, output_dir, export, export_file_path, label, verbose, plot, interactive, debug,
-         plot_summary_figure, exported_data_key):
+def main(cli, config_file_path, output_dir, export, export_file_path, label, verbose, plot, plot_summary_figure,
+         run_vel):
     """
-    To execute on a single process:
-    python -i optimize_biBTSP_synthetic_WD_D.py --plot --framework=serial --interactive
-
-    To execute using MPI parallelism with 1 controller process and N - 1 worker processes:
-    mpirun -n N python -i -m mpi4py.futures optimize_biBTSP_synthetic_WD_D.py --plot --framework=mpi --interactive
-
-    To optimize the models by running many instances in parallel:
-    mpirun -n N python -m mpi4py.futures -m nested.optimize --config-file-path=$PATH_TO_CONFIG_FILE --disp --export \
-        --framework=mpi --pop_size=200 --path_length=3 --max_iter=50
+    To execute on a single process and export data to a file:
+    python -i simulate_biBTSP_synthetic_WD.py --plot --export --export-file-path=$PATH_TO_DATA_FILE
 
     To plot results previously exported to a file on a single process:
-    python -i optimize_biBTSP_synthetic_WD_D.py --plot-summary-figure --export-file-path=$PATH_TO_MODEL_FILE \
-        --framework=serial --interactive
+    python -i simulate_biBTSP_synthetic_WD.py --plot-summary-figure --export-file-path=$PATH_TO_DATA_FILE
 
     :param cli: contains unrecognized args as list of str
     :param config_file_path: str (path)
@@ -1072,58 +927,40 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
     :param label: str
     :param verbose: int
     :param plot: bool
-    :param interactive: bool
-    :param debug: bool
     :param plot_summary_figure: bool
-    :param exported_data_key: str
+    :param run_vel: float
     """
     # requires a global variable context: :class:'Context'
+    if export_file_path is None:
+        if label is not None:
+            label = '_' + label
+        else:
+            label = ''
+        if output_dir is None:
+            output_dir_str = ''
+        else:
+            output_dir_str = output_dir + '/'
+        export_file_path = '%s%s_biBTSP_WD_simulation_output%s.hdf5' % \
+                           (output_dir_str, datetime.datetime.today().strftime('%Y%m%d_%H%M%S'), label)
     context.update(locals())
     kwargs = get_unknown_click_arg_dict(cli.args)
+    context.update(kwargs)
+    config_dict = read_from_yaml(config_file_path)
+    context.update(config_dict)
+    context.update(context.x0)
     context.disp = verbose > 0
 
-    context.interface = get_parallel_interface(source_file=__file__, source_package=__package__, **kwargs)
-    context.interface.start(disp=context.disp)
-    context.interface.ensure_controller()
-    config_optimize_interactive(__file__, config_file_path=config_file_path, output_dir=output_dir,
-                                export=export, export_file_path=export_file_path, label=label,
-                                disp=context.disp, interface=context.interface, verbose=verbose, plot=plot, **kwargs)
-
     if plot_summary_figure:
-        context.interface.execute(plot_model_summary_figure, export_file_path, exported_data_key)
-    elif not debug:
-        model_id = int(exported_data_key)  # 0
-        if 'model_key' in context() and context.model_key is not None:
-            model_label = context.model_key
-        else:
-            model_label = 'test'
-
-        features = get_features_interactive(context.interface, context.x0_array, model_id=model_id, plot=plot)
-        features, objectives = context.interface.execute(get_objectives, features, model_id, context.export)
-        if export:
-            merge_exported_data(context, param_arrays=[context.x0_array],
-                                model_ids=[model_id], model_labels=[model_label], features=[features],
-                                objectives=[objectives], export_file_path=context.export_file_path,
-                                verbose=context.verbose > 1)
-
-        sys.stdout.flush()
-        print('model_id: %i; model_labels: %s' % (model_id, model_label))
-        print('params:')
-        pprint.pprint(context.x0_dict)
-        print('features:')
-        pprint.pprint(features)
-        print('objectives:')
-        pprint.pprint(objectives)
-        sys.stdout.flush()
-        time.sleep(.1)
-
-        if plot:
-            context.interface.apply(plt.show)
-
-    if context.interactive:
-        context.update(locals())
+        plot_model_summary_figure(export_file_path)
     else:
-        context.interface.stop()
+        if run_vel is None:
+            run_vel_list = [10. * i for i in range(1,6)]
+        else:
+            run_vel_list = [run_vel]
+        for model_id, this_run_vel in enumerate(run_vel_list):
+            config_context(run_vel=this_run_vel, plot=plot)
+            for induction in range(1, 3):
+                ramp_features = simulate_biBTSP_WD(induction, this_run_vel, model_id, export, plot)
 
 
 if __name__ == '__main__':

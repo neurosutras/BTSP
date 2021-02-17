@@ -752,6 +752,7 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             group.create_dataset('local_signal_filter', compression='gzip', data=local_signal_filter)
             group.create_dataset('global_filter_t', compression='gzip', data=global_filter_t)
             group.create_dataset('global_filter', compression='gzip', data=global_filter)
+            group.attrs['default_run_vel'] = context.default_run_vel
             group.attrs['dend_depo'] = this_dend_depo
             group.attrs['mean_induction_start_loc'] = context.mean_induction_start_loc
             group.attrs['mean_induction_stop_loc'] = context.mean_induction_stop_loc
