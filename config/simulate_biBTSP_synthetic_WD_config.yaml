@@ -6,10 +6,10 @@ max_dend_depo: 10.
 default_run_vel: 25.
 default_track_length: 187.
 default_num_inputs: 200
-expand_track: 3
+expand_track: 4
 induction_loc:
-  '1': 120.
-  '2': 45.
+  '1': 320.
+  '2': 235.
 target_ramp_width_1: 160.
 target_ramp_pot_width_2: 160.
 target_ramp_dep_width_2: 140.
@@ -42,12 +42,12 @@ target_range:
 target_val:
   ramp_amp_after_first_plateau: 4.
 x0:
-  f_dep_half_width: 3.165316E-02
-  f_dep_th: 1.111949E-03
-  f_pot_half_width: 3.628727E-01
-  f_pot_th: 2.464920E-01
-  global_signal_decay: 2.003253E+02
-  k_dep: 5.564307E-01
-  k_pot: 3.377128E+00
-  local_signal_decay: 1.611058E+03
-  peak_delta_weight: 3.091679E+00
+  f_dep_half_width: 1.166108E-02
+  f_dep_th: 1.026429E-03
+  f_pot_half_width: 2.967520E-01
+  f_pot_th: 3.871166E-02
+  global_signal_decay: 5.973286E+02
+  k_dep: 2.896611E-01
+  k_pot: 1.573373E+00
+  local_signal_decay: 1.447838E+03
+  peak_delta_weight: 3.620245E+00

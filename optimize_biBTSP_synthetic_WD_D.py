@@ -118,9 +118,9 @@ def init_context():
 
     down_dt = 10.  # ms, to speed up optimization
     if 'num_induction_laps' not in context():
-        num_induction_laps = 1
+        num_induction_laps = 3
     else:
-        num_induction_laps = context.num_induction_laps
+        num_induction_laps = int(context.num_induction_laps)
     induction_dur = 300.  # ms
     context.update(locals())
 
@@ -329,6 +329,7 @@ def load_data(induction):
     for rate_map in context.complete_rate_maps:
         this_down_rate_map = np.interp(context.down_t, context.complete_t, rate_map)
         context.down_rate_maps.append(this_down_rate_map)
+    context.down_rate_maps = np.array(context.down_rate_maps)
     context.down_induction_gate = np.interp(context.down_t, context.complete_t, context.induction_gate)
     context.induction = induction
 

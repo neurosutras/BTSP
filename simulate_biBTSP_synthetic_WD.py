@@ -612,6 +612,9 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             group.create_dataset('local_signal_filter', compression='gzip', data=local_signal_filter)
             group.create_dataset('global_filter_t', compression='gzip', data=global_filter_t)
             group.create_dataset('global_filter', compression='gzip', data=global_filter)
+            group.create_dataset('min_induction_t', compression='gzip', data=context.min_induction_t)
+            group.create_dataset('clean_induction_t_indexes', compression='gzip',
+                                 data=context.clean_induction_t_indexes)
             group.attrs['run_vel'] = context.run_vel
             group.attrs['track_length'] = context.track_length
             group.attrs['mean_induction_start_loc'] = context.mean_induction_start_loc
@@ -646,6 +649,8 @@ def calculate_model_ramp(model_id=None, export=False, plot=False):
             group.create_group('delta_weights_snapshots')
             for i, this_delta_weights in enumerate(delta_weights_snapshots):
                 group['delta_weights_snapshots'].create_dataset(str(i), data=this_delta_weights)
+        print('Exported data for induction: %i; model_id: %s; run_vel: %.1f to file: %s' %
+              (context.induction, str(model_id)), context.run_vel, context.export_file_path)
 
     # catch models with excessive fluctuations in weights across laps:
     result['weights_path_distance'] = \
@@ -895,9 +900,10 @@ def simulate_biBTSP_WD(induction, run_vel, model_id=None, export=False, plot=Fal
 @click.option("--plot", is_flag=True)
 @click.option("--plot-summary-figure", is_flag=True)
 @click.option("--run-vel", type=float, default=None)
+@click.option("--debug", is_flag=True)
 @click.pass_context
 def main(cli, config_file_path, output_dir, export, export_file_path, label, verbose, plot, plot_summary_figure,
-         run_vel):
+         run_vel, debug):
     """
     To execute on a single process and export data to a file:
     python -i simulate_biBTSP_synthetic_WD.py --plot --export --export-file-path=$PATH_TO_DATA_FILE
@@ -915,6 +921,7 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
     :param plot: bool
     :param plot_summary_figure: bool
     :param run_vel: float
+    :param debug: bool
     """
     # requires a global variable context: :class:'Context'
     if export_file_path is None:
@@ -938,9 +945,9 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
 
     if plot_summary_figure:
         plot_model_summary_figure(export_file_path)
-    else:
+    elif not debug:
         if run_vel is None:
-            run_vel_list = [10. * i for i in range(1,6)]
+            run_vel_list = [15. + 10. * i for i in range(4)]
         else:
             run_vel_list = [run_vel]
         for model_id, this_run_vel in enumerate(run_vel_list):
