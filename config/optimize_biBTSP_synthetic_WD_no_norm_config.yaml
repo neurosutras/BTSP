@@ -22,7 +22,7 @@ bounds:
   - 1500.
   global_signal_decay: !!python/tuple
   - 500.
-  - 1750.
+  - 1500.
   peak_delta_weight: !!python/tuple
   - 1.5
   - 5.
@@ -55,15 +55,15 @@ feature_names:
 - induction2_delta_val_at_model_min
 - ramp_amp_after_first_plateau
 update_context:
-- - optimize_biBTSP_synthetic_WD
+- - optimize_biBTSP_synthetic_WD_no_norm
   - update_model_params
 get_features_stages:
-- source: optimize_biBTSP_synthetic_WD
+- source: optimize_biBTSP_synthetic_WD_no_norm
   get_args_static: get_args_static_model_ramp
   compute_features: compute_features_model_ramp
   filter_features: filter_features_model_ramp
 get_objectives:
-  optimize_biBTSP_synthetic_WD: get_objectives
+  optimize_biBTSP_synthetic_WD_no_norm: get_objectives
 kwargs:
   data_file_name: 20201123_biBTSP_data.hdf5
   input_field_width: 90.  # cm
@@ -74,7 +74,7 @@ kwargs:
   default_run_vel: 25.
   induction_loc:
     '1': 120.
-    '2': 35.
+    '2': 45.
   target_ramp_width_1: 160.
   target_ramp_pot_width_2: 160.
   target_ramp_dep_width_2: 140.
