@@ -9,7 +9,7 @@ from numpy import genfromtxt
 
 # replace this file path with the path to your csv file
 # the file should have 3 columns: min_t, initial_ramp, delta_ramp
-# min_t is the timebase (delay to plateau onset) for each spatial bin
+# min_t is the timebase in seconds (delay to plateau onset) for each spatial bin
 # append data from all cells and all bins to these three columns
 # the number of rows should be # of cells * # of bins
 
@@ -19,7 +19,7 @@ flat_min_t, flat_initial_ramp, flat_delta_ramp = imported_data.T
 
 
 tmax = 5.  # s
-res = 100.  # number of temporal bins
+res = 100  # number of temporal bins
 
 points = np.array([flat_min_t, flat_initial_ramp]).transpose()
 data = np.array(flat_delta_ramp)
@@ -47,7 +47,7 @@ ymin = min(0., np.min(flat_initial_ramp))
 vmax = max(abs(np.max(flat_delta_ramp)), abs(np.min(flat_delta_ramp)))
 
 cax = this_axis.pcolormesh(t_grid, initial_ramp_grid, interp_data, cmap=interp_cmap, vmin=-vmax,
-                           vmax=vmax, zorder=0, edgecolors='face', rasterized=True)
+                           vmax=vmax, zorder=0, edgecolors='face', rasterized=True, shading='auto')
 this_axis.set_ylabel('Initial Vm ramp\namplitude (mV)')
 this_axis.set_xlabel('Time from plateau (s)')
 this_axis.set_ylim(0., ymax)
@@ -56,6 +56,5 @@ this_axis.set_xticks(np.arange(-4., 5., 2.))
 cbar = plt.colorbar(cax, ax=this_axis)
 cbar.set_label(r'$\Delta$Vm (mV)', rotation=270., labelpad=15.)
 
-clean_axes(this_axis)
 fig.tight_layout()
 fig.show()
