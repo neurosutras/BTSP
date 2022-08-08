@@ -35,7 +35,7 @@ def main(model_file_path, output_dir, export, show_traces, label, exported_data_
     :param label: str
     :param exported_data_key: str
     """
-    date_stamp = datetime.datetime.today().strftime('%Y%m%d_%H%M')
+    date_stamp = datetime.datetime.today().strftime('%Y%m%d_%H%M%S')
     if label is None:
         label = date_stamp
     if not os.path.isfile(model_file_path):

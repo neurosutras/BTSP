@@ -1254,12 +1254,12 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
 
     cmap = 'gray_r'
     # fig, axes = plt.subplots(3, figsize=(10., 5.))
-    fig = plt.figure(figsize=(6., 9.))
-    rows = 31
+    fig = plt.figure(figsize=(8., 7.))
+    rows = 6
     cols = 2
     rasterized=True
 
-    source_xlim = (-2.5, 10.)
+    source_xlim = (-1., 6.)
     rate_map_matrix = np.empty((len(context.down_rate_maps), len(context.down_t)))
     for i, rate_map in enumerate(context.down_rate_maps):
         rate_map_matrix[i, :] = rate_map
@@ -1267,19 +1267,8 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     X, Y = np.meshgrid((context.down_t - context.induction_start_times[induction_lap]) / 1000.,
                        range(len(context.down_rate_maps) + 1))
 
-    axis = plt.subplot2grid((rows, cols), (5, 0), rowspan=5, colspan=cols)
-    # axis = axes[1]
-    cdict = {'red': ((0.0, 1.0, 1.0),
-                     (1.0, 1.0, 1.0)),
-
-             'green': ((0.0, 1.0, 1.0),
-                       (1.0, 0.0, 0.0)),
-
-             'blue': ((0.0, 1.0, 1.0),
-                      (1.0, 0.0, 0.0))}
-    this_cmap = mpl.colors.LinearSegmentedColormap('my_colormap', cdict)
-
-    hm = axis.pcolormesh(X, Y, rate_map_matrix, cmap=this_cmap, vmin=0., rasterized=rasterized)  # , vmin=0., vmax=1.)
+    axis = plt.subplot2grid((rows, cols), (1, 0), rowspan=1, colspan=cols)
+    hm = axis.pcolormesh(X, Y, rate_map_matrix, cmap='binary', vmin=0., rasterized=rasterized, shading='auto')
     axins = inset_axes(axis,
                        width="2.5%",  # width = 10% of parent_bbox width
                        height="100%",  # height : 50%
@@ -1292,7 +1281,8 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     cb.ax.set_ylabel('Presynaptic\nfiring rate\n(Hz)', rotation=0, va='center')
     cb.ax.get_yaxis().labelpad = 40
     axis.set_ylim((len(context.down_rate_maps) + 1, 0))
-    axis.set_ylabel('Sorted\nsynaptic\ninputs', rotation=0., va='center', labelpad=25)
+    axis.set_yticks([len(context.down_rate_maps), len(context.down_rate_maps) // 2, 0])
+    # axis.set_ylabel('Sorted\nsynaptic\ninputs', rotation=0., va='center', labelpad=25)
     source_xlim_axis = axis
     plt.setp(axis.get_xticklabels(), visible=False)
 
@@ -1303,12 +1293,12 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     pretty_position[indexes] = np.nan
     plateau_indexes = [np.where(context.complete_t >= start_time)[0][0] for start_time in context.induction_start_times]
 
-    axis = plt.subplot2grid((rows, cols), (0, 0), rowspan=5, colspan=cols, sharex=source_xlim_axis)
+    axis = plt.subplot2grid((rows, cols), (0, 0), rowspan=1, colspan=cols, sharex=source_xlim_axis)
     # axis = axes[0]
     axis.plot((context.complete_t - context.induction_start_times[induction_lap]) / 1000., pretty_position, c='grey',
               zorder=0)
     axis.scatter((context.complete_t[plateau_indexes] - context.induction_start_times[induction_lap]) / 1000.,
-                 pretty_position[plateau_indexes], c='k', zorder=1,
+                 pretty_position[plateau_indexes], c='sienna', zorder=1,
                  label='Plateau')
     axis.set_ylabel('Position\n(cm)', rotation=0., va='center', labelpad=25)
     axis.set_ylim((context.track_length + 5., -5.))
@@ -1320,11 +1310,10 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     for i, local_signal in enumerate(local_signals):
         local_signal_matrix[i, :] = local_signal
 
-    axis = plt.subplot2grid((rows, cols), (10, 0), rowspan=5, colspan=cols, sharex=source_xlim_axis)
-    # axis = axes[2]
-    clist = [(0., 'White'), (1., 'Purple')]
+    axis = plt.subplot2grid((rows, cols), (2, 0), rowspan=1, colspan=cols, sharex=source_xlim_axis)
+    clist = [(0., 'White'), (1., 'Green')]
     this_cmap = mpl.colors.LinearSegmentedColormap.from_list('my_colormap', clist)
-    hm = axis.pcolormesh(X, Y, local_signal_matrix, cmap=this_cmap, vmin=0., rasterized=rasterized)  # , vmin=0., vmax=1.)
+    hm = axis.pcolormesh(X, Y, local_signal_matrix, cmap=this_cmap, vmin=0., rasterized=rasterized, shading='auto')
     axins = inset_axes(axis,
                        width="2.5%",  # width = 10% of parent_bbox width
                        height="100%",  # height : 50%
@@ -1334,25 +1323,60 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
                        borderpad=0.,
                        )
     cb = plt.colorbar(hm, cax=axins)
-    cb.ax.set_ylabel('Eligibility\ntrace\n(a.u.)', rotation=0, va='center')
+    cb.ax.set_ylabel('Eligibility\ntrace (ET)\n(a.u.)', rotation=0, va='center')
     cb.ax.get_yaxis().labelpad = 40
     axis.set_ylim((len(context.down_rate_maps) + 1, 0))
+    axis.set_yticks([len(context.down_rate_maps), len(context.down_rate_maps) // 2, 0])
+    plt.setp(axis.get_xticklabels(), visible=False)
+    # axis.set_ylabel('Sorted\nsynaptic\ninputs', rotation=0., va='center', labelpad=25)
+
+    axis = plt.subplot2grid((rows, cols), (3, 0), rowspan=1, colspan=cols, sharex=source_xlim_axis)
+    global_signal_matrix = np.resize(global_signal, len(global_signal) * len(local_signal_matrix)).reshape(
+        len(local_signal_matrix), len(global_signal))
+    clist = [(0., 'White'), (1., 'Orange')]
+    this_cmap = mpl.colors.LinearSegmentedColormap.from_list('my_colormap', clist)
+    hm = axis.pcolormesh(X, Y, global_signal_matrix, cmap=this_cmap, vmin=0., rasterized=rasterized, shading='auto')
+    axins = inset_axes(axis,
+                       width="2.5%",  # width = 10% of parent_bbox width
+                       height="100%",  # height : 50%
+                       loc=2,
+                       bbox_to_anchor=(1.02, 0., 1, 1),
+                       bbox_transform=axis.transAxes,
+                       borderpad=0.,
+                       )
+    cb = plt.colorbar(hm, cax=axins)
+    cb.ax.set_ylabel('Instructive\nsignal (IS)\n(a.u.)', rotation=0, va='center')
+    cb.ax.get_yaxis().labelpad = 40
+    axis.set_ylim((len(context.down_rate_maps) + 1, 0))
+    axis.set_yticks([len(context.down_rate_maps), len(context.down_rate_maps) // 2, 0])
     plt.setp(axis.get_xticklabels(), visible=False)
     axis.set_ylabel('Sorted\nsynaptic\ninputs', rotation=0., va='center', labelpad=25)
 
-    axis = plt.subplot2grid((rows, cols), (15, 0), rowspan=2, colspan=cols, sharex=source_xlim_axis)
-    axis.plot((context.down_t - context.induction_start_times[induction_lap]) / 1000., global_signal, c='k',
-              linewidth=1., label='Instructive\nsignal\n(a.u.)')
-    axis.set_xlim((0., source_xlim_axis.get_xlim()[1]))
-    leg = axis.legend(loc='best', frameon=False, handlelength=0.)
-    plt.setp(leg.get_texts(), ha='center')
-    clean_axes(axis)
+    axis = plt.subplot2grid((rows, cols), (4, 0), rowspan=1, colspan=cols, sharex=source_xlim_axis)
+    ET_IS = local_signal_matrix * global_signal_matrix
+    clist = [(0., 'White'), (1., 'Purple')]
+    this_cmap = mpl.colors.LinearSegmentedColormap.from_list('my_colormap', clist)
+    hm = axis.pcolormesh(X, Y, ET_IS, cmap=this_cmap, vmin=0., rasterized=rasterized, shading='auto')
+    axins = inset_axes(axis,
+                       width="2.5%",  # width = 10% of parent_bbox width
+                       height="100%",  # height : 50%
+                       loc=2,
+                       bbox_to_anchor=(1.02, 0., 1, 1),
+                       bbox_transform=axis.transAxes,
+                       borderpad=0.,
+                       )
+    cb = plt.colorbar(hm, cax=axins)
+    cb.ax.set_ylabel('Signal\noverlap\n(ET * IS)\n(a.u.)', rotation=0, va='center')
+    cb.ax.get_yaxis().labelpad = 40
+    axis.set_ylim((len(context.down_rate_maps) + 1, 0))
+    axis.set_yticks([len(context.down_rate_maps), len(context.down_rate_maps) // 2, 0])
     plt.setp(axis.get_xticklabels(), visible=False)
+    # axis.set_ylabel('Sorted\nsynaptic\ninputs', rotation=0., va='center', labelpad=25)
 
-    axis = plt.subplot2grid((rows, cols), (17, 0), rowspan=5, colspan=cols, sharex=source_xlim_axis)
+    axis = plt.subplot2grid((rows, cols), (5, 0), rowspan=1, colspan=cols, sharex=source_xlim_axis)
     scale = np.abs(np.min(complete_change_in_weight_matrix))
     hm = axis.pcolormesh(X, Y, complete_change_in_weight_matrix, vmin=-2. * scale, vmax=2. * scale, cmap='bwr',
-                         rasterized=rasterized)
+                         rasterized=rasterized, shading='auto')
     axins = inset_axes(axis,
                        width="2.5%",  # width = 10% of parent_bbox width
                        height="100%",  # height : 50%
@@ -1365,12 +1389,13 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
     cb.ax.set_ylabel('dW/dt\n(a.u./s)', rotation=0, va='center')
     cb.ax.get_yaxis().labelpad = 25
     axis.set_ylim((len(context.down_rate_maps) + 1, 0))
-    axis.set_ylabel('Sorted\nsynaptic\ninputs', rotation=0., va='center', labelpad=25)
-    axis.set_xlabel('Time (s)')
+    axis.set_yticks([len(context.down_rate_maps), len(context.down_rate_maps) // 2, 0])
+    # axis.set_ylabel('Sorted\nsynaptic\ninputs', rotation=0., va='center', labelpad=25)
+    axis.set_xlabel('Time from plateau (s)')
     plt.setp(axis.get_xticklabels(), visible=True)
     source_xlim_axis.set_xlim(source_xlim)
 
-    fig.subplots_adjust(hspace=5., right=0.7, left=0.2, wspace=0.4)
+    fig.subplots_adjust(hspace=0.18, right=0.7, left=0.2, wspace=0.4)
     # fig.savefig('Figures/test.svg', format='svg', dpi=300)
     fig.show()
 
@@ -1406,7 +1431,7 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
 
     axis = plt.subplot2grid((1, 2), (0, 0), rowspan=1, colspan=1)
     X, Y = np.meshgrid(np.linspace(0., len(context.peak_locs), 200), np.arange(-0.5, weights_matrix.shape[0], 1.))
-    hm = axis.pcolormesh(X, Y, weights_matrix, vmin=0., rasterized=rasterized)
+    hm = axis.pcolormesh(X, Y, weights_matrix, vmin=0., rasterized=rasterized, shading='auto')
     axins = inset_axes(axis,
                        width="6%",  # width = 10% of parent_bbox width
                        height="100%",  # height : 50%
@@ -1431,7 +1456,7 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
 
     axis = plt.subplot2grid((1, 2), (0, 1), rowspan=1, colspan=1)
     X, Y = np.meshgrid(np.linspace(0., context.track_length, 100), np.arange(-0.5, weights_matrix.shape[0], 1.))
-    hm = axis.pcolormesh(X, Y, ramp_matrix, rasterized=rasterized)  # , vmin=0.)
+    hm = axis.pcolormesh(X, Y, ramp_matrix, rasterized=rasterized, shading='auto')  # , vmin=0.)
     axins = inset_axes(axis,
                        width="6%",  # width = 10% of parent_bbox width
                        height="100%",  # height : 50%
