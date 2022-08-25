@@ -394,7 +394,7 @@ def initialize():
     input_field_width = 90.  # cm
     input_field_peak_rate = 40.  # Hz
     num_inputs = 200  # 200
-    track_length = 187.  # cm
+    track_length = 180.  # cm
 
     binned_dx = track_length / 100.  # cm
     binned_x = np.arange(0., track_length+binned_dx/2., binned_dx)[:100] + binned_dx/2.
