@@ -446,7 +446,7 @@ def boxplot_compare_ramp_summary_features(model_file_path_dict, ordered_labels, 
 @click.option("--tmax", type=float, default=5.)
 @click.option("--truncate", type=float, default=2.5)
 @click.option("--debug", is_flag=True)
-@click.option("--target-induction", type=int, multiple=True, default=[2, 3])
+@click.option("--target-induction", '-i', type=int, multiple=True, default=[1, 2, 3])
 @click.option("--font-size", type=float, default=12.)
 def main(data_file_path, vmax, tmax, truncate, debug, target_induction, font_size):
     """
