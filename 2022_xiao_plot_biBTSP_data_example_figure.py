@@ -54,7 +54,7 @@ def main(data_file_path, tmax, truncate, debug, cell):
     ordered_interval_group_colors = [('k', 'grey'), ('red', 'red'), ('green', 'green')]
     interval_group_keys = defaultdict(list)
     interp_delta_exp_raw_by_interval_group = defaultdict(list)
-    exclude = [('44', '2'), ('7', '2')]
+    exclude = []
     for cell_key in exp_ramp:
         for induction_key in exp_ramp[cell_key]:
             if (cell_key, induction_key) in exclude:
@@ -77,6 +77,8 @@ def main(data_file_path, tmax, truncate, debug, cell):
             print('cell: %s, induction: %s, inter-field interval: %.1f' %
                   (cell_key, induction_key, min_inter_field_interval))
     for col, interval_group_label in enumerate(ordered_interval_group_labels):
+        if not interp_delta_exp_raw_by_interval_group[interval_group_label]:
+            continue
         mean_interp_delta_exp_ramp = np.nanmean(interp_delta_exp_raw_by_interval_group[interval_group_label], axis=0)
         std_interp_delta_exp_ramp = np.nanstd(interp_delta_exp_raw_by_interval_group[interval_group_label], axis=0) / \
                                     np.sqrt(len(interval_group_keys[interval_group_label]))
@@ -91,8 +93,8 @@ def main(data_file_path, tmax, truncate, debug, cell):
                                color=ordered_interval_group_colors[col][1], alpha=0.25, linewidth=0)
         axes[2][col].plot(reference_delta_t / 1000., np.zeros_like(reference_delta_t), c='darkgrey', alpha=0.75,
                           zorder=1, linestyle='--')
-        axes[2][col].set_yticks(np.arange(-10., 21., 5.))
         axes[2][col].set_xlim((-tmax, tmax))
+        axes[2][col].set_yticks(np.arange(-10., 21., 5.))
         axes[2][col].set_ylabel('Change in ramp\namplitude (mV)')
         axes[2][col].set_xlabel('Time relative to plateau onset (s)')
         axes[2][col].legend(loc='best', frameon=False, framealpha=0.5, fontsize=mpl.rcParams['font.size'],
