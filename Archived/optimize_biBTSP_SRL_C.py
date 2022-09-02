@@ -1238,7 +1238,7 @@ def plot_model_summary_figure(cell_id, model_file_path=None):
             rate_map *= weights[i] * context.ramp_scaling_factor
             ymax = max(ymax, np.max(rate_map))
             this_axis.plot(context.binned_x, rate_map, c='gray', zorder=0, linewidth=0.75)  # , alpha=0.5)
-        for i, (name, index) in enumerate(viewitems(example_input_dict)):
+        for i, (name, index) in enumerate(example_input_dict.items()):
             rate_map = np.array(context.input_rate_maps[index])
             rate_map *= weights[index] * context.ramp_scaling_factor
             ymax = max(ymax, np.max(rate_map))
@@ -1590,9 +1590,9 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
         print('params:')
         pprint.pprint(dict(zip(context.param_names, context.x0_array)))
         print('features:')
-        pprint.pprint({key: val for (key, val) in viewitems(features) if key in context.feature_names})
+        pprint.pprint({key: val for (key, val) in features.items() if key in context.feature_names})
         print('objectives')
-        pprint.pprint({key: val for (key, val) in viewitems(objectives) if key in context.objective_names})
+        pprint.pprint({key: val for (key, val) in objectives.items() if key in context.objective_names})
         sys.stdout.flush()
         if plot:
             context.interface.apply(plt.show)

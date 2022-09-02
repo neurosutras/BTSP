@@ -1149,7 +1149,7 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
     this_t = context.down_t[indexes] / 1000.
     this_global_signal = global_signal[indexes]
 
-    for name, i in viewitems(example_input_dict):
+    for name, i in example_input_dict.items():
         example_pre_rates[name] = context.down_rate_maps[i][indexes]
         this_local_signal = local_signals[i]
         example_local_signals[name] = this_local_signal[indexes]
@@ -1170,7 +1170,7 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
     ymax2 = 0.
     axes0_1_right = [axes[0][1].twinx(), axes[0][2].twinx()]
     axes0_1_right[0].get_shared_y_axes().join(axes0_1_right[0], axes0_1_right[1])
-    for i, (name, index) in enumerate(viewitems(example_input_dict)):
+    for i, (name, index) in enumerate(example_input_dict.items()):
         this_rate_map = example_pre_rates[name]
         this_local_signal = example_local_signals[name]
         this_net_dwdt = example_net_dwdt[name]
@@ -1265,12 +1265,12 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
     for col, weights in zip(range(1, 3), [initial_weights, final_weights]):
         this_axis = axes[3][col]
         this_max_rate_map = np.zeros_like(context.input_rate_maps[0])
-        for i in (index for index in input_sample_indexes if index not in viewvalues(example_input_dict)):
+        for i in (index for index in input_sample_indexes if index not in example_input_dict.values()):
             rate_map = np.array(context.input_rate_maps[i])
             rate_map *= weights[i] * context.ramp_scaling_factor
             ymax3 = max(ymax3, np.max(rate_map))
             this_axis.plot(context.binned_x, rate_map, c='gray', zorder=0, linewidth=0.75)  # , alpha=0.5)
-        for i, (name, index) in enumerate(viewitems(example_input_dict)):
+        for i, (name, index) in enumerate(example_input_dict.items()):
             rate_map = np.array(context.input_rate_maps[index])
             rate_map *= weights[index] * context.ramp_scaling_factor
             ymax3 = max(ymax3, np.max(rate_map))

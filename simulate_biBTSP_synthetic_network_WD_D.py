@@ -558,7 +558,7 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
                                                        end_locs_by_track_phase[label][cell_index], context.track_length)
             if this_delta_loc < -1. or this_delta_loc > 1.:
                 delta_locs_by_track_phase[label].append(this_delta_loc)
-            for reward_loc in viewvalues(reward_loc_by_track_phase):
+            for reward_loc in reward_loc_by_track_phase.values():
                 end_reward_distance = abs(get_circular_distance(end_locs_by_track_phase[label][cell_index],
                                                                 reward_loc, context.track_length))
                 if cell_index in start_locs_by_track_phase[label]:

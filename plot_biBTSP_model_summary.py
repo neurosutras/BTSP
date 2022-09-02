@@ -80,7 +80,7 @@ def process_biBTSP_model_results(file_path, show=False, export=False, output_dir
         source = get_h5py_group(f, [exported_data_key, 'exported_data'])
         for cell_key in source:
             description = 'model_ramp_features'
-            group = next(iter(viewvalues(source[cell_key])))[description]
+            group = next(iter(source[cell_key].values()))[description]
             param_array = group['param_array'][:]
             param_dict = param_array_to_dict(param_array, param_names)
             if 'peak_delta_weight' in param_dict:
@@ -272,7 +272,7 @@ def plot_compare_models_mse_by_induction(model_file_path_dict):
     all_mse = dict()
     max_val = defaultdict(lambda: 0.)
 
-    for model, model_file_path in viewitems(model_file_path_dict):
+    for model, model_file_path in model_file_path_dict.items():
         ramp_amp, ramp_width, peak_shift, min_val, all_mse[model], discard_ramp_mse_array, discard_ramp_sse_array, \
         max_delta_ramp_val, min_delta_ramp_val = process_biBTSP_model_results(model_file_path)
     fig, axes = plt.subplots(1, 2)

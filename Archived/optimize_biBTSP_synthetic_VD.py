@@ -824,7 +824,7 @@ def plot_model_summary_figure(model_file_path=None):
             rate_map *= weights[i] * context.ramp_scaling_factor
             ymax = max(ymax, np.max(rate_map))
             this_axis.plot(context.binned_x, rate_map, c='gray', zorder=0, linewidth=0.75)  # , alpha=0.5)
-        for i, (name, index) in enumerate(viewitems(example_input_dict)):
+        for i, (name, index) in enumerate(example_input_dict.items()):
             rate_map = np.array(context.input_rate_maps[index])
             rate_map *= weights[index] * context.ramp_scaling_factor
             ymax = max(ymax, np.max(rate_map))

@@ -92,7 +92,7 @@ def plot_BTSP_model_param_cdfs(param_dict, config_dict, data_file_path, export=F
     bounds = config_dict['bounds']
 
     for cell in cell_keys:
-        for param_name, param_val in viewitems(param_dict[cell]):
+        for param_name, param_val in param_dict[cell].items():
             params[param_name].append(param_val)
 
     fig, axes = plt.figure(figsize=(12, 4.5)), []
@@ -178,7 +178,7 @@ def print_beta_values_from_half_widths(param_dict, config_dict, label=None):
     cell_keys = [key for key in param_dict if key not in ['all', 'default']]
     params = defaultdict(list)
     for cell in cell_keys:
-        for param_name, param_val in viewitems(param_dict[cell]):
+        for param_name, param_val in param_dict[cell].items():
             params[param_name].append(param_val)
     param_keys = ['f_pot_half_width', 'f_dep_half_width']
     new_labels = {'f_pot_half_width': 'beta_+', 'f_dep_half_width': 'beta_-'}

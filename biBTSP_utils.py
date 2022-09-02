@@ -93,7 +93,7 @@ class StateMachine(object):
         :param rates: dict
         """
         for s0 in rates:
-            for s1, r in viewitems(rates[s0]):
+            for s1, r in rates[s0].items():
                 self.update_transition(s0, s1, r)
 
     def update_states(self, states):
@@ -101,7 +101,7 @@ class StateMachine(object):
 
         :param states: dict
         """
-        for s, v in viewitems(states):
+        for s, v in states.items():
             self.init_states[s] = v
             self.states[s] = v
             self.states_history[s] = np.array([v])

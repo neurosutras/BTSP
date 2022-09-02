@@ -389,7 +389,7 @@ def boxplot_compare_ramp_summary_features(model_file_path_dict, ordered_labels, 
     induction_key = str(induction)
     exported_data_key = 'exported_data'
     description = 'model_ramp_features'
-    for label, file_path in viewitems(model_file_path_dict):
+    for label, file_path in model_file_path_dict.items():
         with h5py.File(file_path, 'r') as f:
             for cell_key in f[exported_data_key]:
                 if induction_key in f[exported_data_key][cell_key]:
