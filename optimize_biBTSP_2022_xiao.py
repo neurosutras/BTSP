@@ -720,16 +720,17 @@ def calculate_model_ramp(local_signal_peak=None, global_signal_peak=None, model_
     return {context.cell_id: {context.induction: result}}
 
 
-def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data_key=None, induction_lap=0):
+def plot_model_summary_supp_figure(cell_id, induction_id, export_file_path=None, exported_data_key=None, induction_lap=0):
     """
 
     :param cell_id: int
+    :param induction_id: int
     :param export_file_path: str (path)
     :param exported_data_key: str
     :param induction_lap: int
     """
-    if (cell_id, 2) not in context.data_keys:
-        raise KeyError('plot_model_summary_figure: cell_id: %i, induction: 2 not found' % cell_id)
+    if (cell_id, induction_id) not in context.data_keys:
+        raise KeyError('plot_model_summary_figure: cell_id: %i, induction: %i not found' % (cell_id, induction_id))
     if export_file_path is None:
         raise IOError('plot_model_summary_figure: no export_file_path provided')
     elif not os.path.isfile(export_file_path):
@@ -739,7 +740,7 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
         x = source['param_array'][:]
         if 'local_signal_peak' not in source.attrs or 'global_signal_peak' not in source.attrs:
             raise KeyError('plot_model_summary_figure: missing required attributes for cell_id: %i, '
-                           'induction 2; from file: %s' % (cell_id, export_file_path))
+                           'induction %i; from file: %s' % (cell_id, induction_id, export_file_path))
         local_signal_peak = source.attrs['local_signal_peak']
         global_signal_peak = source.attrs['global_signal_peak']
         local_signal_filter_t = source['local_signal_filter_t'][:]
@@ -757,7 +758,7 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
             delta_weights_snapshots.append(source['delta_weights_snapshots'][str(lap)][:])
         final_weights = source['model_weights'][:]
 
-    import_data(cell_id, 2)
+    import_data(cell_id, induction_id)
     update_source_contexts(x)
 
     initial_exp_ramp = context.exp_ramp['before']
@@ -837,7 +838,8 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
 
     this_axis = axes[3][0]
     ymax = 0.
-    for color, label, ramp in zip(['darkgrey', 'k'], ['Before Induction 2', 'After Induction 2'],
+    for color, label, ramp in zip(['darkgrey', 'k'],
+                                  ['Before Induction %i' % induction_id, 'After Induction %i' % induction_id],
                                   [initial_ramp, model_ramp]):
         this_axis.plot(context.binned_x, ramp, c=color, label=label)
         ymax = max(ymax, np.max(ramp))
@@ -1032,8 +1034,8 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
         this_axis.set_xlabel('Position (cm)')
     axes[3][1].legend(loc=(0.8, 1.35), frameon=False, framealpha=0.5, handlelength=1, fontsize=mpl.rcParams['font.size'])
     axes[3][1].set_ylabel('Input\namplitude (mV)')
-    axes[3][1].set_title('Before Induction 2', fontsize=mpl.rcParams['font.size'], y=1.)
-    axes[3][2].set_title('After Induction 2', fontsize=mpl.rcParams['font.size'], y=1.)
+    axes[3][1].set_title('Before Induction %i' % induction_id, fontsize=mpl.rcParams['font.size'], y=1.)
+    axes[3][2].set_title('After Induction %i' % induction_id, fontsize=mpl.rcParams['font.size'], y=1.)
     ymax3 = math.ceil(10. * ymax3 / 0.95) / 10.
     bar_loc = ymax3 * 0.95
     for col in range(1, 3):
@@ -1042,13 +1044,13 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
         this_axis.hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
 
     clean_axes(axes)
-    fig.suptitle('Weight-dependent model D (cell %i)' % cell_id,
+    fig.suptitle('Model data (cell %i, induction %i)' % (cell_id, induction_id),
                  fontsize=mpl.rcParams['font.size'], x=0.02, ha='left')
     fig.subplots_adjust(left=0.1, hspace=1.075, wspace=0.7, right=0.955, top=0.925, bottom=0.05)
     fig.show()
 
     # Alternative plots
-    fig, axes = plt.subplots(4, 3, figsize=(8, 10))
+    fig, axes = plt.subplots(2, 3, figsize=(8, 5.5))
 
     axes[0][0].get_shared_x_axes().join(axes[0][0], axes[0][1], axes[0][2], axes[1][1], axes[1][2])
     axes[0][0].get_shared_y_axes().join(axes[0][0], axes[0][1], axes[1][1])
@@ -1059,8 +1061,8 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
     axes[0][2].plot(context.peak_locs, delta_weights, c='k')
     axes[0][2].axhline(y=0., linestyle='--', c='grey')
     axes[0][2].hlines(peak_weight * 1.05, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
-    axes[0][1].plot(context.binned_x, initial_ramp, label='Before Induction 2', c='darkgrey')
-    axes[0][1].plot(context.binned_x, model_ramp, label='After Induction 2', c='k')
+    axes[0][1].plot(context.binned_x, initial_ramp, label='Before Induction %i' % induction_id, c='darkgrey')
+    axes[0][1].plot(context.binned_x, model_ramp, label='After Induction %i' % induction_id, c='k')
     axes[0][1].hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
     axes[0][2].set_ylabel('Change in\nsynaptic weight')
     axes[0][2].set_xlabel('Location (cm)')
@@ -1074,8 +1076,8 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
     axes[0][2].set_ylim([-peak_weight, peak_weight * 1.1])
     axes[0][1].set_title('Model fit', fontsize=mpl.rcParams['font.size'], pad=10.)
 
-    axes[0][0].plot(context.binned_x, initial_exp_ramp, label='Before Induction 2', c='darkgrey')
-    axes[0][0].plot(context.binned_x, target_ramp, label='After Induction 2', c='k')
+    axes[0][0].plot(context.binned_x, initial_exp_ramp, label='Before Induction %i' % induction_id, c='darkgrey')
+    axes[0][0].plot(context.binned_x, target_ramp, label='After Induction %i' % induction_id, c='k')
     axes[0][0].hlines(bar_loc, xmin=context.mean_induction_start_loc, xmax=context.mean_induction_stop_loc)
     axes[0][0].set_ylabel('Ramp\namplitude (mV)')
     axes[0][0].set_xlabel('Location (cm)')
@@ -1118,27 +1120,29 @@ def plot_model_summary_supp_figure(cell_id, export_file_path=None, exported_data
     cbar.set_label('Initial synaptic\nweight (normalized)', rotation=270., labelpad=20.)
 
     clean_axes(axes)
-    fig.suptitle('Weight-dependent model D (cell %i)' % cell_id,
+    fig.suptitle('Model data (cell %i, induction %i)' % (cell_id, induction_id),
                  fontsize=mpl.rcParams['font.size'], x=0.02, ha='left')
-    fig.subplots_adjust(left=0.1, hspace=1.075, wspace=0.7, right=0.955, top=0.925, bottom=0.05)
+    fig.tight_layout(h_pad=2)
+    # fig.subplots_adjust(left=0.1, hspace=1.075, wspace=0.7, right=0.955, top=0.925, bottom=0.05)
     fig.show()
 
     context.update(locals())
 
 
-def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=None, induction_lap=0,
+def plot_model_summary_figure(cell_id, induction_id, export_file_path=None, exported_data_key=None, induction_lap=0,
                               target_min_delay=2750., target_delay_range=250.):
     """
 
     :param cell_id: int
+    :param induction_id: int
     :param export_file_path: str (path)
     :param exported_data_key: str
     :param induction_lap: int
     :param target_min_delay
     :param target_delay_range
     """
-    if (cell_id, 2) not in context.data_keys:
-        raise KeyError('plot_model_summary_figure: cell_id: %i, induction: 2 not found' % cell_id)
+    if (cell_id, induction_id) not in context.data_keys:
+        raise KeyError('plot_model_summary_figure: cell_id: %i, induction: %i not found' % (cell_id, induction_id))
     if export_file_path is None:
         raise IOError('plot_model_summary_figure: no export_file_path provided')
     elif not os.path.isfile(export_file_path):
@@ -1148,7 +1152,7 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
         x = source['param_array'][:]
         if 'local_signal_peak' not in source.attrs or 'global_signal_peak' not in source.attrs:
             raise KeyError('plot_model_summary_figure: missing required attributes for cell_id: %i, '
-                           'induction 2; from file: %s' % (cell_id, export_file_path))
+                           'induction %i; from file: %s' % (cell_id, induction_id, export_file_path))
         local_signal_peak = source.attrs['local_signal_peak']
         global_signal_peak = source.attrs['global_signal_peak']
         local_signal_filter_t = source['local_signal_filter_t'][:]
@@ -1166,7 +1170,7 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
             delta_weights_snapshots.append(source['delta_weights_snapshots'][str(lap)][:])
         final_weights = source['model_weights'][:]
 
-    import_data(cell_id, 2)
+    import_data(cell_id, induction_id)
     update_source_contexts(x, context)
 
     initial_exp_ramp = context.exp_ramp['before']
@@ -1252,7 +1256,6 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
             complete_change_in_weight_matrix[i, indexes] = this_dwdt * peak_weight
 
     cmap = 'gray_r'
-    # fig, axes = plt.subplots(3, figsize=(10., 5.))
     fig = plt.figure(figsize=(8., 7.))
     rows = 6
     cols = 2
@@ -1564,7 +1567,7 @@ def plot_model_summary_figure(cell_id, export_file_path=None, exported_data_key=
 
     clean_twin_right_axes([axes0_right])
     clean_axes(axes)
-    fig.suptitle('Weight-dependent model D (cell %i)' % cell_id,
+    fig.suptitle('Model data (cell %i, induction %i)' % (cell_id, induction_id),
                  fontsize=mpl.rcParams['font.size'], x=0.02, ha='left')
     fig.subplots_adjust(left=0.25, hspace=0.8, right=0.8, top=0.8, bottom=0.1)
     fig.show()
@@ -1824,10 +1827,11 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
     if plot_summary_figure:
         if 'cell_id' not in kwargs:
             raise RuntimeError('optimize_biBTSP_%s: missing required parameter: cell_id' % BTSP_model_name)
-        context.interface.execute(plot_model_summary_figure, int(context.kwargs['cell_id']), export_file_path,
-                                  exported_data_key)
-        context.interface.execute(plot_model_summary_supp_figure, int(context.kwargs['cell_id']), export_file_path,
-                                  exported_data_key)
+        for this_cell_id, this_induction_id in context.data_keys:
+            context.interface.execute(plot_model_summary_figure, this_cell_id, this_induction_id, export_file_path,
+                                      exported_data_key)
+            context.interface.execute(plot_model_summary_supp_figure, this_cell_id, this_induction_id, export_file_path,
+                                      exported_data_key)
         context.interface.execute(plt.show)
     elif not debug:
         run_tests()
