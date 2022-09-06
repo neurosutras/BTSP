@@ -1806,20 +1806,21 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
             raise RuntimeError('optimize_biBTSP_%s: missing required parameter: cell_id' % BTSP_model_name)
         context.interface.execute(plot_model_summary_figure, int(context.kwargs['cell_id']), model_file_path)
         context.interface.execute(plot_model_summary_supp_figure, int(context.kwargs['cell_id']), model_file_path)
+        context.interface.execute(plt.show)
     elif not debug:
         model_id = 0
-        if 'model_key' in context() and context.model_key is not None:
-            model_label = context.model_key
-        else:
-            model_label = 'test'
 
         features = get_features_interactive(context.interface, context.x0_array, plot=plot)
         features, objectives = context.interface.execute(get_objectives, features, context.export)
         if export:
-            merge_exported_data(context, param_arrays=[context.x0_array],
-                                model_ids=[model_id], model_labels=[model_label], features=[features],
-                                objectives=[objectives], export_file_path=context.export_file_path,
-                                verbose=context.verbose > 1)
+            if 'model_key' in context() and context.model_key is not None:
+                model_label = context.model_key
+            else:
+                model_label = 'x0'
+            legend = {'model_labels': [model_label], 'export_keys': [context.exported_data_key],
+                      'source': context.config_file_path}
+            merge_exported_data(context, export_file_path=context.export_file_path,
+                                output_dir=context.output_dir, legend=legend, verbose=context.disp)
         print('params:')
         pprint.pprint(dict(zip(context.param_names, context.x0_array)))
         print('features:')

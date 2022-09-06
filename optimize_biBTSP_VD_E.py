@@ -1487,10 +1487,6 @@ def get_objectives(features, model_id=None, export=False):
 def run_tests():
 
     model_id = 0
-    if 'model_key' in context() and context.model_key is not None:
-        model_label = context.model_key
-    else:
-        model_label = 'test'
 
     features = {}
     args = context.interface.execute(get_args_static_signal_amplitudes)
@@ -1510,19 +1506,25 @@ def run_tests():
     features.update(new_features)
 
     features, objectives = context.interface.execute(get_objectives, features, model_id, context.export)
+
     if context.export:
-        merge_exported_data(context, param_arrays=[context.x0_array],
-                            model_ids=[model_id], model_labels=[model_label], features=[features],
-                            objectives=[objectives], export_file_path=context.export_file_path,
-                            verbose=context.verbose > 1)
+        if 'model_key' in context() and context.model_key is not None:
+            model_label = context.model_key
+        else:
+            model_label = 'x0'
+        legend = {'model_labels': [model_label], 'export_keys': [context.exported_data_key],
+                  'source': context.config_file_path}
+        merge_exported_data(context, export_file_path=context.export_file_path,
+                            output_dir=context.output_dir, legend=legend, verbose=context.disp)
+
     sys.stdout.flush()
     print('model_id: %i; model_labels: %s' % (model_id, model_label))
     print('params:')
-    pprint.pprint(context.x0_dict)
+    print_param_dict_like_yaml(context.x0_dict)
     print('features:')
-    pprint.pprint(features)
+    print_param_dict_like_yaml(features)
     print('objectives:')
-    pprint.pprint(objectives)
+    print_param_dict_like_yaml(objectives)
     sys.stdout.flush()
     time.sleep(.1)
 
@@ -1606,6 +1608,7 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
                                   exported_data_key)
         context.interface.execute(plot_model_summary_supp_figure, int(context.kwargs['cell_id']), export_file_path,
                                   exported_data_key)
+        context.interface.execute(plt.show)
     elif not debug:
         run_tests()
 

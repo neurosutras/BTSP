@@ -945,6 +945,7 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
 
     if plot_summary_figure:
         plot_model_summary_figure(export_file_path)
+        plt.show()
     elif not debug:
         if run_vel is None:
             run_vel_list = [15. + 10. * i for i in range(4)]
