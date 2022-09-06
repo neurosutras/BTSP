@@ -8,3 +8,13 @@
   local_signal_decay: 1381.4889832033402
   global_signal_decay: 1264.9252232787333
   peak_delta_weight: 3.9759665228008845
+1_xiao:
+  f_dep_half_width: 0.021833977827265642
+  f_dep_th: 0.07856374724535171
+  f_pot_half_width: 0.1253038418135967
+  f_pot_th: 0.5607354147926145
+  global_signal_decay: 1122.2154659282057
+  k_dep: 0.08648625517842377
+  k_pot: 4.595148588118686
+  local_signal_decay: 1349.810346788073
+  peak_delta_weight: 3.914411442056246
