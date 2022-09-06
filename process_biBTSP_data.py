@@ -97,8 +97,7 @@ def main(cell_id, config_file_path, data_dir, output_dir, plot, export, export_f
     for induction in induction_list:
         cell_filename = meta_data[context.cell_id][induction]['file_name']
         file_path = context.data_dir + '/' + cell_filename
-        # df = pd.read_csv(file_path, sep='\t', header=0)
-        df = pd.read_csv(file_path, sep=None, header=0)
+        df = pd.read_csv(file_path, sep=None, header=0, engine='python')
 
         data = {}
         for c in range(len(df.values[0, :])):

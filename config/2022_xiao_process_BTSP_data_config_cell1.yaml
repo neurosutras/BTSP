@@ -1,0 +1,49 @@
+1:
+  1:
+    current_columns:
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    file_name: distance_current5_2021-4-3_0001.txt
+    position_columns:
+      induction:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+      pre:
+      - 0
+      post:
+      - 6
+    ramp_columns:
+      before: 28
+      after: 29
+    sampling_rate: 20000.0
+    spont: False
+  2:
+    current_columns:
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    file_name: distance_current5_2021-4-3_0001.txt
+    position_columns:
+      induction:
+      - 15
+      - 16
+      - 17
+      - 18
+      - 19
+      pre:
+      - 14
+      post:
+      - 20
+    ramp_columns:
+      before: 30
+      after: 31
+    sampling_rate: 20000.0
+    spont: False
