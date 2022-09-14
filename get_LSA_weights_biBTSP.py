@@ -1,8 +1,8 @@
 __author__ = 'Aaron D. Milstein'
 from biBTSP_utils import *
 import click
-from nested.parallel import *
-from nested.optimize_utils import *
+from nested.parallel import get_parallel_interface
+from nested.optimize_utils import Context, nested_parallel_init_contexts_interactive, merge_exported_data
 
 """
 Magee lab CA1 BTSP2 place field data should have already been exported to .hdf5 file with a standard format.
@@ -32,7 +32,7 @@ context = Context()
 @click.option("--calibration-ramp-width", type=float, default=108.)
 @click.option("--data-dir", type=click.Path(exists=True, file_okay=False, dir_okay=True), default='data')
 @click.option("--data-file-name", type=str, default='20201123_biBTSP_data.hdf5')
-@click.option("--export-file-name", type=str, default=None)
+@click.option("--export-file-path", type=str, default=None)
 @click.option("--export", is_flag=True)
 @click.option("--debug", is_flag=True)
 @click.option("--plot", type=int, default=1)
@@ -40,7 +40,7 @@ context = Context()
 @click.option("--verbose", type=int, default=1)
 @click.pass_context
 def main(cli, min_delta_weight, peak_delta_weight, input_field_width, calibration_ramp_width, data_dir, data_file_name,
-         export_file_name, export, debug, plot, interactive, verbose):
+         export_file_path, export, debug, plot, interactive, verbose):
     """
     :param cli: contains unrecognized args as list of str
     :param min_delta_weight: float
@@ -49,7 +49,7 @@ def main(cli, min_delta_weight, peak_delta_weight, input_field_width, calibratio
     :param calibration_ramp_width: float
     :param data_dir: str (path)
     :param data_file_name: str (path)
-    :param export_file_name: str (path)
+    :param export_file_path: str (path)
     :param export: bool
     :param debug: bool
     :param plot: bool
@@ -60,14 +60,14 @@ def main(cli, min_delta_weight, peak_delta_weight, input_field_width, calibratio
     kwargs = get_unknown_click_arg_dict(cli.args)
     context.disp = verbose > 0
 
-    context.interface = get_parallel_interface(source_file=__file__, source_package=__package__, **kwargs)
+    context.interface = get_parallel_interface(**kwargs)
     context.interface.start(disp=context.disp)
     context.interface.ensure_controller()
-    config_parallel_interface(__file__, output_dir=data_dir, export=export, disp=context.disp,
-                              interface=context.interface, min_delta_weight=min_delta_weight,
-                              peak_delta_weight=peak_delta_weight, input_field_width=input_field_width,
-                              calibration_ramp_width=calibration_ramp_width, data_dir=data_dir,
-                              data_file_name=data_file_name, debug=debug, verbose=verbose, **kwargs)
+    nested_parallel_init_contexts_interactive(context, output_dir=data_dir, disp=context.disp,
+                                              export_file_path=export_file_path, min_delta_weight=min_delta_weight,
+                                              peak_delta_weight=peak_delta_weight, input_field_width=input_field_width,
+                                              calibration_ramp_width=calibration_ramp_width, data_dir=data_dir,
+                                              data_file_name=data_file_name, debug=debug, verbose=verbose, **kwargs)
 
     ramp_scaling_factor = context.interface.execute(compute_ramp_scaling_factor, plot=plot, verbose=verbose)
     args = context.interface.execute(get_cell_ids)
@@ -76,23 +76,18 @@ def main(cli, min_delta_weight, peak_delta_weight, input_field_width, calibratio
     context.interface.map(compute_LSA_weights, *sequences)
 
     if export:
-        if export_file_name is not None:
-            export_file_path = data_dir + '/' + export_file_name
-        else:
-            export_file_path = data_dir + '/' + data_file_name
-        merge_exported_data(context, export_file_path=export_file_path, verbose=context.verbose > 0)
+        merge_exported_data(context, export_file_path=context.export_file_path,
+                            output_dir=context.output_dir, verbose=context.disp)
 
     if plot > 0:
-        context.interface.apply(plt.show)
+        context.interface.show()
 
     if not interactive:
         context.interface.stop()
 
 
 def config_worker():
-    """
 
-    """
     context.data_file_path = context.data_dir + '/' + context.data_file_name
     if not os.path.isfile(context.data_file_path):
         raise IOError('init_context: invalid data_file_path: %s' % context.data_file_path)
@@ -349,5 +344,4 @@ def export_data(export_file_path=None):
 
 
 if __name__ == '__main__':
-    main(args=sys.argv[(list_find(lambda s: s.find(os.path.basename(__file__)) != -1, sys.argv) + 1):],
-         standalone_mode=False)
+    main(standalone_mode=False)

@@ -39,8 +39,8 @@ biBTSP_WD_D:
 """
 __author__ = 'milsteina'
 from biBTSP_utils import *
-from nested.parallel import *
-from nested.optimize_utils import *
+from nested.parallel import get_parallel_interface
+from nested.optimize_utils import Context, nested_parallel_init_contexts_interactive
 import click
 
 context = Context()
@@ -63,8 +63,6 @@ def init_context():
                       context.data_file_path)
 
     context.verbose = int(context.verbose)
-    if 'plot' not in context():
-        context.plot = False
 
     context.update(context.x0)
 
@@ -633,7 +631,8 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
     axes1[2][2].set_title('Translocation towards reward location', fontsize=mpl.rcParams['font.size'], y=1.1)
 
     X, Y = np.meshgrid(context.default_interp_x, range(len(pop_rep_density_history) + 1))
-    hm = axes1[0][2].pcolormesh(X, Y, pop_rep_density_history, cmap=this_cmap, edgecolors='face')  #, vmin=0., vmax=1.)
+    hm = axes1[0][2].pcolormesh(X, Y, pop_rep_density_history, cmap=this_cmap, edgecolors='face',
+                                shading='auto')  #, vmin=0., vmax=1.)
     cb = plt.colorbar(hm, ax=axes1[0][2])
     cb.ax.set_ylabel('Normalized\npopulation activity', rotation=270)
     cb.ax.get_yaxis().labelpad = 25
@@ -676,7 +675,7 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
         sorted_ramp_pop = modulated_ramp_pop + nonmodulated_ramp_pop
         X, Y = np.meshgrid(context.binned_x, range(len(sorted_ramp_pop)))
         hm = axes2[0][2].pcolormesh(X, Y, sorted_ramp_pop, cmap=this_cmap, vmin=0., vmax=context.input_field_peak_rate,
-                                    edgecolors='face')
+                                    edgecolors='face', shading='auto')
         cb = plt.colorbar(hm, ax=axes2[0][2])
         cb.ax.set_ylabel('Firing rate (Hz)', rotation=270, fontsize=mpl.rcParams['font.size'])
         cb.ax.get_yaxis().labelpad = 15
@@ -695,7 +694,8 @@ def plot_network_history(ramp_pop_history, pop_rep_density_history):
                 prev_sorted_delta_rate.append(this_delta_rate)
             X, Y = np.meshgrid(context.binned_x, range(len(prev_sorted_delta_rate)))
             hm = axes2[0][1].pcolormesh(X, Y, prev_sorted_delta_rate, vmin=-context.input_field_peak_rate,
-                                        vmax=context.input_field_peak_rate, cmap='seismic', edgecolors='face') # cmap='bwr',
+                                        vmax=context.input_field_peak_rate, cmap='seismic', edgecolors='face',
+                                        shading='auto') # cmap='bwr',
             cb = plt.colorbar(hm, ax=axes2[0][1])
             cb.ax.set_ylabel('Change in firing rate (Hz)', rotation=270, fontsize=mpl.rcParams['font.size'])
             cb.ax.get_yaxis().labelpad = 15
@@ -819,21 +819,23 @@ def main(cli, config_file_path, trial, output_dir, export, export_file_path, lab
     kwargs = get_unknown_click_arg_dict(cli.args)
     context.disp = verbose > 0
 
-    context.interface = get_parallel_interface(source_file=__file__, source_package=__package__, **kwargs)
+    context.interface = get_parallel_interface(**kwargs)
     context.interface.start(disp=context.disp)
     context.interface.ensure_controller()
-    config_parallel_interface(__file__, config_file_path=config_file_path, output_dir=output_dir, export=export,
-                              export_file_path=export_file_path, label=label, disp=context.disp,
-                              interface=context.interface, verbose=verbose, plot=plot, **kwargs)
+    nested_parallel_init_contexts_interactive(context, config_file_path=config_file_path, output_dir=output_dir,
+                                              export_file_path=export_file_path, label=label, disp=context.disp,
+                                              verbose=verbose, plot=plot, **kwargs)
+
     if not context.interface.controller_is_worker:
         config_worker()
+
     if plot_summary_figure:
         plot_model_summary(model_file_path)
-        plot = True
+        plt.show()
     elif not debug:
         simulate_network(export, plot)
     if plot:
-        context.interface.apply(plt.show)
+        context.interface.show()
         plt.show()
 
     if context.interactive:
@@ -843,5 +845,4 @@ def main(cli, config_file_path, trial, output_dir, export, export_file_path, lab
 
 
 if __name__ == '__main__':
-    main(args=sys.argv[(list_find(lambda s: s.find(os.path.basename(__file__)) != -1, sys.argv) + 1):],
-         standalone_mode=False)
+    main(standalone_mode=False)
