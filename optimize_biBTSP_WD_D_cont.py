@@ -1732,7 +1732,7 @@ def run_tests():
     time.sleep(.1)
 
     if context.plot:
-        context.interface.apply(plt.show)
+        context.interface.show()
 
     return features
 
