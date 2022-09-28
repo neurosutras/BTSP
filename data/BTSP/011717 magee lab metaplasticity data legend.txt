@@ -22,6 +22,6 @@ Second field induction data: 1st field induction laps in separate file
 
 11: 151009_1ni.txt
 
-12. 160318_2ii*.txt  # original cell 18. Jeff labeled as problem. What is the problem?
+12. 160318_2ii_star.txt  # original cell 18. Jeff labeled as problem. What is the problem?
 
-13. 160826_2ii*.txt  # original cell 11. There was an oscillatory current injection during induction 1 that induced a small second bump. Not ideal, but we used it for the first paper, and there's so little data, we should probably use it here, too.
+13. 160826_2ii_star.txt  # original cell 11. There was an oscillatory current injection during induction 1 that induced a small second bump. Not ideal, but we used it for the first paper, and there's so little data, we should probably use it here, too.
