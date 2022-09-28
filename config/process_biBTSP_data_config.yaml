@@ -307,7 +307,7 @@
     - 9
     - 10
     - 11
-    file_name: 160826_2ii*.txt
+    file_name: 160826_2ii_star.txt
     position_columns:
       induction:
       - 0
@@ -476,7 +476,7 @@
     - 8
     - 9
     - 10
-    file_name: 160318_2ii*.txt
+    file_name: 160318_2ii_star.txt
     position_columns:
       pre:
       - 5
