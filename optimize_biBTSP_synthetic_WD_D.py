@@ -1095,14 +1095,15 @@ def main(cli, config_file_path, output_dir, export, export_file_path, label, ver
         context.interface.execute(plt.show)
     elif not debug:
         model_id = int(exported_data_key)  # 0
+        if 'model_key' in context() and context.model_key is not None:
+            model_label = context.model_key
+        else:
+            model_label = 'x0'
 
         features = get_features_interactive(context.interface, context.x0_array, model_id=model_id, plot=plot)
         features, objectives = context.interface.execute(get_objectives, features, model_id, context.export)
         if export:
-            if 'model_key' in context() and context.model_key is not None:
-                model_label = context.model_key
-            else:
-                model_label = 'x0'
+
             legend = {'model_labels': [model_label], 'export_keys': [context.exported_data_key],
                       'source': context.config_file_path}
             merge_exported_data(context, export_file_path=context.export_file_path,
